@@ -2,10 +2,10 @@
  * 인터페이스 오류 탐색 테스트 (Playwright, Chromium)
  * 실행: npx playwright install chromium   (최초 1회)
  *       node tests/ui-qa.js [index.html 경로]
- * 20개 범주(A~T) 81개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
+ * 21개 범주(A~U) 87개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
  * 숫자 경계값, 극단적 명단, 날짜 팝오버, 연타·중단, Worker 차단 환경, 수동 교체, 프로필 이름,
  * 저장 전 입력 보존, 대규모 명단, 모바일 배치, 키보드 조작, 출력, 공휴일 입력, 손상된 저장값, 이전 결과 조작,
- * 기간 입력(~와 -의 변형, 날짜 형식 기간, 열린 기간 -5·20-).
+ * 기간 입력(~와 -의 변형, 날짜 형식 기간, 열린 기간 -5·20-), 실행 요약(소요 시간·개선 기록).
  * 각 항목은 JS 예외·콘솔 오류·브라우저 기본 대화상자 발생도 함께 실패로 기록합니다.
  */
 
@@ -248,6 +248,19 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
  for(const [inp,want] of Object.entries(exp)){ const got=await p.evaluate(v=>fmtDays(parseDays(v,31).days),inp); log('T "'+inp+'"',got===want,'→ '+(got||'(오류 표시)')); }
  for(const [N,w] of [[30,'20~30'],[28,'20~28']]){ const g=await p.evaluate(N=>fmtDays(parseDays('20-',N).days),N); log('T "20-" '+N+'일 달',g===w,'→ '+g); }
  errsOK(p,'T'); await p.context().close();}
+
+// U. 실행 요약: 소요 시간, 마지막 개선 시점, 그래프·표
+{const p=await fresh(b); await p.click('#btnSample'); await p.waitForTimeout(300); await gen(p,'5000');
+ const info=await p.evaluate(()=>({run:state.run, best:state.cands[0].attempt, ticks:[...document.querySelectorAll('#runSvg text.ax')].map(t=>t.textContent), rows:document.querySelectorAll('.run-table tbody tr').length}));
+ const H=info.run.hist, last=H[H.length-1];
+ log('U1 실행 요약 표시',await p.isVisible('#runSum')&&/초/.test(await p.textContent('#progText')),(await p.textContent('#progText')).slice(0,40));
+ log('U2 마지막 개선 = 1안 발견 시도',last.a===info.best,`마지막 개선 ${last.a} · 1안 ${info.best}`);
+ log('U3 개선 기록 오름차순·첫 기록 1번째',H[0].a===1&&H.every((h,i)=>!i||h.a>H[i-1].a),H.map(h=>h.a).join(','));
+ log('U4 표 행 수 = 기록 수',info.rows===H.length,info.rows+'행');
+ log('U5 로그 눈금',info.ticks.includes('1')&&info.ticks.includes('5,000'),info.ticks.join(' '));
+ await p.click('#btnProfileNew'); await p.fill('#askInput','U빈'); await p.click('#askYes'); await p.waitForTimeout(200);
+ log('U6 프로필 전환 시 요약 숨김',!(await p.isVisible('#runSum')),'');
+ errsOK(p,'U'); await p.context().close();}
 
 await b.close();
 const f=results.filter(r=>!r.ok); console.log(`\n총 ${results.length}건 · 통과 ${results.length-f.length} · 실패 ${f.length}`);

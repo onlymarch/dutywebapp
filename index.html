@@ -179,6 +179,26 @@ th[data-tip]:hover,th[data-tip]:focus{color:var(--accent);outline:none}
 /* ---------- 7. 생성·사전 점검 ---------- */
 .progress{height:10px;background:#e9ecf2;border-radius:999px;overflow:hidden;flex:1;min-width:160px}
 .progress>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),#6b8cff);transition:width .15s}
+.run-sum{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px;display:flex;flex-direction:column;gap:10px}
+.run-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.run-tiles>div{background:#f7f8fa;border-radius:8px;padding:6px 10px}
+.run-tiles .k{font-size:11px;color:var(--sub)}
+.run-tiles .v{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
+.run-tiles .s{font-size:11px;color:var(--sub)}
+.run-advice{font-size:12px;margin:0;padding:8px 10px;border-radius:8px;background:var(--accent-weak);color:#24408f;line-height:1.6}
+.run-chart{position:relative;margin:0}
+.run-chart figcaption{font-size:12px;font-weight:700;margin-bottom:4px}
+.run-chart figcaption span{font-weight:400;color:var(--sub)}
+.run-chart svg{display:block;width:100%;height:150px;overflow:visible}
+.run-chart svg:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.run-chart .ax{font-size:10px;fill:var(--sub)}
+.run-tip{position:absolute;pointer-events:none;background:#1d2330;color:#fff;border-radius:8px;padding:6px 9px;font-size:11px;line-height:1.45;white-space:nowrap;transform:translate(-50%,-100%);z-index:5}
+.run-tip b{font-size:13px}
+.run-tip i{display:inline-block;width:12px;height:2px;background:var(--accent);vertical-align:middle;margin-right:4px}
+.run-table{font-size:12px}
+.run-table summary{cursor:pointer;color:var(--accent);font-weight:600}
+.run-table table{margin-top:6px;max-width:420px}
+.run-table td,.run-table th{text-align:center;font-variant-numeric:tabular-nums}
 .precheck{margin-top:12px;font-size:12px;border-top:1px dashed var(--line);padding-top:10px}
 .precheck ul{margin:4px 0 0;padding:0;list-style:none}
 .precheck li{padding:2px 0}
@@ -412,6 +432,8 @@ body.printing-sheet #printSheet{display:block}
     <div class="progress"><i id="progBar"></i></div>
     <span class="muted" id="progText">대기 중</span>
   </div>
+  <!-- 생성 완료 후: 소요 시간, 마지막 개선 시점, 최고 DFI 변화 그래프 (renderRunSummary) -->
+  <div class="run-sum hidden" id="runSum"></div>
   <div class="precheck" id="precheck" aria-live="polite"></div>
 </section>
 
@@ -838,6 +860,10 @@ function computeDFI(cfg, cal, duty, assist){
  *
  * 순위 기준: 미배정일이 적은 안 → DFI가 높은 안 → 먼저 찾은 안
  * 같은 배정(정규·조력 모두 동일)은 한 번만 남깁니다.
+ *
+ * 개선 기록(hist): 1위 안이 바뀔 때마다 {a: 시도 번호, total: 그 안의 DFI, unf: 미배정일 수}를 남깁니다.
+ *   마지막 기록의 a가 "이후 더 좋아지지 않은 시점"입니다. 동점은 먼저 찾은 안을 유지하므로 기록되지 않습니다.
+ *   미배정일이 줄어든 안은 DFI가 낮아도 1위가 되므로, 드물게 기록의 DFI가 내려갈 수 있습니다.
  */
 function* simulate(cfg){
   const cal = buildCalendar(cfg.year, cfg.month, cfg.holidays);
@@ -850,6 +876,7 @@ function* simulate(cfg){
   const pre = precompute(cfg, cal);
   const TOPN = 3, top = [], step = Math.max(1, Math.floor(cfg.maxAttempts / 100));
   const better = (x, y) => x.unfilled.length !== y.unfilled.length ? x.unfilled.length < y.unfilled.length : x.dfi.total > y.dfi.total;
+  const hist = [];
 
   for (let a = 1; a <= cfg.maxAttempts; a++){
     const r = runAttempt(cfg, cal, pre), dfi = computeDFI(cfg, cal, r.duty, r.assist);
@@ -861,12 +888,13 @@ function* simulate(cfg){
         c.key = key; top.push(c);
         top.sort((x, y) => better(x, y) ? -1 : better(y, x) ? 1 : x.attempt - y.attempt);
         if (top.length > TOPN) top.pop();
+        if (top[0] === c) hist.push({ a, total: dfi.total, unf: r.unfilled.length });   // 1위가 바뀜
       }
     }
-    if (a % step === 0 || a === cfg.maxAttempts) yield { attempt: a, total: cfg.maxAttempts, best: top[0].dfi.total };
+    if (a % step === 0 || a === cfg.maxAttempts) yield { attempt: a, total: cfg.maxAttempts, best: top[0].dfi.total, lastImp: hist[hist.length - 1].a };
   }
   top.forEach(t => { delete t.key; });     // Worker → 메인 스레드 전송량 절감
-  return { top, best: top[0], attempts: cfg.maxAttempts };
+  return { top, best: top[0], attempts: cfg.maxAttempts, hist };
 }
 
 /* Web Worker 진입점: Worker 안에서 평가될 때만 메시지 수신기를 등록합니다.
@@ -919,8 +947,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.9.9', APP_BUILD = '2026-11-22';
+const APP_VERSION = '1.10.0', APP_BUILD = '2026-11-22';
 const CHANGELOG = [
+  '1.10.0 생성 실행 요약: 소요 시간·초당 시도 수, 마지막 개선 시점(이후 더 좋아지지 않은 시도), 최고 DFI 변화 그래프·표, 시도 횟수 조언',
   '1.9.9 목표 DFI(50~100, 5 단위)와 시뮬레이션 횟수(1,000~9,000, 2,000 단위)를 슬라이더로 변경. 격자에 맞지 않는 저장값은 가장 가까운 칸으로 보정',
   '1.9.8 배정 규칙의 평일·휴일을 색 칩으로 강조',
   '1.9.7 열린 기간 입력: -5 → 1~5일, 20- → 20일~말일(달마다 자동). 입력칸 아래에 해석 결과를 따로 표시',
@@ -1091,8 +1120,9 @@ function blankPerson(){ return { name: '', level: 3, weight: 1.0, wish: '', avai
  *   hl       : 강조 중인 근무자 인덱스 (-1 = 없음)
  *   genSig   : 생성 당시 입력의 서명 → 현재 입력과 다르면 "결과 낡음"
  *   miniOpen : 3개 안 카드의 미니 달력 펼침 여부
+ *   run      : 마지막 생성 실행 정보 {ms: 소요 시간, attempts: 시도 수, hist: 개선 기록, fallback: 대체 실행 여부}
  */
-const state = { profile: '', settings: defaultSettings(), people: [], result: null, cands: null, sel: 0, hl: -1, genSig: null, miniOpen: false };
+const state = { profile: '', settings: defaultSettings(), people: [], result: null, cands: null, sel: 0, hl: -1, genSig: null, miniOpen: false, run: null };
 
 /* 요일 선택 배열 [0/1 ×7] ↔ 비트마스크 정수 (저장 용량 절약) */
 const mask   = a => a.reduce((m, v, i) => m | (v ? 1 << i : 0), 0);
@@ -1446,7 +1476,8 @@ $('#holHint').addEventListener('click', e => {
 function clearResults(){
   if (isRunning()) stopRun();                       // 다른 프로필로 바뀌면 진행 중인 생성은 버림
   hideUndo();                                       // 이전 프로필에 대한 실행 취소가 새 프로필에 적용되지 않도록
-  Object.assign(state, { result: null, cands: null, hl: -1, genSig: null });
+  Object.assign(state, { result: null, cands: null, hl: -1, genSig: null, run: null });
+  renderRunSummary();
   $('#results').classList.add('hidden'); $('#emptyResults').classList.remove('hidden'); $('#genBadge').classList.add('hidden');
   $('#progBar').style.width = '0%'; $('#progText').textContent = '대기 중';
   updateOutBar();
@@ -1825,10 +1856,13 @@ function buildCfg(){
   };
 }
 function setRunning(on){ $('#btnGenerate').disabled = on; $('#btnRegen').disabled = on; $('#btnCancel').classList.toggle('hidden', !on); }
+let runStart = 0;                                   // 생성 시작 시각 (performance.now)
+const fmtSec = ms => (ms / 1000).toFixed(ms < 10000 ? 2 : 1) + '초';
 function onProgress(p){
   const pct = Math.round(p.attempt / p.total * 100);
   $('#progBar').style.width = pct + '%';
-  $('#progText').textContent = `${p.attempt.toLocaleString()} / ${p.total.toLocaleString()} (${pct}%) · 현재 최고 DFI ${p.best.toFixed(1)}`;
+  $('#progText').textContent = `${p.attempt.toLocaleString()} / ${p.total.toLocaleString()} (${pct}%) · ${fmtSec(performance.now() - runStart)} · ` +
+    `현재 최고 DFI ${p.best.toFixed(1)} (${p.lastImp.toLocaleString()}번째 시도)`;
 }
 /** 시뮬레이션 완료: 결과를 state.cands로 옮기고 화면을 그립니다. */
 function onDone(res){
@@ -1839,7 +1873,9 @@ function onDone(res){
     dfi: t.dfi, attempt: t.attempt, edited: new Set(), at }));
   Object.assign(state, { sel: 0, result: state.cands[0], hl: -1, genSig: cfgSig(cfgSnapshot) });
 
-  $('#progText').textContent = `완료 · ${res.attempts.toLocaleString()}회 시도 중 상위 ${state.cands.length}개 안 (최고 DFI ${res.best.dfi.total.toFixed(1)})`;
+  state.run = { ms: performance.now() - runStart, attempts: res.attempts, hist: res.hist, fallback: !!$('#engineMode').textContent };
+  $('#progText').textContent = `완료 · ${res.attempts.toLocaleString()}회 · ${fmtSec(state.run.ms)} · 상위 ${state.cands.length}개 안 (최고 DFI ${res.best.dfi.total.toFixed(1)})`;
+  renderRunSummary();
   const gb = $('#genBadge'); gb.textContent = '생성: ' + at.toLocaleString('ko-KR', { hour12: false }); gb.classList.remove('hidden');
   renderResults(); markStale();
   try { $('#results').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e){}
@@ -1875,6 +1911,7 @@ function generate(){
   if (isRunning()) return;                          // 연타·키보드 반복 입력 방지
   const id = ++runId;
   closeDP(); cfgSnapshot = cfg; setRunning(true);
+  runStart = performance.now(); state.run = null; renderRunSummary();   // 이전 실행 요약은 새 실행이 끝날 때까지 숨김
   $('#progBar').style.width = '0%'; $('#progText').textContent = '연산 시작…';
   try {
     workerURL = URL.createObjectURL(new Blob([ENGINE_SRC], { type: 'text/javascript' }));
@@ -1892,6 +1929,119 @@ function generate(){
 $('#btnGenerate').addEventListener('click', generate);
 $('#btnRegen').addEventListener('click', () => { $('#genCard').scrollIntoView({ behavior: 'smooth', block: 'start' }); generate(); });
 $('#btnCancel').addEventListener('click', () => stopRun('사용자가 중단했습니다.'));
+
+/* ─────────────────────────── §12-1 실행 요약 ───────────────────────────
+   생성이 끝나면 3단계 카드 아래에 다음을 보여 줍니다.
+   - 소요 시간과 초당 시도 수
+   - 마지막 개선 시점: 1위 안이 마지막으로 바뀐 시도 번호와 그 비율 (이후 더 좋아지지 않음)
+   - 최고 DFI 변화 그래프: 시도 번호(x) → 그때까지의 최고 DFI(y) 계단선. 점 = 1위가 바뀐 시점
+   - 같은 내용을 표로 (그래프를 보지 않아도 모든 값에 접근 가능)
+   시도 횟수 조언은 경험적 기준입니다: 마지막 개선이 후반 20% 안이면 늘리기를, 앞 절반이면 조건 조정을 권합니다. */
+function renderRunSummary(){
+  const box = $('#runSum'), R = state.run;
+  if (!R || !R.hist || !R.hist.length){ box.classList.add('hidden'); box.innerHTML = ''; return; }
+  const H = R.hist, last = H[H.length - 1], N = R.attempts;
+  const ratio = last.a / N, idle = N - last.a, rate = Math.round(N / Math.max(R.ms / 1000, 0.001));
+  const advice = ratio >= 0.8
+    ? `마지막 20% 구간(${Math.round(N * 0.8).toLocaleString()}번째 이후)에서도 최고점이 바뀌었습니다. 시도 횟수를 늘리면 더 높은 점수가 나올 가능성이 있습니다.`
+    : ratio <= 0.5
+    ? `전체의 앞쪽 절반 안에서 최고점이 나온 뒤 ${idle.toLocaleString()}회 동안 더 오르지 않았습니다. 시도 횟수를 늘려도 효과가 작을 가능성이 큽니다. 점수를 더 높이려면 입력 조건(희망일 충돌, 제외요일, 한도 등)을 조정하십시오.`
+    : `중반(${Math.round(ratio * 100)}% 지점) 이후 최고점이 바뀌지 않았습니다.`;
+  box.innerHTML = `
+    <div class="run-tiles">
+      <div><div class="k">소요 시간</div><div class="v">${fmtSec(R.ms)}</div><div class="s">초당 ${rate.toLocaleString()}회${R.fallback ? ' · 대체 실행' : ''}</div></div>
+      <div><div class="k">마지막 개선</div><div class="v">${last.a.toLocaleString()}번째</div><div class="s">전체 ${N.toLocaleString()}회 중 ${(ratio * 100).toFixed(0)}% 지점</div></div>
+      <div><div class="k">이후 개선 없음</div><div class="v">${idle.toLocaleString()}회</div><div class="s">최고 DFI ${last.total.toFixed(1)} 유지</div></div>
+      <div><div class="k">최고점 갱신</div><div class="v">${H.length}번</div><div class="s">첫 시도 ${H[0].total.toFixed(1)} → ${last.total.toFixed(1)}</div></div>
+    </div>
+    <p class="run-advice">💡 ${advice}</p>
+    <figure class="run-chart">
+      <figcaption>시도 횟수에 따른 최고 DFI <span>· 가로축은 로그 눈금(1·10·100·1,000) · 점 = 최고 안이 바뀐 시점 · 마우스를 올리거나 선택 후 ←→ 키로 확인</span></figcaption>
+      <svg id="runSvg" tabindex="0" role="img" aria-label="최고 DFI가 ${H[0].total.toFixed(1)}에서 ${last.total.toFixed(1)}로 ${H.length}번 갱신되었고, 마지막 갱신은 ${last.a}번째 시도입니다."></svg>
+      <div class="run-tip hidden" id="runTip"></div>
+    </figure>
+    <details class="run-table"><summary>최고점 갱신 기록 표 (${H.length}건)</summary>
+      <table><thead><tr><th>순서</th><th>시도 번호</th><th>DFI</th><th>미배정일</th></tr></thead><tbody>${
+        H.map((h, i) => `<tr><td>${i + 1}</td><td>${h.a.toLocaleString()}</td><td>${h.total.toFixed(1)}</td><td>${h.unf}</td></tr>`).join('')}</tbody></table>
+    </details>`;
+  box.classList.remove('hidden');
+  drawRunChart();
+}
+
+/**
+ * 최고 DFI 계단 그래프 (SVG). 가로축은 로그 눈금, 세로축은 DFI.
+ * 그릴 때의 실제 폭으로 좌표를 계산하므로 창 크기가 바뀌면 다시 그립니다.
+ * 표시 규칙(시각화 지침): 선 2px, 점 8px + 흰 테두리, 격자·축은 흐리게, 범례 없음(단일 계열 — 제목이 이름),
+ * 마지막 개선점에만 직접 라벨. 툴팁은 세로 보조선이 포인터 위치의 시도 번호로 붙습니다.
+ */
+function drawRunChart(){
+  const svg = $('#runSvg'), R = state.run; if (!svg || !R) return;
+  const H = R.hist, N = R.attempts, W = Math.max(260, svg.clientWidth || 600), Ht = 150;
+  const m = { l: 34, r: 14, t: 14, b: 22 }, iw = W - m.l - m.r, ih = Ht - m.t - m.b;
+  const vals = H.map(h => h.total);
+  let lo = Math.floor(Math.min(...vals) - 1), hi = Math.ceil(Math.max(...vals) + 1);
+  if (hi - lo < 4){ const c = (hi + lo) / 2; lo = Math.floor(c - 2); hi = Math.ceil(c + 2); }
+  // 가로축은 로그 눈금: 개선은 대개 앞쪽 수백 회 안에 몰리므로 균등 눈금이면 한 점으로 눌려 보입니다.
+  const LN = Math.log10(Math.max(N, 10));
+  const X = a => m.l + (Math.log10(Math.max(1, a)) / LN) * iw, Y = v => m.t + (1 - (v - lo) / (hi - lo)) * ih;
+  const invX = px => Math.round(Math.pow(10, Math.min(1, Math.max(0, (px - m.l) / iw)) * LN));
+  // 그 시도 번호까지의 최고 기록 (이진 탐색)
+  const bestAt = a => { let i = 0, j = H.length - 1, k = 0; while (i <= j){ const mid = (i + j) >> 1; if (H[mid].a <= a){ k = mid; i = mid + 1; } else j = mid - 1; } return k; };
+
+  let d = `M${X(H[0].a)},${Y(H[0].total)}`;
+  for (let i = 1; i < H.length; i++) d += `H${X(H[i].a)}V${Y(H[i].total)}`;
+  d += `H${X(N)}`;
+  const yt = [lo, Math.round((lo + hi) / 2), hi];
+  // 눈금: 1, 10, 100, 1,000 … 과 마지막 시도 수 (마지막과 너무 가까운 10의 거듭제곱은 생략)
+  const xt = []; for (let v = 1; v < N; v *= 10) if (X(N) - X(v) > 34) xt.push(v); xt.push(N);
+  const last = H[H.length - 1], lx = X(last.a), ly = Y(last.total);
+  const lblRight = lx < m.l + iw * 0.6;            // 라벨이 오른쪽 끝을 넘지 않도록
+  svg.setAttribute('viewBox', `0 0 ${W} ${Ht}`);
+  svg.innerHTML =
+    yt.map(v => `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="#eceff4"/><text class="ax" x="${m.l - 6}" y="${Y(v) + 3}" text-anchor="end">${v}</text>`).join('') +
+    xt.map(a => `<line x1="${X(a)}" x2="${X(a)}" y1="${m.t + ih}" y2="${m.t + ih + 3}" stroke="#c5cbd6"/><text class="ax" x="${X(a)}" y="${Ht - 6}" text-anchor="${a === 1 ? 'start' : a === N ? 'end' : 'middle'}">${a.toLocaleString()}</text>`).join('') +
+    `<line x1="${lx}" x2="${lx}" y1="${m.t}" y2="${m.t + ih}" stroke="#9aa3b2" stroke-dasharray="3 3"/>` +
+    `<path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>` +
+    H.map(h => `<circle cx="${X(h.a)}" cy="${Y(h.total)}" r="4" fill="var(--accent)" stroke="#fff" stroke-width="2"/>`).join('') +
+    `<text x="${lblRight ? lx + 6 : lx - 6}" y="${Math.max(m.t + 9, ly - 8)}" text-anchor="${lblRight ? 'start' : 'end'}" font-size="11" font-weight="700" fill="var(--ink)">${last.a.toLocaleString()}번째 · ${last.total.toFixed(1)}</text>` +
+    `<line id="runCross" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}" stroke="var(--ink)" stroke-width="1" visibility="hidden"/>` +
+    `<circle id="runDot" r="5" fill="var(--accent)" stroke="#fff" stroke-width="2" visibility="hidden"/>` +
+    `<rect x="${m.l}" y="0" width="${iw}" height="${Ht}" fill="transparent" id="runHit"/>`;
+
+  // ---- 툴팁: 포인터 또는 키보드(←→: 갱신 지점 이동) ----
+  const tip = $('#runTip'), cross = $('#runCross'), dot = $('#runDot');
+  const show = (a, k) => {
+    const h = H[k], x = X(a), y = Y(h.total), sc = svg.getBoundingClientRect().width / W;
+    cross.setAttribute('x1', x); cross.setAttribute('x2', x); cross.setAttribute('visibility', 'visible');
+    dot.setAttribute('cx', X(h.a)); dot.setAttribute('cy', y); dot.setAttribute('visibility', 'visible');
+    tip.textContent = '';
+    const b = document.createElement('b'), key = document.createElement('i');
+    tip.append(key, b, document.createElement('br'), `${a.toLocaleString()}번째 시도까지의 최고 · ${h.a.toLocaleString()}번째에서 달성${h.unf ? ` · 미배정 ${h.unf}일` : ''}`);
+    b.textContent = 'DFI ' + h.total.toFixed(1);
+    tip.style.left = Math.min(Math.max(x * sc, 90), svg.getBoundingClientRect().width - 90) + 'px';
+    // 점이 그래프 위쪽에 있으면 상자를 점 아래에 띄워 제목을 가리지 않게 합니다.
+    const below = y * sc < 64;
+    tip.style.transform = below ? 'translate(-50%, 0)' : 'translate(-50%, -100%)';
+    tip.style.top = (below ? y * sc + 12 : y * sc - 8) + 'px';
+    tip.classList.remove('hidden');
+  };
+  const hide = () => { tip.classList.add('hidden'); cross.setAttribute('visibility', 'hidden'); dot.setAttribute('visibility', 'hidden'); };
+  const hit = $('#runHit');
+  hit.onpointermove = e => {
+    const r = svg.getBoundingClientRect(), a = Math.min(N, Math.max(1, invX((e.clientX - r.left) * W / r.width)));
+    show(a, bestAt(a));
+  };
+  hit.onpointerleave = hide;
+  let kIdx = H.length - 1;
+  svg.onfocus = () => show(H[kIdx].a, kIdx);
+  svg.onblur = hide;
+  svg.onkeydown = e => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault(); kIdx = Math.min(H.length - 1, Math.max(0, kIdx + (e.key === 'ArrowRight' ? 1 : -1))); show(H[kIdx].a, kIdx);
+  };
+}
+let runChartTimer = null;
+window.addEventListener('resize', () => { clearTimeout(runChartTimer); runChartTimer = setTimeout(drawRunChart, 150); });
 
 /* ─────────────────────────── §13 결과 화면 ───────────────────────────
    renderResults()  : 선택된 안 기준으로 카드·달력·통계·DFI를 모두 다시 그림
