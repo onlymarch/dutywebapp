@@ -30,3 +30,23 @@ ffmpeg -y -i assets/promo-20s.mp4 -vf "fps=10,scale=640:-1:flags=lanczos,split[a
 ```
 
 Requires Playwright (Chromium) and ffmpeg. `qr.svg` points to https://onlymarch.github.io/dutywebapp/. The video has a stereo AAC soundtrack; the GIF preview is silent.
+
+## 30-second guide videos (English, Korean)
+
+`assets/guide-en-30s.mp4` and `assets/guide-ko-30s.mp4` — 1920×1080, 30 fps, 30 s, no audio. They walk through the five steps on real app screens with an animated cursor, highlight boxes, camera zoom and captions.
+
+- `guide-capture.js` — puts the app into each step's state in English and Korean and saves 1920×1080 screenshots plus the on-screen position of every button the cursor points at (`guide/<lang>/manifest.json`).
+- `guide.html` — one scene file for both languages (`?lang=en|ko`); captions, cursor path, highlights and camera are a single timeline, and every position is computed from the manifest, so re-capturing keeps everything aligned.
+- `guide-render.js` — renders 900 frames per language.
+
+```bash
+node promo/guide-capture.js
+```
+
+```bash
+node promo/guide-render.js full en
+```
+
+```bash
+node promo/guide-render.js full ko
+```

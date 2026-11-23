@@ -23,6 +23,8 @@ Current version: **v1.14.3** (2026-11-23)
 
 ## How to use
 
+🎬 **30-second video guide** (no sound): [English](https://onlymarch.github.io/dutywebapp/assets/guide-en-30s.mp4) · [한국어](https://onlymarch.github.io/dutywebapp/assets/guide-ko-30s.mp4)
+
 1. **Settings** — Pick the target month. Korean public holidays are filled in automatically; for other countries, type your holidays or click them on the mini calendar. Use the sliders to set rest days after a duty (0–5) and the target DFI (50–100, in steps of 5). The number of attempts is automatic (see *Attempts* below).
 2. **Staff roster** — Enter name, level, weight, monthly max, preferred dates, preferred weekdays, available dates, unavailable dates and unavailable weekdays. Write dates like `3, 15, 20~22`; ranges accept both `~` and `-`. `-5` means days 1–5 and `25-` means the 25th to the end of the month. If a range ends past the last day (e.g. `15-31` in February), it is cut at the month end. You can also pick dates on a calendar with the 📅 button.
 3. **Generate** — A pre-check flags conflicting input before you start. When it finishes, you see how many attempts were made, how long it took, when the best score last improved, and a chart of the best DFI over attempts.
@@ -90,8 +92,8 @@ Download `index.html` and open it in a browser. Nothing to install.
 | `index.html` | The whole app (UI, scheduling engine, DFI, storage, printing, translations) |
 | `tests/ui-qa.js` | UI test suite (23 categories, 135 checks, including all languages) |
 | `README.ko.md` | Korean README |
-| `assets/` | Screenshots, link-preview image, the 20-second promo video and its GIF preview |
-| `promo/` | Source for the promo video (screen capture, motion graphics, renderer) |
+| `assets/` | Screenshots, link-preview image, promo videos (20 s, landscape and vertical), GIF preview and 30-second guide videos (English, Korean) |
+| `promo/` | Source for the promo and guide videos (screen capture, motion graphics, renderer) |
 | `.nojekyll` | Tells GitHub Pages to serve files as they are |
 
 ## Tests

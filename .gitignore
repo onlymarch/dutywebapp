@@ -4,3 +4,4 @@ promo/info.json
 promo/video-silent*.mp4
 promo/music.wav
 promo/*.txt
+promo/guide/

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<!--
+  사용법 가이드 영상 (30초, 1920×1080, 음성·음악 없음) — 영어·한국어 공용 장면 파일
+  열기: guide.html?lang=en | guide.html?lang=ko   (렌더러가 window.MANIFEST에 캡처 좌표를 넣어 줌)
+  구성: 제목(0–2.6) → ①설정 → ②명단 → ③생성 → ④결과 → ⑤출력·저장 → 마무리(28.4–30)
+
+  원리
+  - 화면: guide-capture.js가 실제 앱을 단계별 상태로 만들어 찍은 1920×1080 캡처(guide/<lang>/*.png)
+  - 커서·강조 테두리·클릭 파문·카메라(확대/이동)·자막은 모두 Web Animations로 만들고,
+    요소마다 20~30초 전체를 하나의 애니메이션(offset = 초 ÷ 30)으로 둡니다.
+    렌더러가 프레임마다 모든 애니메이션의 currentTime을 같은 값으로 맞춰 캡처합니다.
+  - 좌표는 manifest.json의 실제 요소 위치(영상 픽셀)를 쓰므로 커서가 정확히 버튼 위로 갑니다.
+-->
+<style>
+*{box-sizing:border-box;margin:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#0b1022;font-family:"Inter","Noto Sans CJK KR","Noto Sans KR",sans-serif;color:#fff}
+.layer{position:absolute;inset:0}
+#cam{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;background:#f6f7f9}
+.shot{position:absolute;left:0;top:0;width:1920px;height:1080px;opacity:0}
+.ring{position:absolute;border:5px solid #ff7a1a;border-radius:14px;box-shadow:0 0 0 6px rgba(255,122,26,.25),0 0 30px rgba(255,122,26,.5);opacity:0}
+.ripple{position:absolute;width:70px;height:70px;margin:-35px 0 0 -35px;border-radius:50%;border:5px solid #2f5bea;opacity:0}
+#cursor{position:absolute;left:0;top:0;width:34px;height:42px;filter:drop-shadow(0 3px 4px rgba(0,0,0,.45));z-index:5}
+/* 하단 자막 */
+#bar{position:absolute;left:0;right:0;bottom:0;height:210px;background:linear-gradient(180deg,rgba(11,16,34,0) 0%,rgba(11,16,34,.92) 32%,rgba(11,16,34,.97) 100%)}
+.cap{position:absolute;left:90px;right:70px;bottom:30px;opacity:0}
+.cap .t{font-size:46px;font-weight:800;letter-spacing:-.5px;display:flex;align-items:center;gap:18px}
+.cap .t i{font-style:normal;width:54px;height:54px;border-radius:50%;background:#2f5bea;display:grid;place-items:center;font-size:30px;flex:none}
+.cap .s{font-size:28px;color:#c9d3f2;margin-top:8px;padding-left:72px;line-height:1.35}
+/* 단계 표시 (오른쪽 아래) */
+#steps{position:absolute;right:70px;bottom:126px;display:flex;gap:10px}   /* 자막 제목 줄 오른쪽 */
+#steps span{font-size:20px;font-weight:700;padding:9px 16px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);color:#9aa6c9}
+#steps span b{display:none}
+.stepon{position:absolute;opacity:0;font-size:20px;font-weight:800;padding:9px 16px;border-radius:999px;background:#2f5bea;border:1px solid #9db4ff;color:#fff}
+/* 제목·마무리 카드 */
+.card{position:absolute;inset:0;background:radial-gradient(1200px 800px at 70% 30%,#16204a 0%,#0a0f22 60%,#05070f 100%);opacity:0;display:flex;flex-direction:column;justify-content:center;padding:0 160px}
+.card .k{font-size:34px;color:#38d9ff;font-weight:700;letter-spacing:1px}
+.card h1{font-size:120px;font-weight:900;letter-spacing:-3px;margin:14px 0 10px}
+.card .m{font-size:44px;color:#c9d3f2}
+.card ol{list-style:none;display:flex;gap:16px;margin-top:56px;padding:0}
+.card ol li{font-size:30px;font-weight:700;padding:14px 26px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.22)}
+.card ol li b{color:#38d9ff;margin-right:8px}
+.end{padding-right:620px}   /* 오른쪽 QR 영역과 글자가 겹치지 않도록 */
+.end .url{font-size:62px;font-weight:800;margin-top:18px;white-space:nowrap}
+.end .url::after{content:"";display:block;height:8px;margin-top:14px;width:100%;border-radius:8px;background:linear-gradient(90deg,#4d74ff,#38d9ff)}
+.end .qr{position:absolute;right:150px;top:300px;width:380px;padding:30px;border-radius:28px;background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.25)}
+.end .qr img{width:100%;display:block}
+/* 출력 양식 미리보기 */
+#print{position:absolute;inset:0;background:#2a3142;opacity:0}
+#print img{position:absolute;left:50%;top:40px;height:870px;transform:translateX(-50%);box-shadow:0 30px 90px rgba(0,0,0,.6);border-radius:6px}
+</style></head><body>
+<div id="cam"></div>
+<div id="print"></div>
+<div id="bar"></div>
+<div id="steps"></div>
+<div id="caps"></div>
+<div id="cards"></div>
+<script>
+const LANG = new URLSearchParams(location.search).get('lang') || 'en';
+const M = window.MANIFEST;                       // 렌더러가 주입: {shot: {key: [x,y,w,h]}}
+const D = 30;                                    // 영상 길이(초)
+const IMG = n => `guide/${LANG}/${n}.png`;
+
+/* ---------------- 문구 (영어·한국어) ---------------- */
+const TX = {
+  en: { kick: 'QUICK GUIDE', title: 'How to use', app: 'Duty Roster Generator · 5 steps',
+    steps: ['Settings', 'Staff roster', 'Generate', 'Results', 'Print & save'],
+    cap: {
+      '1a': ['Pick the target month', 'Public holidays fill in automatically — click the mini calendar to add more.'],
+      '1b': ['Set the rules', 'Rest days after a weekday or holiday duty, and the target fairness score (DFI).'],
+      '2a': ['Add your staff', 'Add people one by one, or load the sample to try it out.'],
+      '2b': ['Enter preferences', 'Type dates like 3, 15, 20-22 — and click weekdays to prefer or exclude them.'],
+      '2c': ['Or pick dates on a calendar', 'Choose Preferred, Available or Unavailable, then click the days.'],
+      '3a': ['Check, then generate', 'The pre-check flags conflicting input first. Then click Generate.'],
+      '3b': ['Done in a moment', 'Hundreds to thousands of plans are tested; the summary shows how the best score improved.'],
+      '4a': ['Compare the top 3 plans', 'Click a card to choose the plan you want to print.'],
+      '4b': ["See anyone's duties", "Click a name to highlight that person's days — copy the list in one click."],
+      '4c': ['Swap manually if needed', 'Rule conflicts are flagged, the score is recalculated, and you can undo.'],
+      '4d': ['Check the fairness score', 'Five metrics make up the DFI — hover a bar to see how it is calculated.'],
+      '5a': ['Print or save', 'Print, save a printable file or CSV — and back up to JSON to move devices.'],
+      '5b': ['A one-page A4 roster', 'With statistics, a DFI summary and an approval box.'] },
+    endK: 'TRY IT NOW — FREE', endH: 'Make this month’s roster', endM: 'No install · No sign-up · Your data stays in your browser' },
+  ko: { kick: '빠른 사용 안내', title: '사용 방법', app: '당직배정 웹앱 · 5단계',
+    steps: ['설정', '근무자 명단', '생성', '결과', '출력·저장'],
+    cap: {
+      '1a': ['대상 연월을 고릅니다', '공휴일은 자동으로 입력됩니다. 미니 달력을 눌러 추가할 수도 있습니다.'],
+      '1b': ['규칙을 정합니다', '평일·휴일 당직 후 배정 제외일과 목표 공정성 점수(DFI)를 정합니다.'],
+      '2a': ['근무자를 입력합니다', '한 명씩 추가하거나, 샘플 데이터로 바로 체험해 볼 수 있습니다.'],
+      '2b': ['희망 조건을 입력합니다', '날짜는 3, 15, 20-22처럼 쓰고, 요일 버튼으로 희망·제외 요일을 고릅니다.'],
+      '2c': ['달력에서 고를 수도 있습니다', '희망·가능·제외 중 하나를 고른 뒤 날짜를 누르면 됩니다.'],
+      '3a': ['점검하고 생성합니다', '사전 점검이 입력 충돌을 먼저 알려 줍니다. 그다음 [당직표 생성]을 누릅니다.'],
+      '3b': ['순식간에 완료됩니다', '수백~수천 개 안을 시험하고, 최고 점수가 어떻게 올라갔는지 요약해 보여 줍니다.'],
+      '4a': ['상위 3개 안을 비교합니다', '카드를 눌러 출력할 안을 고릅니다.'],
+      '4b': ['개인별 근무일을 봅니다', '이름을 누르면 그 사람의 근무일이 강조되고, 목록을 바로 복사할 수 있습니다.'],
+      '4c': ['필요하면 직접 바꿉니다', '규칙 위반은 경고하고, 점수를 다시 계산하며, 실행 취소도 됩니다.'],
+      '4d': ['공정성 점수를 확인합니다', '5개 지표로 DFI를 계산합니다. 막대에 마우스를 올리면 계산 방법이 보입니다.'],
+      '5a': ['출력하거나 저장합니다', '출력, 인쇄용 파일, CSV 저장, 그리고 다른 기기로 옮길 때는 JSON 백업.'],
+      '5b': ['A4 한 장 당직표', '근무자별 통계, DFI 요약, 결재란이 함께 들어갑니다.'] },
+    endK: '지금 바로 무료로', endH: '이번 달 당직표를 만들어 보세요', endM: '설치 없음 · 가입 없음 · 데이터는 브라우저 밖으로 나가지 않습니다' }
+}[LANG];
+document.documentElement.lang = LANG;
+
+/* ---------------- 시간표 ---------------- */
+// 화면: [이름, 시작, 끝]  (다음 화면이 다 나타난 뒤 이전 화면이 사라지도록 겹침)
+const SHOTS = [['s1',2.6,7.6],['s2z',7.6,9.0],['s2a',9.0,10.4],['s2b',10.4,11.8],['s2c',11.8,14.6],['s3a',14.6,16.4],['s3b',16.4,18.6],
+               ['s4a',18.6,20.0],['s4b0',20.0,20.8],['s4b',20.8,22.0],['s4c',22.0,23.6],['s4d',23.6,25.2],['s5a',25.2,26.6]];
+// 자막: [키, 단계(1~5), 시작, 끝]
+const CAPS = [['1a',1,2.7,5.0],['1b',1,5.0,7.6],['2a',2,7.6,9.0],['2b',2,9.0,11.8],['2c',2,11.8,14.6],['3a',3,14.6,16.4],['3b',3,16.4,18.6],
+              ['4a',4,18.6,20.0],['4b',4,20.0,22.0],['4c',4,22.0,23.6],['4d',4,23.6,25.2],['5a',5,25.2,26.6],['5b',5,26.6,28.4]];
+const STEP_T = [[1,2.6,7.6],[2,7.6,14.6],[3,14.6,18.6],[4,18.6,25.2],[5,25.2,28.4]];
+// 좌표 도우미 (영상 픽셀)
+const R = (s, k) => M[s][k];
+const C = (s, k, fx = .5, fy = .5) => { const r = R(s, k); return [r[0] + r[2] * fx, r[1] + r[3] * fy]; };
+// 커서 경로: [초, x, y]  (같은 위치 두 번 = 멈춤)
+const P = [];
+const go = (t, xy) => P.push([t, xy[0], xy[1]]);
+go(0, [1500, 760]); go(2.8, [1500, 760]);
+go(3.4, C('s1','ym',.3)); go(3.7, C('s1','ym',.3)); go(4.3, C('s1','miniCal',.8,.75)); go(4.8, C('s1','miniCal',.8,.75));
+go(5.6, C('s1','restW',.25,.25)); go(6.2, C('s1','restW',.25,.25)); go(6.8, C('s1','minDFI',.6,.32)); go(7.6, C('s1','minDFI',.6,.32));
+go(8.2, C('s2z','sample')); go(8.9, C('s2z','sample'));
+go(9.4, C('s2a','avail')); go(9.7, C('s2a','avail')); go(10.0, C('s2a','wishDow',.5)); go(10.4, C('s2a','wishDow',.5));
+go(11.0, C('s2b','avail')); go(11.5, C('s2a','dp')); go(11.9, C('s2a','dp'));
+go(12.5, C('s2c','day')); go(14.6, C('s2c','day'));
+go(15.4, C('s3a','gen')); go(16.4, C('s3a','gen')); go(17.0, C('s3b','tiles',.3)); go(18.6, C('s3b','tiles',.3));
+go(19.2, C('s4a','cand2',.5,.4)); go(20.0, C('s4a','cand2',.5,.4));
+go(20.5, C('s4b0','name')); go(20.8, C('s4b0','name')); go(20.81, C('s4b','name')); go(21.5, C('s4b','name'));
+go(21.8, C('s4c','editbtn')); go(22.0, C('s4c','editbtn')); go(22.6, C('s4c','duty',.8)); go(23.6, C('s4c','duty',.8));
+go(24.1, C('s4d','gauge',.3)); go(25.2, C('s4d','gauge',.3));
+go(25.8, C('s5a','print')); go(26.6, C('s5a','print')); go(30, C('s5a','print'));
+const CLICKS = [[3.55, C('s1','ym',.3)], [4.45, C('s1','miniCal',.8,.75)], [8.45, C('s2z','sample')], [9.55, C('s2a','avail')], [10.2, C('s2a','wishDow',.5)],
+                [11.72, C('s2a','dp')], [12.6, C('s2c','day')], [15.9, C('s3a','gen')], [20.65, C('s4b0','name')], [21.9, C('s4c','editbtn')], [26.1, C('s5a','print')]];
+// 강조 테두리: [화면, 키, 시작, 끝]
+const RINGS = [['s1','ym',3.6,4.9],['s1','miniCal',4.4,5.0],['s1','restW',5.7,6.6],['s1','minDFI',6.6,7.5],
+               ['s2z','sample',8.0,9.0],['s2b','avail',10.5,11.6],['s2b','wishDow',10.5,11.6],['s2c','dp',12.0,14.5],
+               ['s3a','precheck',14.8,15.8],['s3a','gen',15.5,16.4],['s3b','tiles',16.7,17.9],['s3b','chart',17.6,18.5],
+               ['s4a','cand2',19.1,20.0],['s4b','hl',20.9,21.9],['s4c','dialog',22.1,23.5],['s4d','tip',24.2,25.1],
+               ['s5a','print',25.7,26.6],['s5a','csv',25.9,26.6],['s5a','json',26.1,26.6]];
+// 카메라: [초, 초점x, 초점y, 배율]  — 초점이 화면 가운데(자막 띠 위쪽)에 오도록 이동, 가장자리는 넘지 않게 고정
+const mid = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+const F = (t, xy, sc) => [t, xy[0], xy[1], sc];          // 카메라 키프레임 (초점 = 캡처 좌표에서 계산)
+const CAM = [[0,960,540,1],[2.9,960,540,1],
+  F(3.4, mid(C('s1','ym'), C('s1','miniCal')), 1.55), F(4.9, mid(C('s1','ym'), C('s1','miniCal')), 1.55),
+  F(5.4, mid(C('s1','restW'), C('s1','minDFI')), 1.5), F(7.3, mid(C('s1','restW'), C('s1','minDFI')), 1.5), [7.6,960,540,1],
+  F(7.9, C('s2z','sample'), 1.5), F(8.9, C('s2z','sample'), 1.5),
+  F(9.3, mid(C('s2a','avail'), C('s2a','wishDow')), 1.75), F(11.5, mid(C('s2a','avail'), C('s2a','wishDow')), 1.75),
+  F(11.9, C('s2c','dp'), 1.45), F(14.4, C('s2c','dp'), 1.45),
+  F(14.8, mid(C('s3a','gen'), C('s3a','precheck')), 1.4), F(16.4, mid(C('s3a','gen'), C('s3a','precheck')), 1.4),
+  F(16.6, mid(C('s3b','tiles'), C('s3b','chart')), 1.25), F(18.4, mid(C('s3b','tiles'), C('s3b','chart')), 1.25),
+  F(18.7, C('s4a','cand2'), 1.35), F(20.0, C('s4a','cand2'), 1.35),
+  F(20.2, C('s4b0','name'), 1.5), F(20.8, C('s4b0','name'), 1.5), F(21.0, mid(C('s4b','name'), C('s4b','hl')), 1.45), F(21.9, mid(C('s4b','name'), C('s4b','hl')), 1.45),
+  F(22.1, C('s4c','dialog'), 1.5), F(23.5, C('s4c','dialog'), 1.5),
+  F(23.8, C('s4d','tip'), 1.5), F(25.1, C('s4d','tip'), 1.5),
+  F(25.4, C('s5a','csv'), 1.4), F(26.6, C('s5a','csv'), 1.4), F(30, C('s5a','csv'), 1.4)];
+
+/* ---------------- 애니메이션 도우미 ---------------- */
+// 요소마다 0~30초 전체를 하나의 애니메이션으로 (렌더러가 currentTime으로 맞춤)
+const anim = (el, frames) => {
+  const ks = frames.map(([t, st]) => Object.assign({ offset: Math.min(1, Math.max(0, t / D)) }, st)).sort((a, b) => a.offset - b.offset);
+  ks.forEach((k, i) => { if (i && k.offset < ks[i - 1].offset) k.offset = ks[i - 1].offset; });
+  el.animate(ks, { duration: D * 1000, fill: 'both', easing: 'linear' });
+};
+const win = (a, b, fi = .25, fo = .25, extra = {}) => [[0, { opacity: 0, ...extra.from }], [a, { opacity: 0, ...extra.from }], [a + fi, { opacity: 1, ...extra.to }], [b - fo, { opacity: 1, ...extra.to }], [b, { opacity: 0, ...extra.to }], [D, { opacity: 0, ...extra.to }]];
+const make = (tag, cls, parent, html = '') => { const e = document.createElement(tag); if (cls) e.className = cls; e.innerHTML = html; parent.appendChild(e); return e; };
+
+const cam = document.getElementById('cam');
+// 화면 캡처: 다음 화면이 0.25초에 걸쳐 나타나고, 이전 화면은 그 뒤 0.3초까지 남김(어두운 틈 방지)
+SHOTS.forEach(([n, a, b], i) => {
+  const img = make('img', 'shot', cam); img.src = IMG(n);
+  const last = i === SHOTS.length - 1;
+  anim(img, win(a, last ? D : b + 0.3, i ? 0.25 : 0.01, last ? 0.01 : 0.05));
+});
+// 강조 테두리
+RINGS.forEach(([s, k, a, b]) => {
+  const r = R(s, k); const pad = 8; const e = make('div', 'ring', cam);
+  Object.assign(e.style, { left: r[0] - pad + 'px', top: r[1] - pad + 'px', width: r[2] + pad * 2 + 'px', height: r[3] + pad * 2 + 'px' });
+  anim(e, win(a, b, .2, .2, { from: { transform: 'scale(1.12)' }, to: { transform: 'scale(1)' } }));
+});
+// 클릭 파문
+CLICKS.forEach(([t, [x, y]]) => {
+  const e = make('div', 'ripple', cam); Object.assign(e.style, { left: x + 'px', top: y + 'px' });
+  anim(e, [[0, { opacity: 0, transform: 'scale(.2)' }], [t, { opacity: 0, transform: 'scale(.2)' }], [t + .02, { opacity: 1, transform: 'scale(.3)' }], [t + .45, { opacity: 0, transform: 'scale(1.6)' }], [D, { opacity: 0, transform: 'scale(1.6)' }]]);
+});
+// 커서 (클릭 순간 살짝 눌림)
+const cur = make('div', '', cam, '<svg viewBox="0 0 34 42" width="34" height="42"><path d="M3 2 L3 33 L11 26 L16.5 39 L22 36.5 L16.5 24 L27 24 Z" fill="#fff" stroke="#111" stroke-width="2.4" stroke-linejoin="round"/></svg>');
+cur.id = 'cursor';
+const easeIO = 'cubic-bezier(.45,.05,.25,1)';
+anim(cur, P.map(([t, x, y]) => [t, { transform: `translate(${x - 4}px,${y - 3}px)`, easing: easeIO }]));
+cur.animate([{ opacity: 0 }, { opacity: 0, offset: 2.75 / D }, { opacity: 1, offset: 2.9 / D }, { opacity: 1, offset: 28.3 / D }, { opacity: 0, offset: 28.45 / D }, { opacity: 0 }], { duration: D * 1000, fill: 'both' });
+// 클릭 순간 커서가 살짝 작아졌다 돌아옴
+cur.firstChild.animate(CLICKS.flatMap(([t]) => [{ offset: (t - .06) / D, transform: 'scale(1)' }, { offset: t / D, transform: 'scale(.8)' }, { offset: (t + .12) / D, transform: 'scale(1)' }])
+  .concat([{ offset: 0, transform: 'scale(1)' }, { offset: 1, transform: 'scale(1)' }]).sort((a, b) => a.offset - b.offset), { duration: D * 1000, fill: 'both' });
+// 카메라: 초점(fx,fy)을 화면 가운데(자막 띠 위, y≈455)로, 가장자리 밖은 보이지 않게
+const camT = ([, fx, fy, s]) => {
+  let tx = 960 - fx * s, ty = 455 - fy * s;
+  tx = Math.min(0, Math.max(1920 - 1920 * s, tx)); ty = Math.min(0, Math.max(1080 - 1080 * s, ty));
+  return `translate(${tx}px,${ty}px) scale(${s})`;
+};
+anim(cam, CAM.map(f => [f[0], { transform: camT(f), easing: easeIO }]));
+
+// 출력 양식 미리보기
+const pr = document.getElementById('print'); make('img', '', pr).src = IMG('print');
+anim(pr, win(26.6, 28.55, .3, .15));
+anim(pr.firstChild, [[0, { transform: 'translateX(-50%) scale(.9)' }], [26.6, { transform: 'translateX(-50%) scale(.9)' }], [28.4, { transform: 'translateX(-50%) scale(1)' }], [D, { transform: 'translateX(-50%) scale(1)' }]]);
+
+// 자막 + 단계 표시
+const caps = document.getElementById('caps'), bar = document.getElementById('bar'), steps = document.getElementById('steps');
+CAPS.forEach(([k, st, a, b]) => {
+  const [t, s] = TX.cap[k];
+  const e = make('div', 'cap', caps, `<div class="t"><i>${st}</i>${t}</div><div class="s">${s}</div>`);
+  anim(e, win(a, b, .25, .2, { from: { transform: 'translateY(16px)' }, to: { transform: 'none' } }));
+});
+anim(bar, win(2.6, 28.45, .3, .15)); anim(steps, win(2.6, 28.45, .3, .15));
+TX.steps.forEach((n, i) => {
+  const sp = make('span', '', steps, `${i + 1} ${n}`);
+  const on = make('div', 'stepon', sp.parentNode, `${i + 1} ${n}`);
+  const [, a, b] = STEP_T[i];
+  // 켜진 단계 칩을 같은 위치에 겹쳐 표시
+  requestAnimationFrame(() => { on.style.left = sp.offsetLeft + 'px'; on.style.top = sp.offsetTop + 'px'; });
+  anim(on, win(a, b, .15, .1));
+});
+document.getElementById('steps').style.position = 'absolute';
+
+// 제목 카드
+const cards = document.getElementById('cards');
+const title = make('div', 'card', cards, `<div class="k">${TX.kick}</div><h1>${TX.title}</h1><div class="m">${TX.app}</div>
+  <ol>${TX.steps.map((n, i) => `<li><b>${i + 1}</b>${n}</li>`).join('')}</ol>`);
+anim(title, [[0, { opacity: 1 }], [2.35, { opacity: 1 }], [2.7, { opacity: 0 }], [D, { opacity: 0 }]]);
+title.querySelectorAll('li').forEach((li, i) => anim(li, [[0, { opacity: 0, transform: 'translateY(20px)' }], [0.5 + i * 0.15, { opacity: 0, transform: 'translateY(20px)' }], [0.8 + i * 0.15, { opacity: 1, transform: 'none' }], [D, { opacity: 1, transform: 'none' }]]));
+anim(title.querySelector('h1'), [[0, { opacity: 0, transform: 'translateY(30px)' }], [0.1, { opacity: 0, transform: 'translateY(30px)' }], [0.5, { opacity: 1, transform: 'none' }], [D, { opacity: 1, transform: 'none' }]]);
+// 마무리 카드
+const end = make('div', 'card end', cards, `<div class="k">${TX.endK}</div><h1 style="font-size:84px;line-height:1.1">${TX.endH}</h1>
+  <div class="url">onlymarch.github.io/dutywebapp</div><div class="m" style="margin-top:34px;font-size:36px">${TX.endM}</div>
+  <div class="qr"><img src="qr.svg"></div>`);
+anim(end, win(28.4, D + 1, .35, .01));
+</script>
+</body></html>
