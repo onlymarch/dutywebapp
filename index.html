@@ -78,6 +78,7 @@ button.big{padding:10px 22px;font-size:15px}
 .ph{font-size:10.5px;line-height:1.3;margin-top:2px}
 .ph:empty{display:none}
 .ph .ok{color:var(--ok)} .ph .bad{color:var(--bad);font-weight:700}
+.ph .open{color:var(--warn);font-weight:600}   /* 열린 기간 해석 안내 (의도 확인용) */
 
 /* ---------- 4. 설정: 프로필·공휴일 ---------- */
 /* 설정은 4개 묶음(.set-group)으로 나눕니다.
@@ -384,7 +385,7 @@ body.printing-sheet #printSheet{display:block}
 
 <!-- ===================== 2. 근무자 명단 ===================== -->
 <section class="card" id="rosterCard">
-  <h2><span class="step">2</span>👥 근무자 명단 <span class="muted">날짜 입력 예: 3, 15, 20~22 또는 20-22 · 📅 버튼으로 달력에서 고를 수 있습니다</span></h2>
+  <h2><span class="step">2</span>👥 근무자 명단 <span class="muted">날짜 입력 예: 3, 15, 20~22 또는 20-22 · -5는 1~5일, 25-는 25일~말일 · 📅 버튼으로 달력에서 고를 수 있습니다</span></h2>
   <div class="table-wrap" id="rosterWrap">
     <table id="roster">
       <!-- data-tip: TIPS 객체의 키. 머리글에 마우스를 올리거나 포커스하면 설명 툴팁 표시 -->
@@ -917,8 +918,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.9.6', APP_BUILD = '2026-11-22';
+const APP_VERSION = '1.9.7', APP_BUILD = '2026-11-22';
 const CHANGELOG = [
+  '1.9.7 열린 기간 입력: -5 → 1~5일, 20- → 20일~말일(달마다 자동). 입력칸 아래에 해석 결과를 따로 표시',
   '1.9.6 기간 입력: ~와 -의 모든 변형(전각 ～, 〜, −, – 등)을 기간으로 인식, 12/20-12/22·2026-12-20~2026-12-22처럼 날짜 형식으로 쓴 기간도 인식',
   '1.9.5 설정 영역을 4개 묶음(프로필·대상 기간·배정 규칙·생성 옵션)으로 재배치, 모바일: 프로필 버튼 2×2, 숫자 칸 2열, 공휴일 달력 전체 폭, 입력칸 16px(iOS 확대 방지)',
   '1.9.4 인터페이스 오류 수정: 생성 중 프로필 전환 시 이전 결과 표시, 삭제 실행 취소가 다른 프로필 명단에 섞임, JSON 복원 시 같은 이름 프로필 무확인 덮어쓰기와 손상 데이터 처리, 연월 변경 시 날짜 팝오버 잔류, 저장 전 입력 유실, 같은 이름으로 이름 변경 시 오류 안내, 좁은 화면 결과 영역 가로 넘침',
@@ -1185,7 +1187,9 @@ const RANGE_SEP_RE = new RegExp('\\s*[' + RANGE_CHARS + ']\\s*', 'g');
  *   단일: "3, 15"  "25일"  "12월 25일"  "12/25"  "12.25"  "2026-12-25"
  *   기간: "20~22"  "20-22"  "20 ~ 22"  "20일~22일"  "20～22"(전각)  "20–22"(대시)
  *         "12/20-12/22"  "12.20~12.22"  "12월 20일~22일"  "2026-12-20~2026-12-22"
+ *   열린 기간: "-5" → 1~5 (월초부터), "20-" → 20~말일 (월말까지, 30·31·28·29일에 맞춤)
  *   기간은 ~와 -(및 그 변형)를 모두 같은 뜻으로 봅니다. 시작일이 종료일보다 크면(22-20) 오류로 표시합니다.
+ *   기호만 있는 경우("-", "~")는 오류로 표시합니다.
  * 구분자: 쉼표, 공백, 가운데점, 세미콜론
  *
  * 처리 순서 (앞 단계가 뒤 단계의 기호를 오인하지 않도록)
@@ -1195,10 +1199,13 @@ const RANGE_SEP_RE = new RegExp('\\s*[' + RANGE_CHARS + ']\\s*', 'g');
  *   3) 구분자로 나눠 토큰별로 해석
  * @param {string} str 입력 원문
  * @param {number} N   해당 월 일수 (범위를 벗어난 날짜는 bad로 분류)
- * @returns {{days:number[], bad:string[]}} days: 오름차순·중복 제거 / bad: 해석하지 못한 토큰
+ * @returns {{days:number[], bad:string[], open:string[]}}
+ *   days: 오름차순·중복 제거 / bad: 해석하지 못한 토큰
+ *   open: 열린 기간을 어떻게 해석했는지 (예: "20- → 20~31일") — 입력칸 아래에 따로 보여 줘
+ *         "20-22"를 치다 멈춘 경우처럼 의도와 다른 해석을 바로 알아챌 수 있게 합니다.
  */
 function parseDays(str, N){
-  const out = new Set(), bad = [];
+  const out = new Set(), bad = [], open = [];
   const s = String(str || '')
     .replace(/\d{4}\s*[-./년]\s*\d{1,2}\s*[-./월]\s*(\d{1,2})\s*일?/g, '$1')   // 2026-12-25, 2026.12.25, 2026년 12월 25일 → 25
     .replace(/(\d{1,2})\s*월\s*(\d{1,2})\s*일?/g, '$2')                        // 12월 25일 → 25
@@ -1207,19 +1214,21 @@ function parseDays(str, N){
     .replace(RANGE_SEP_RE, '~');                                                // 20 - 22, 20～22 → 20~22
   for (const tok of s.split(/[,\s·;、]+/)){
     if (!tok) continue;
-    // 기간: 20~22
-    const m = tok.match(/^(\d{1,2})~(\d{1,2})$/);
-    if (m){
-      const a = +m[1], b = +m[2];
+    // 기간: 20~22 / 열린 기간: ~5(월초부터), 20~(월말까지). 숫자가 하나도 없는 "~"는 아래에서 오류 처리
+    const m = tok.match(/^(\d{1,2})?~(\d{1,2})?$/);
+    if (m && (m[1] || m[2])){
+      const a = m[1] ? +m[1] : 1, b = m[2] ? +m[2] : N;
       if (a < 1 || b > N || a > b){ bad.push(tok); continue; }
       for (let d = a; d <= b; d++) out.add(d);
+      if (!m[1]) open.push(`-${b} → 1~${b}일(월초부터)`);
+      if (!m[2]) open.push(`${a}- → ${a}~${N}일(월말까지)`);
       continue;
     }
     // 단일 숫자
     if (/^\d{1,2}$/.test(tok)){ const d = +tok; (d >= 1 && d <= N) ? out.add(d) : bad.push(tok); continue; }
     bad.push(tok);
   }
-  return { days: [...out].sort((a, b) => a - b), bad };
+  return { days: [...out].sort((a, b) => a - b), bad, open };
 }
 const parseDayList = (str, N) => parseDays(str, N).days;
 
@@ -1238,6 +1247,7 @@ function hintHTML(str, N){
   if (!String(str || '').trim()) return '';
   const r = parseDays(str, N);
   return (r.days.length ? `<span class="ok">✓ ${esc(fmtDays(r.days))} (${r.days.length}일)</span>` : '<span class="bad">인식된 날짜 없음</span>') +
+         (r.open.length ? ` <span class="open">· ${esc(r.open.join(', '))}</span>` : '') +
          (r.bad.length ? ` <span class="bad">무시: ${esc(r.bad.join(' '))}</span>` : '');
 }
 
