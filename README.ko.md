@@ -16,7 +16,7 @@
 
 ## 사용 순서
 
-🎬 **30초 사용법 영상** (소리 없음): [한국어](https://onlymarch.github.io/dutywebapp/assets/guide-ko-30s.mp4) · [English](https://onlymarch.github.io/dutywebapp/assets/guide-en-30s.mp4)
+🎬 **30초 사용법 영상** (음성 안내 포함): [한국어](https://onlymarch.github.io/dutywebapp/assets/guide-ko-30s.mp4) · [English](https://onlymarch.github.io/dutywebapp/assets/guide-en-30s.mp4)
 
 1. **설정**: 대상 연월을 고릅니다. 한국어 화면에서는 한국 공휴일이 자동으로 입력됩니다(다른 언어 화면에서는 직접 입력하거나 달력을 누릅니다). 슬라이더로 배정 제외일(0~5일)과 목표 DFI(50~100점, 5점 단위)를 정합니다. 시도 횟수는 자동입니다(아래 '시도 횟수' 참고).
 2. **근무자 명단**: 성명, 레벨, 가중치, 월 최대 횟수, 희망일·희망요일·가능일, 제외일·제외요일을 입력합니다. 날짜는 `3, 15, 20~22`처럼 쓰며, 기간은 `~`와 `-`를 모두 쓸 수 있습니다. `-5`는 1~5일, `25-`는 25일부터 그 달 말일까지입니다. 끝 날짜가 말일을 넘으면(2월에 `15-31`) 말일까지로 맞춥니다. 📅 버튼으로 달력에서 고를 수도 있습니다.

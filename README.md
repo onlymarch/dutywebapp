@@ -23,7 +23,7 @@ Current version: **v1.15.0** (2026-11-23)
 
 ## How to use
 
-🎬 **30-second video guide** (no sound): [English](https://onlymarch.github.io/dutywebapp/assets/guide-en-30s.mp4) · [한국어](https://onlymarch.github.io/dutywebapp/assets/guide-ko-30s.mp4)
+🎬 **30-second video guide** (with narration): [English](https://onlymarch.github.io/dutywebapp/assets/guide-en-30s.mp4) · [한국어](https://onlymarch.github.io/dutywebapp/assets/guide-ko-30s.mp4)
 
 1. **Settings** — Pick the target month. Type your public holidays or click them on the mini calendar (in the Korean interface, Korean public holidays are filled in automatically). Use the sliders to set rest days after a duty (0–5) and the target DFI (50–100, in steps of 5). The number of attempts is automatic (see *Attempts* below).
 2. **Staff roster** — Enter name, level, weight, monthly max, preferred dates, preferred weekdays, available dates, unavailable dates and unavailable weekdays. Write dates like `3, 15, 20~22`; ranges accept both `~` and `-`. `-5` means days 1–5 and `25-` means the 25th to the end of the month. If a range ends past the last day (e.g. `15-31` in February), it is cut at the month end. You can also pick dates on a calendar with the 📅 button.

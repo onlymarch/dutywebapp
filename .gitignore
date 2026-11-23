@@ -5,3 +5,5 @@ promo/video-silent*.mp4
 promo/music.wav
 promo/*.txt
 promo/guide/
+promo/narration/silent-*.mp4
+promo/narration/mix-*.wav

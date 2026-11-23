@@ -33,11 +33,13 @@ Requires Playwright (Chromium) and ffmpeg. `qr.svg` points to https://onlymarch.
 
 ## 30-second guide videos (English, Korean)
 
-`assets/guide-en-30s.mp4` and `assets/guide-ko-30s.mp4` — 1920×1080, 30 fps, 30 s, no audio. They walk through the five steps on real app screens with an animated cursor, highlight boxes, camera zoom and captions.
+`assets/guide-en-30s.mp4` and `assets/guide-ko-30s.mp4` — 1920×1080, 30 fps, about 30 s (the end card is held up to 2 s longer so the last line fits), with ElevenLabs voice narration and no music. They walk through the five steps on real app screens with an animated cursor, highlight boxes, camera zoom and captions.
 
 - `guide-capture.js` — puts the app into each step's state in English and Korean and saves 1920×1080 screenshots plus the on-screen position of every button the cursor points at (`guide/<lang>/manifest.json`).
 - `guide.html` — one scene file for both languages (`?lang=en|ko`); captions, cursor path, highlights and camera are a single timeline, and every position is computed from the manifest, so re-capturing keeps everything aligned.
-- `guide-render.js` — renders 900 frames per language.
+- `guide-render.js` — renders 900 frames per language (silent).
+- `narration/<lang>-<key>.mp3` — one ElevenLabs clip per caption (model `eleven_v4`; English voice "Andrew – Clear & Trustworthy", Korean voice "Hani"). Script and timing: `guide-narration.md`.
+- `narrate.py` — trims each clip, places it at its caption's start time (pushed later if the previous line is still playing, sped up by at most 1.25× if it would run into the next caption), normalises to −16 LUFS and muxes the track into the video. The silent render is kept as `narration/silent-<lang>.mp4`, so it can be run again safely.
 
 ```bash
 node promo/guide-capture.js
@@ -49,4 +51,12 @@ node promo/guide-render.js full en
 
 ```bash
 node promo/guide-render.js full ko
+```
+
+```bash
+python3 promo/narrate.py en
+```
+
+```bash
+python3 promo/narrate.py ko
 ```
