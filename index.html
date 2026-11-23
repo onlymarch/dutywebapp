@@ -126,6 +126,8 @@ th{font-size:12px;color:var(--sub);font-weight:600;background:#fafbfc;white-spac
 th[data-tip]{cursor:help}
 th[data-tip]:hover,th[data-tip]:focus{color:var(--accent);outline:none}
 .tip-i{font-style:normal;font-size:11px;color:var(--accent);opacity:.8}
+.tip-i.tt{cursor:help;font-size:13px}
+.tip .note{margin-top:6px;color:#b9c3d6;font-size:11px}
 #roster th,#roster td{padding:5px 4px}
 #roster td input[type=text]{min-width:78px}
 #roster td input[type=number]{width:64px}
@@ -291,25 +293,24 @@ tr.hl-row td{background:var(--hl-weak)}
 #stats tbody tr:not(.hl-row):hover td{background:#f3f6fd}
 .d-pos{color:var(--warn);font-weight:700} .d-neg{color:var(--accent);font-weight:700}   /* 기대보다 많음 / 적음 */
 /* 8-4. DFI */
-.dfi-intro{font-size:12px;color:var(--sub);margin:0 0 10px;line-height:1.6}
-.dfi-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px}
-.dfi-score{font-size:34px;font-weight:800}
+.dfi-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.dfi-score{font-size:30px;font-weight:800;line-height:1}
+.dfi-meta{font-size:12px;color:var(--sub);line-height:1.5}
+#dfiGrade{cursor:help}
 .grade{font-size:18px;font-weight:800;width:40px;height:40px;border-radius:10px;display:grid;place-items:center;color:#fff}
 .grade.S{background:#6a1b9a}.grade.A{background:var(--ok)}.grade.B{background:var(--warn)}.grade.C{background:var(--bad)}
-.gauge{display:grid;grid-template-columns:150px 1fr 70px;gap:8px;align-items:center;margin:6px 0}
+.gauge{display:grid;grid-template-columns:150px 1fr 62px;gap:8px;align-items:center;padding:3px 4px;margin:0 -4px;border-radius:6px;cursor:help}
+.gauge:hover,.gauge:focus{background:#f5f7fb;outline:none}
+.gauge:focus-visible{outline:2px solid var(--accent)}
+.gauge .tip-i{margin-left:2px}
 @media (max-width:520px){.gauge{grid-template-columns:110px 1fr 60px}}
 .gauge .bar{height:12px;background:#e9ecf2;border-radius:999px;overflow:hidden}
 .gauge .bar i{display:block;height:100%;border-radius:999px}
 .gauge .lbl{font-size:12px}
 .gauge .val{font-size:12px;text-align:right;font-variant-numeric:tabular-nums}
-.gauge-desc{font-size:11px;color:var(--ink);margin:-4px 0 1px}
-.diag-box{margin:4px 0 10px;padding:10px 12px;border-radius:10px;background:#fff4e5;border:1px solid #ffe0b2;font-size:12px;line-height:1.6}
-.diag-box ul{margin:4px 0;padding-left:18px}
+/* 목표 미달 한 줄 요약. 개선 방법은 툴팁 */
+.diag-line{margin:0 0 8px;padding:6px 10px;border-radius:8px;background:#fff4e5;border:1px solid #ffe0b2;font-size:12px;color:#7a4a00;cursor:help}
 .warn-list{color:var(--warn);font-size:12px}
-.dfi-more{margin-top:10px;font-size:12px;border-top:1px dashed var(--line);padding-top:8px}
-.dfi-more summary{cursor:pointer;color:var(--accent);font-weight:600}
-.dfi-more ul{padding-left:18px;margin:6px 0}
-.dfi-more li{margin:3px 0}
 /* 8-5. 출력·저장 */
 .out-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:16px}
 @media (max-width:760px){.out-grid{grid-template-columns:1fr}}
@@ -468,23 +469,17 @@ body.printing-sheet #printSheet{display:block}
     <div class="hl-info hidden" id="hlInfo"></div>
     <div class="cal" id="cal"></div>
   </section>
+  <!-- DFI 카드: 점수·등급·지표 막대만 기본 표시하고, 설명은 ⓘ·막대에 마우스를 올리거나(터치·키보드 포커스) 툴팁으로 봅니다. -->
   <section class="card" id="dfiCard">
-    <h2>⚖️ 당직 공정성 지수 <span class="muted">DFI · Duty Fairness Index</span></h2>
-    <p class="dfi-intro">DFI는 당직이 근무자 사이에 <b>얼마나 공정하게</b> 나뉘었는지를 100점 만점으로 나타낸 점수입니다. 근무량, 휴일 부담, 개인 선호, 근무 간격, 요일 분포의 5개 지표를 더합니다. 미배정일이 있으면 총점에 배정률을 곱합니다.</p>
+    <h2>⚖️ 당직 공정성 지수 <span class="muted">DFI</span> <i class="tip-i tt" tabindex="0" role="button" data-tt="dfiAbout" aria-label="DFI 설명">ⓘ</i></h2>
     <div class="dfi-head">
       <div class="dfi-score" id="dfiTotal">-</div>
-      <div class="grade" id="dfiGrade">-</div>
-      <div class="muted" id="dfiMeta"></div>
+      <div class="grade" id="dfiGrade" tabindex="0" data-tt="dfiGrade">-</div>
+      <div class="dfi-meta" id="dfiMeta"></div>
     </div>
-    <div class="diag-box hidden" id="dfiDiag"></div>
+    <div class="diag-line hidden" id="dfiDiag" tabindex="0" data-tt="dfiDiag"></div>
     <div id="gauges"></div>
     <div class="warn-list" id="dfiWarn"></div>
-    <details class="dfi-more">
-      <summary>등급 기준과 계산 방법 보기</summary>
-      <p><b>등급</b>: S 90점 이상(매우 공정) · A 80점 이상(공정) · B 70점 이상(보통, 일부 쏠림) · C 70점 미만(불균형, 조정 권장)</p>
-      <ul id="dfiHow"></ul>
-      <p class="muted">SD는 표준편차, RMSE는 평균제곱근오차입니다. 값이 작을수록 고르게 나뉜 것입니다.</p>
-    </details>
   </section>
   </div>
   <section class="card">
@@ -940,7 +935,7 @@ if (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScop
  *   §15 알림 모달
  *   §16 내보내기: JSON 백업·복원, CSV
  *   §17 당직표 출력 (A4 세로 1장)
- *   §18 명단 머리글 툴팁
+ *   §18 툴팁 (명단 머리글·DFI 카드)
  *   §19 초기화
  *
  * 데이터 흐름 요약
@@ -955,8 +950,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.11.1', APP_BUILD = '2026-11-22';
+const APP_VERSION = '1.12.0', APP_BUILD = '2026-11-22';
 const CHANGELOG = [
+  '1.12.0 DFI 카드 간소화: 점수·등급·지표 막대만 표시하고 소개·등급 기준·지표 설명·계산 방법·개선 방법은 툴팁으로 이동. 툴팁 처리를 문서 전체로 일반화',
   '1.11.1 근무자별 통계표의 행 어디를 눌러도 그 근무자를 강조 (다시 누르면 해제), 행 마우스오버 표시',
   '1.11.0 명단 열 순서 변경(성명·레벨·가중치·월 최대·달력·희망일·가능일·희망요일·제외일·제외요일·관리), 용어 기피일 → 제외일',
   '1.10.5 명단의 희망·제외 요일 버튼에서 일요일 테두리를 연한 분홍색, 토요일 테두리를 하늘색으로 표시',
@@ -2195,31 +2191,50 @@ const GUIDE = {
   M4: '개인별 근무 간격이 불규칙합니다. 배정 제외일을 1일씩 늘리거나 시뮬레이션 횟수를 늘리십시오.',
   M5: '근무가 특정 요일에 몰렸습니다. 희망요일·제외요일 지정을 줄이면 요일 분산이 개선됩니다.'
 };
+/* 결과에 따라 내용이 바뀌는 툴팁. 키는 HTML의 data-tt 값입니다. 형식은 TIPS와 같습니다({t, items, eff?, note?}). */
+const DYN_TIPS = {};
+const GRADE_TEXT = 'S 90점 이상(매우 공정) · A 80점 이상(공정) · B 70점 이상(보통, 일부 쏠림) · C 70점 미만(불균형, 조정 권장)';
+DYN_TIPS.dfiAbout = { t: '당직 공정성 지수 (DFI · Duty Fairness Index)', items: [
+  '당직이 근무자 사이에 <b>얼마나 공정하게</b> 나뉘었는지를 100점 만점으로 나타낸 점수입니다.',
+  '근무량(M1), 휴일 부담(M2), 개인 선호(M3), 근무 간격(M4), 요일 분포(M5)의 5개 지표를 더합니다.',
+  '미배정일이 있으면 총점에 배정률을 곱합니다.',
+  '<b>등급</b>: ' + GRADE_TEXT],
+  note: '각 지표 막대에 마우스를 올리면 계산 방법과 현재 값을 볼 수 있습니다. SD는 표준편차, RMSE는 평균제곱근오차이며 작을수록 고르게 나뉜 것입니다.' };
+DYN_TIPS.dfiGrade = { t: '등급 기준', items: GRADE_TEXT.split(' · ') };
+
+/**
+ * DFI 카드: 점수·등급·목표 달성·배정률, 목표 미달 한 줄, 5개 지표 막대.
+ * 지표 설명(무엇을·어떻게 계산·현재 값)과 개선 방법은 툴팁(DYN_TIPS)으로 옮겨 카드 높이를 줄였습니다.
+ */
 function renderDFI(R){
   const D = R.dfi, met = D.total >= R.cfg.minDFI;
   $('#dfiTotal').textContent = D.total.toFixed(1);
   const g = $('#dfiGrade'); g.textContent = D.grade; g.className = 'grade ' + D.grade;
+  g.setAttribute('aria-label', `${D.grade}등급`);
   $('#dfiMeta').innerHTML = `목표 ${R.cfg.minDFI} · ${met ? '<b style="color:var(--ok)">달성</b>' : '<b style="color:var(--bad)">미달</b>'}` +
     `<br>배정률 ${(D.coverage * 100).toFixed(0)}%${R.edited.size ? ' · 수동 수정 ' + R.edited.size + '건' : ''}`;
 
-  // 목표 미달 진단 (점수 비율이 가장 낮은 지표 기준)
+  // 목표 미달: 한 줄 요약 + 툴팁에 개선 방법 (점수 비율이 가장 낮은 지표 기준)
   const box = $('#dfiDiag');
   if (met) box.classList.add('hidden');
   else {
     const weak = D.metrics.slice().sort((a, b) => a.score / a.max - b.score / b.max)[0];
-    box.innerHTML = `<b>목표 미달 (${D.total.toFixed(1)} / ${R.cfg.minDFI})</b> — 가장 낮은 지표는 <b>${weak.key} ${weak.name}</b> ${weak.score.toFixed(1)}/${weak.max} (${(weak.score / weak.max * 100).toFixed(0)}%)입니다.
-      <ul><li>${GUIDE[weak.key]}</li><li>시뮬레이션 횟수를 늘리면(최대 9,000) 더 나은 안을 찾을 가능성이 커집니다. 현재 ${R.cfg.maxAttempts.toLocaleString()}회.</li>${R.cfg.minDFI > 85 ? '<li>현재 명단 조건에서 목표가 과도할 수 있습니다. 목표 DFI를 낮추는 것도 검토하십시오.</li>' : ''}</ul>`;
+    box.innerHTML = `⚠️ <b>목표 미달</b> ${D.total.toFixed(1)} / ${R.cfg.minDFI} · 가장 낮은 지표 <b>${weak.key} ${weak.name}</b> ${(weak.score / weak.max * 100).toFixed(0)}% <i class="tip-i tt">ⓘ 개선 방법</i>`;
+    DYN_TIPS.dfiDiag = { t: `개선 방법 — ${weak.key} ${weak.name} ${weak.score.toFixed(1)}/${weak.max}`, items: [
+      GUIDE[weak.key],
+      `시뮬레이션 횟수를 늘리면(최대 9,000) 더 나은 안을 찾을 가능성이 커집니다. 현재 ${R.cfg.maxAttempts.toLocaleString()}회.`,
+      ...(R.cfg.minDFI > 85 ? ['현재 명단 조건에서 목표가 과도할 수 있습니다. 목표 DFI를 낮추는 것도 검토하십시오.'] : [])] };
     box.classList.remove('hidden');
   }
 
-  // 지표 막대: 85% 이상 초록, 60% 이상 주황, 그 미만 빨강
-  $('#gauges').innerHTML = D.metrics.map(m => {
+  // 지표 막대: 85% 이상 초록, 60% 이상 주황, 그 미만 빨강. 행 전체가 툴팁 대상(마우스·포커스·터치)
+  $('#gauges').innerHTML = D.metrics.map((m, j) => {
     const r = m.score / m.max, col = r >= .85 ? 'var(--ok)' : r >= .6 ? 'var(--warn)' : 'var(--bad)';
-    return `<div class="gauge" title="${esc(m.detail)}"><div class="lbl"><b>${m.key}</b> ${m.name}</div>` +
+    DYN_TIPS['m' + j] = { t: `${m.key} ${m.name} (${m.max}점 만점) — ${m.score.toFixed(1)}점`, items: [esc(m.desc) + '.', esc(m.how)], eff: '현재 값: ' + esc(m.detail) };
+    return `<div class="gauge" tabindex="0" data-tt="m${j}" aria-label="${m.key} ${m.name} ${m.score.toFixed(1)}점 / ${m.max}점"><div class="lbl"><b>${m.key}</b> ${m.name} <i class="tip-i">ⓘ</i></div>` +
       `<div class="bar" role="meter" aria-valuemin="0" aria-valuemax="${m.max}" aria-valuenow="${m.score.toFixed(1)}" aria-label="${m.name}"><i style="width:${(r * 100).toFixed(1)}%;background:${col}"></i></div>` +
-      `<div class="val">${m.score.toFixed(1)}/${m.max}</div></div><div class="gauge-desc">${esc(m.desc)}</div><div class="muted" style="margin:0 0 6px;font-size:11px">${esc(m.detail)}</div>`;
+      `<div class="val">${m.score.toFixed(1)}/${m.max}</div></div>`;
   }).join('');
-  $('#dfiHow').innerHTML = D.metrics.map(m => `<li><b>${m.key} ${m.name} (${m.max}점)</b> — ${esc(m.desc)}. ${esc(m.how)}</li>`).join('');
   $('#dfiWarn').innerHTML = R.unfilled.length ? `미배정일: ${fmtDays(R.unfilled)}일 — 총점에 배정률이 곱해집니다.` : '';
 }
 
@@ -2593,7 +2608,7 @@ $('#btnPrintFile').addEventListener('click', async () => {
   toast('인쇄용 파일을 저장했습니다. 열어서 [인쇄 / PDF 저장]을 누르십시오.');
 });
 
-/* ─────────────────────────── §18 명단 머리글 툴팁 ───────────────────────────
+/* ─────────────────────────── §18 툴팁 (명단 머리글·DFI 카드) ───────────────────────────
    마우스 오버·키보드 포커스·터치(탭으로 열고 닫기)를 모두 지원합니다. 스크롤·Esc로 닫습니다. */
 const TIPS = {
   level: { t: '레벨 — 숙련도와 근무 규칙', items: [
@@ -2634,24 +2649,32 @@ const TIPS = {
     '희망일 쿼터 보호의 기준이 됩니다.'],
     eff: '전체 인원의 한도 합계가 그 달 일수보다 작으면 생성을 시작하지 않습니다. 한도가 기대 근무수보다 낮으면 M1 점수가 떨어집니다.' }
 };
-(function setupHeaderTips(){
+/* 툴팁 공통 처리: [data-tip](TIPS, 고정 설명)과 [data-tt](DYN_TIPS, 결과에 따라 바뀌는 설명)
+   마우스 오버·키보드 포커스·터치(탭으로 열고 닫기)를 모두 지원하고, 스크롤·Esc로 닫습니다. */
+(function setupTips(){
   const tip = $('#tip'); let cur = null;
-  const html = k => { const d = TIPS[k]; return `<b class="t">${d.t}</b><ul>${d.items.map(x => `<li>${x}</li>`).join('')}</ul><div class="eff">효과: ${d.eff}</div>`; };
-  function show(th){
-    if (cur === th) return; cur = th;
-    tip.innerHTML = html(th.dataset.tip); tip.classList.add('show');
-    const r = th.getBoundingClientRect(), tw = tip.offsetWidth, tH = tip.offsetHeight;
+  const SEL = '[data-tip],[data-tt]';
+  const html = el => {
+    const d = el.dataset.tip ? TIPS[el.dataset.tip] : DYN_TIPS[el.dataset.tt]; if (!d) return '';
+    return `<b class="t">${d.t}</b><ul>${d.items.map(x => `<li>${x}</li>`).join('')}</ul>` +
+      (d.eff ? `<div class="eff">${el.dataset.tip ? '효과: ' : ''}${d.eff}</div>` : '') + (d.note ? `<div class="note">${d.note}</div>` : '');
+  };
+  function show(el){
+    if (cur === el) return;
+    const h = html(el); if (!h) return;
+    cur = el; tip.innerHTML = h; tip.classList.add('show');
+    const r = el.getBoundingClientRect(), tw = tip.offsetWidth, tH = tip.offsetHeight;
     const left = Math.min(Math.max(8, r.left + r.width / 2 - tw / 2), window.innerWidth - tw - 8);
     let top = r.bottom + 8; if (top + tH > window.innerHeight - 8) top = Math.max(8, r.top - tH - 8);
     tip.style.left = left + 'px'; tip.style.top = top + 'px';
   }
   function hide(){ cur = null; tip.classList.remove('show'); }
-  const head = $('#roster thead'), thOf = e => e.target.closest && e.target.closest('th[data-tip]');
-  head.addEventListener('mouseover', e => { const th = thOf(e); if (th) show(th); });
-  head.addEventListener('mouseout', e => { const th = thOf(e); if (th && !th.contains(e.relatedTarget)) hide(); });
-  head.addEventListener('focusin', e => { const th = thOf(e); if (th) show(th); });
-  head.addEventListener('focusout', hide);
-  document.addEventListener('touchstart', e => { const th = e.target.closest && e.target.closest('#roster th[data-tip]'); if (th){ cur === th ? hide() : show(th); } else hide(); }, { passive: true });
+  const targetOf = e => e.target.closest && e.target.closest(SEL);
+  document.addEventListener('mouseover', e => { const el = targetOf(e); if (el) show(el); });
+  document.addEventListener('mouseout', e => { const el = targetOf(e); if (el && !el.contains(e.relatedTarget)) hide(); });
+  document.addEventListener('focusin', e => { const el = targetOf(e); el ? show(el) : hide(); });
+  document.addEventListener('focusout', e => { if (targetOf(e)) hide(); });
+  document.addEventListener('touchstart', e => { const el = targetOf(e); if (el){ cur === el ? hide() : show(el); } else hide(); }, { passive: true });
   window.addEventListener('scroll', hide, true);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') hide(); });
 })();
