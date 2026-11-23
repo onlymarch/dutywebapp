@@ -2,10 +2,12 @@
  * 인터페이스 오류 탐색 테스트 (Playwright, Chromium)
  * 실행: npx playwright install chromium   (최초 1회)
  *       node tests/ui-qa.js [index.html 경로]
- * 22개 범주(A~V) 96개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
+ * 23개 범주(A~W) 128개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
  * 숫자 경계값, 극단적 명단, 날짜 팝오버, 연타·중단, Worker 차단 환경, 수동 교체, 프로필 이름,
  * 저장 전 입력 보존, 대규모 명단, 모바일 배치, 키보드 조작, 출력, 공휴일 입력, 손상된 저장값, 이전 결과 조작,
- * 기간 입력(~와 -의 변형, 날짜 형식 기간, 열린 기간 -5·20-), 실행 요약(소요 시간·개선 기록).
+ * 기간 입력(~와 -의 변형, 날짜 형식 기간, 열린 기간 -5·20-), 실행 요약(소요 시간·개선 기록),
+ * 다국어(W: en·ja·zh·fr·es 각각 화면·툴팁·팝오버·대화상자·출력·CSV에 한글이 남지 않는지, 한국어 복원,
+ *   결과 표시 중 재전환, 새로 고침 후 유지, 360px 가로 넘침, 12月25日 형식 해석). 기본 언어는 한국어입니다.
  * 각 항목은 JS 예외·콘솔 오류·브라우저 기본 대화상자 발생도 함께 실패로 기록합니다.
  */
 
@@ -285,6 +287,69 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
  log('V1 5초 제한에서 멈춤',r.stop==='time'&&r.attempts<20000&&/시간 제한/.test(t),`${r.attempts}회 · ${t.slice(0,45)}`);
  log('V2 시간 제한 안내',/느려/.test(adv),adv.slice(0,50));
  errsOK(p,'V'); await p.context().close();}
+
+// W. 다국어: 언어마다 새 페이지에서 화면 전체를 거치며 한글이 남지 않는지 확인
+//    (언어 선택 목록의 '한국어'는 각 언어의 고유 이름이므로 검사에서 뺍니다)
+{const HG=/[가-힣]/, hangul=s=>{const m=String(s).match(/[^\n]{0,30}[가-힣][^\n]{0,30}/);return m?m[0].trim():'';};
+ const bodyText=p=>p.evaluate(()=>{const s=document.querySelector('.lang-pick');s.style.display='none';const t=document.body.innerText;s.style.display='';return t;});
+ const attrText=p=>p.evaluate(()=>[...document.querySelectorAll('body *')].filter(e=>!e.closest('script,.lang-pick'))
+   .flatMap(e=>['title','aria-label','placeholder','data-label','data-edited'].map(a=>e.getAttribute(a)).filter(Boolean)).join('\n'));
+ // W0. 기본 언어는 한국어(브라우저 언어를 따르지 않음)
+ {const p=await fresh(b); const r=await p.evaluate(()=>[document.documentElement.lang,document.querySelector('#langSelect').value,document.querySelector('#btnGenerate').textContent]);
+  log('W0 기본 언어 한국어',r[0]==='ko'&&r[1]==='ko'&&r[2].includes('당직표 생성'),r.join(' · ')); errsOK(p,'W0'); await p.context().close();}
+ // W1. 중국어·일본어 날짜 표기 해석 (12月25日, 25日, 2026年12月25日)
+ {const p=await fresh(b); const g=await p.evaluate(()=>['12月25日','25日','2026年12月25日','12月20日~22日','20日-22日'].map(v=>fmtDays(parseDays(v,31).days)));
+  log('W1 12月25日·25日 형식',JSON.stringify(g)==='["25","25","25","20~22","20~22"]',JSON.stringify(g)); errsOK(p,'W1'); await p.context().close();}
+ for(const L of ['en','ja','zh','fr','es']){
+  const p=await fresh(b); const bad=[]; const chk=(where,s)=>{const h=hangul(s); if(h) bad.push(where+': '+h);};
+  await p.selectOption('#langSelect',L); await p.waitForTimeout(100);
+  await p.click('#btnSample'); await p.waitForTimeout(300);
+  // 사전 점검 충돌: Emma의 희망일 5일을 제외일에도 넣음 / 열린 기간 안내
+  await p.fill('#roster input[data-i="1"][data-f="avoid"]','5, 25'); await p.fill('#roster input[data-i="0"][data-f="avail"]','-5, 25-'); await p.waitForTimeout(500);
+  const pc=await p.textContent('#precheck'); chk('사전 점검',pc); const conflict=/⚠️/.test(pc);
+  await gen(p);
+  await p.click('#btnMiniToggle'); await p.waitForTimeout(100); chk('미니 달력',await p.textContent('#candGrid'));
+  await p.click('[data-dp="0"]'); chk('팝오버',await p.innerHTML('#dp')); await p.keyboard.press('Escape');
+  await p.hover('#roster th[data-tip="level"]'); await p.waitForTimeout(100); const tip1=await p.innerHTML('#tip'); chk('명단 툴팁',tip1);
+  await p.hover('#gauges .gauge:nth-child(3)'); await p.waitForTimeout(100); const tip2=await p.innerHTML('#tip'); chk('DFI 툴팁',tip2);
+  await p.hover('[data-tt="dfiAbout"]'); await p.waitForTimeout(100); chk('DFI 설명 툴팁',await p.innerHTML('#tip')); await p.mouse.move(0,0);
+  await p.click('#cal .duty-name'); await p.waitForTimeout(100); chk('강조 요약',await p.textContent('#hlInfo'));
+  const l4=await p.evaluate(()=>state.result.cfg.people.findIndex(x=>x.level===4));
+  await p.click('#cal [data-edit="5"]'); await p.selectOption('#editDuty',String(l4)); await p.selectOption('#editAssist','-1');
+  chk('수동 교체 창',await p.innerHTML('#editDialog')); await p.click('#editApply'); await p.waitForTimeout(100); chk('실행 취소 막대',await p.textContent('#undoBar'));
+  const docs=await p.evaluate(()=>({print:buildPrintDoc(false).replace(/<style>[\s\S]*?<\/style>/,''),csv:buildCSV(state.result)}));
+  chk('출력 양식',docs.print); chk('CSV',docs.csv);
+  chk('화면',await bodyText(p)); chk('속성',await attrText(p)); chk('문서 제목',await p.title());
+  const tipsOK=tip1.length>50&&tip2.length>50;
+  const msg=bad.length?bad.slice(0,3).join(' | '):!conflict?'사전 점검 충돌이 표시되지 않음':!tipsOK?'툴팁 비어 있음':docs.csv.split('\r\n')[0].slice(1,60);
+  log('W2 '+L+' 한글 없음(화면·툴팁·팝오버·대화상자·출력·CSV)',!bad.length&&conflict&&tipsOK,msg);
+  // 결과가 있는 채로 한국어로 → 한국어 복원, 다시 원래 언어로 → 한글 없음
+  await p.selectOption('#langSelect','ko'); await p.waitForTimeout(150);
+  const ko=await p.evaluate(()=>[document.documentElement.lang,document.querySelector('#calTitle').textContent,document.querySelector('#stats th').textContent,document.querySelector('#btnGenerate').textContent,document.querySelector('.run-tiles .k').textContent]);
+  log('W3 '+L+' → 한국어 복원',ko[0]==='ko'&&/당직/.test(ko[1])&&ko[2]==='성명'&&ko[3].includes('당직표 생성')&&ko[4]==='시도 횟수',ko.join(' · '));
+  await p.selectOption('#langSelect',L); await p.waitForTimeout(150);
+  const again=hangul(await bodyText(p))||hangul(await attrText(p));
+  log('W4 '+L+' 결과 표시 중 언어 재전환',!again,again||'정상');
+  // 오류 대화상자(한도 합계 부족)·미배정 대화상자
+  await setPeople(p,[{name:'a',level:1,max:'3'}]); await p.waitForTimeout(500);
+  await p.click('#btnGenerate'); await p.waitForFunction(()=>document.querySelector('#diagDialog').open,null,{timeout:10000}); const e1=await p.textContent('#diagDialog'); await closeDiag(p);
+  await setPeople(p,[{name:'x',level:2,avoid:'1~10'},{name:'y',level:2,avoid:'1~10'}]); await p.waitForTimeout(500);
+  await p.click('#btnGenerate'); await p.waitForFunction(()=>!document.querySelector('#btnGenerate').disabled,null,{timeout:60000}); await p.waitForTimeout(150);
+  const e2=await p.textContent('#diagDialog'); await closeDiag(p);
+  const dh=hangul(e1)||hangul(e2)||hangul(await bodyText(p));
+  log('W5 '+L+' 오류·미배정 대화상자',!dh&&e1.length>10&&e2.length>10,dh||e1.trim().slice(0,50));
+  // 새로 고침 후에도 언어 유지
+  await p.reload(); await p.waitForTimeout(300);
+  const kept=await p.evaluate(()=>[document.documentElement.lang,document.querySelector('#langSelect').value]); const rh=hangul(await bodyText(p));
+  log('W6 '+L+' 새로 고침 후 언어 유지',kept[0]===L&&kept[1]===L&&!rh,kept.join(',')+(rh?' · '+rh:''));
+  errsOK(p,'W '+L); await p.context().close();
+  // 좁은 화면(360px): 긴 번역으로 가로 넘침이 생기지 않는지
+  {const q=await fresh(b,{vp:{width:360,height:740}}); await q.selectOption('#langSelect',L);
+   await q.click('#btnSample'); await q.waitForTimeout(300); await gen(q);
+   const ov=await q.evaluate(()=>document.documentElement.scrollWidth-innerWidth); log('W7 '+L+' 360px 가로 넘침 없음',ov<=0,'초과 '+ov+'px');
+   errsOK(q,'W7 '+L); await q.context().close();}
+ }
+}
 
 await b.close();
 const f=results.filter(r=>!r.ok); console.log(`\n총 ${results.length}건 · 통과 ${results.length-f.length} · 실패 ${f.length}`);
