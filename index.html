@@ -62,6 +62,7 @@ input:focus,select:focus{outline:2px solid var(--accent-weak);border-color:var(-
 input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
 .range-ticks{display:flex;justify-content:space-between;font-size:10px;color:var(--sub);padding:0 2px}
 .range-val{color:var(--accent);font-size:13px}
+.range-ex{font-size:11px;color:var(--sub);margin-top:2px}   /* 배정 제외일의 의미를 예시로 풀어 쓴 안내 */
 button{font:inherit;border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;color:var(--ink)}
 button:hover{background:#f0f2f6}
 button:disabled{opacity:.5;cursor:not-allowed}
@@ -325,8 +326,8 @@ body.printing-sheet #printSheet{display:block}
   <!-- data-s 속성: state.settings의 키와 연결된 입력칸 (bindSettingInputs에서 일괄 처리) -->
   <div class="grid-ctrl">
     <div class="field"><label for="ym">대상 연월</label><select id="ym"></select></div>
-    <div class="field"><label for="restW">평일 근무 후 최소 휴무일: <b class="range-val" id="restWVal">1</b>일</label><input type="range" id="restW" data-s="restW" min="0" max="5" step="1"><div class="range-ticks"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div></div>
-    <div class="field"><label for="restH">휴일 근무 후 최소 휴무일: <b class="range-val" id="restHVal">2</b>일</label><input type="range" id="restH" data-s="restH" min="0" max="5" step="1"><div class="range-ticks"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div></div>
+    <div class="field"><label for="restW">평일 당직 후 배정 제외일: <b class="range-val" id="restWVal">1</b>일</label><input type="range" id="restW" data-s="restW" min="0" max="5" step="1" aria-describedby="restWEx"><div class="range-ticks"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div><div class="range-ex" id="restWEx"></div></div>
+    <div class="field"><label for="restH">휴일 당직 후 배정 제외일: <b class="range-val" id="restHVal">2</b>일</label><input type="range" id="restH" data-s="restH" min="0" max="5" step="1" aria-describedby="restHEx"><div class="range-ticks"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div><div class="range-ex" id="restHEx"></div></div>
     <div class="field"><label for="minDFI">목표 DFI (당직 공정성 지수, 0–100)</label><input type="number" id="minDFI" data-s="minDFI" min="0" max="100"></div>
     <div class="field"><label for="maxAttempts">시뮬레이션 횟수 (최대 10,000)</label><input type="number" id="maxAttempts" data-s="maxAttempts" min="1" max="10000" step="100"></div>
   </div>
@@ -575,7 +576,8 @@ function precompute(cfg, cal){
  * [1단계] 기본 후보: 다음 조건을 모두 통과한 사람
  *   - 월 최대 한도 미만
  *   - 기피일·제외요일이 아님
- *   - 휴무 간격 충족: 마지막 근무일이 휴일이면 restH, 평일이면 restW일을 초과해 쉬었음
+ *   - 배정 제외일 경과: 마지막 정규 당직일이 휴일이면 restH일, 평일이면 restW일이 지났음
+ *     (조건: 오늘 − 마지막 당직일 > 배정 제외일)
  *     (레벨 1은 특례로 이 규칙을 적용하지 않음)
  *   - 레벨 4는 그날 조력 가능한 레벨 3이 1명 이상 있어야 함
  *
@@ -592,7 +594,7 @@ function precompute(cfg, cal){
  * [4단계] 레벨 4가 뽑히면 조력자(레벨 3)를 붙입니다.
  *   조건: 기피일·제외요일 아님, 전날 정규 당직자 아님
  *   선택: 마지막 근무(정규·조력 포함) 이후 가장 오래 쉰 사람 → 조력 횟수가 적은 사람 → 무작위
- *   조력은 정규 근무수와 휴무 간격 계산에 포함하지 않습니다.
+ *   조력은 정규 근무수와 배정 제외일 계산에 포함하지 않습니다.
  *
  * ※ Math.random() 호출 순서는 v1.8.0과 같습니다. 같은 난수열이면 같은 결과가 나옵니다.
  *
@@ -846,7 +848,7 @@ if (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScop
  *   §3  앱 상태(state)와 직렬화
  *   §4  공통 유틸: 이스케이프, 토스트, 확인창, 실행 취소, 날짜 해석·표기, 복사, 다운로드
  *   §5  자동 저장과 파생 정보(사전 점검·결과 낡음) 갱신
- *   §6  설정 패널: 연월, 휴무일, 공휴일
+ *   §6  설정 패널: 연월, 배정 제외일, 공휴일
  *   §7  프로필: 새로 만들기·복사·이름 변경·삭제
  *   §8  명단 표
  *   §9  달력형 날짜 선택 팝오버
@@ -873,8 +875,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.9.2', APP_BUILD = '2026-11-22';
+const APP_VERSION = '1.9.3', APP_BUILD = '2026-11-22';
 const CHANGELOG = [
+  '1.9.3 용어 변경: 최소 휴무일·휴무 간격 → 배정 제외일(당직 다음 날부터 n일간 배정하지 않음). 슬라이더 아래 의미 예시 추가',
   '1.9.2 강조 시 조력 근무를 정규 당직보다 연한 색으로 표시, 요약 막대에 정규·조력 색 범례 추가',
   '1.9.1 근무자별 통계표 열 정렬 수정(머리글·값 가운데 정렬, 열 폭 고정), 화면을 내릴 때 DFI 카드가 통계표를 덮는 문제 수정',
   '1.9.0 코드 구조 정리·주석 보강. 엔진 사전 계산으로 시도당 연산 감소(결과 동일), 강조 표시 부분 갱신, 통계 캐시, 입력 중 결과 낡음 검사 지연 처리',
@@ -1250,7 +1253,20 @@ $('#ym').addEventListener('change', e => {
 });
 
 const clampRest = v => { v = Math.round(+v); return isNaN(v) ? 0 : Math.min(5, Math.max(0, v)); };
-function renderRangeLabels(){ $('#restWVal').textContent = state.settings.restW; $('#restHVal').textContent = state.settings.restH; }
+/**
+ * 배정 제외일 슬라이더의 숫자와 의미 안내를 갱신합니다.
+ * 배정 제외일 n = 당직 다음 날부터 n일 동안 그 사람에게 정규 당직을 배정하지 않음.
+ * 예: n=1, 3일 당직 → 4일 제외 → 5일부터 가능 (엔진 조건: 다음 당직일 − 마지막 당직일 > n)
+ */
+function rangeExplain(n){
+  return n === 0 ? '제외일 없음 · 다음 날 바로 당직 가능'
+                 : `당직 다음 날부터 ${n}일간 배정하지 않음 · 예: 3일 당직 → ${n + 4}일부터 가능`;
+}
+function renderRangeLabels(){
+  const w = +state.settings.restW || 0, h = +state.settings.restH || 0;
+  $('#restWVal').textContent = w; $('#restHVal').textContent = h;
+  $('#restWEx').textContent = rangeExplain(w); $('#restHEx').textContent = rangeExplain(h);
+}
 /** state.settings → 설정 패널 전체 반영 */
 function renderSettings(){
   state.settings.restW = clampRest(state.settings.restW); state.settings.restH = clampRest(state.settings.restH);
@@ -1632,7 +1648,7 @@ function precheck(){
   if (P.some(p => p.level >= 4) && !P.some(p => p.level === 3))
     err('레벨 4는 레벨 3 조력자가 있어야 배정됩니다. 레벨 3 인원이 없어 레벨 4는 배정되지 않습니다.');
 
-  // 6) 누구도 설 수 없는 날 (휴무 간격은 배정 결과에 따라 달라지므로 제외하고, 확정적인 조건만 봅니다)
+  // 6) 누구도 설 수 없는 날 (배정 제외일은 배정 결과에 따라 달라지므로 제외하고, 확정적인 조건만 봅니다)
   const none = [];
   for (let d = 1; d <= N; d++){
     const w = dowOf(d), free = i => !avoidSet[i].has(d) && !P[i].exDow[w];
@@ -1860,9 +1876,9 @@ function renderStats(R){
 /** 목표 미달 시 가장 낮은 지표에 대한 수정 안내 */
 const GUIDE = {
   M1: '가중치 대비 실제 근무수 편차가 큽니다. 아래 통계표의 "차이" 열에서 많이·적게 배정된 사람을 확인하십시오. 기피일·제외요일·월 최대 한도가 특정 인원의 근무를 막고 있는지 보고 가중치를 조정하십시오.',
-  M2: '휴일 근무가 일부 인원에 쏠렸습니다. 주말 제외요일 설정을 줄이거나 휴일 후 휴무일을 낮추면 휴일 배분 후보가 늘어납니다.',
+  M2: '휴일 근무가 일부 인원에 쏠렸습니다. 주말 제외요일 설정을 줄이거나 휴일 당직 후 배정 제외일을 줄이면 휴일 배분 후보가 늘어납니다.',
   M3: '희망일이 서로 겹치거나 한도보다 많습니다. 사전 점검의 희망일 충돌 항목을 조정하고 가능일 범위를 넓히십시오.',
-  M4: '개인별 근무 간격이 불규칙합니다. 최소 휴무일을 1일씩 늘리거나 시뮬레이션 횟수를 늘리십시오.',
+  M4: '개인별 근무 간격이 불규칙합니다. 배정 제외일을 1일씩 늘리거나 시뮬레이션 횟수를 늘리십시오.',
   M5: '근무가 특정 요일에 몰렸습니다. 희망요일·제외요일 지정을 줄이면 요일 분산이 개선됩니다.'
 };
 function renderDFI(R){
@@ -1999,13 +2015,13 @@ function checkEdit(){
       // 앞쪽 가장 가까운 근무와의 간격 (앞 근무가 휴일이면 restH 적용)
       for (let j = d - 1; j >= 1; j--) if (R.duty[j] === k){
         const rest = R.cal.days[j].isHol ? R.cfg.restH : R.cfg.restW;
-        if (d - j <= rest) w.push(`휴무 간격 위반: ${j}일 근무 후 ${d - j}일차 (필요 > ${rest})`);
+        if (d - j <= rest) w.push(`배정 제외일 위반: ${j}일 당직 후 ${rest}일간 제외 기간입니다 (${d - j}일째).`);
         break;
       }
       // 뒤쪽 가장 가까운 근무와의 간격 (오늘이 휴일이면 restH 적용)
       for (let j = d + 1; j <= R.cal.N; j++) if (R.duty[j] === k){
         const rest = day.isHol ? R.cfg.restH : R.cfg.restW;
-        if (j - d <= rest) w.push(`휴무 간격 위반: 이후 ${j}일 근무와 간격 ${j - d}일`);
+        if (j - d <= rest) w.push(`배정 제외일 위반: 이 날 당직 후 ${rest}일간 제외 기간에 ${j}일 당직이 있습니다.`);
         break;
       }
     }
@@ -2039,8 +2055,8 @@ $('#editApply').addEventListener('click', () => {
 function showUnfilled(){
   const R = (state.cands && state.cands[0]) || state.result;
   $('#diagTitle').textContent = '⚠️ 미배정일이 있습니다';
-  $('#diagBody').innerHTML = `<p style="color:var(--bad)"><b>${fmtDays(R.unfilled)}일 (${R.unfilled.length}일)</b>에 휴무 간격·기피일·제외요일·한도를 모두 통과한 후보가 없었습니다.</p>
-    <ul><li>레벨 1 인원을 늘리거나 최소 휴무일을 낮추십시오.</li><li>해당 날짜의 기피일·제외요일 설정을 확인하십시오(3단계 사전 점검 참고).</li><li>달력의 ✎ 버튼으로 직접 채울 수 있습니다.</li></ul>`;
+  $('#diagBody').innerHTML = `<p style="color:var(--bad)"><b>${fmtDays(R.unfilled)}일 (${R.unfilled.length}일)</b>에 배정 제외일·기피일·제외요일·한도를 모두 통과한 후보가 없었습니다.</p>
+    <ul><li>레벨 1 인원을 늘리거나 배정 제외일을 줄이십시오.</li><li>해당 날짜의 기피일·제외요일 설정을 확인하십시오(3단계 사전 점검 참고).</li><li>달력의 ✎ 버튼으로 직접 채울 수 있습니다.</li></ul>`;
   $('#diagDialog').showModal();
 }
 function showError(msg){
@@ -2151,7 +2167,7 @@ function buildPrintBody(){
 
   // 머리: 제목·메타 + 결재란
   const meta = `${state.profile ? esc(state.profile) + ' · ' : ''}생성 ${R.at.toLocaleString('ko-KR', { hour12: false })}${R.edited.size ? ' · 수동 수정 ' + R.edited.size + '건' : ''}` +
-    `<br>당직배정 웹앱 v${APP_VERSION} · DFI ${R.dfi.total.toFixed(1)}점 (${R.dfi.grade}) · 휴무 규정: 평일 후 ${R.cfg.restW}일 · 휴일 후 ${R.cfg.restH}일`;
+    `<br>당직배정 웹앱 v${APP_VERSION} · DFI ${R.dfi.total.toFixed(1)}점 (${R.dfi.grade}) · 배정 제외일: 평일 당직 후 ${R.cfg.restW}일 · 휴일 당직 후 ${R.cfg.restH}일`;
   let html = `<div class="sheet"><div class="ps-head"><div><h1>${R.cfg.year}년 ${R.cfg.month}월 당직표 <span style="font-size:12px;font-weight:600;color:#555">(${R.rank || 1}안)</span></h1>` +
              `<div class="ps-meta">${meta}</div></div>${o.sign ? SIGN_BLOCK : ''}</div>`;
 
@@ -2243,11 +2259,11 @@ $('#btnPrintFile').addEventListener('click', async () => {
    마우스 오버·키보드 포커스·터치(탭으로 열고 닫기)를 모두 지원합니다. 스크롤·Esc로 닫습니다. */
 const TIPS = {
   level: { t: '레벨 — 숙련도와 근무 규칙', items: [
-    '<b>Lv1 특례(최고숙련)</b>: 휴무 간격 규정을 적용받지 않습니다. 연속 근무가 가능합니다.',
-    '<b>Lv2 숙련</b>: 단독 정규 근무를 합니다. 휴무 간격 규정을 따릅니다.',
+    '<b>Lv1 특례(최고숙련)</b>: 배정 제외일을 적용받지 않습니다. 연속 근무가 가능합니다.',
+    '<b>Lv2 숙련</b>: 단독 정규 근무를 합니다. 배정 제외일을 따릅니다.',
     '<b>Lv3 일반(조력)</b>: 단독 정규 근무를 합니다. 레벨 4 근무일의 조력자 후보가 됩니다.',
     '<b>Lv4 초보</b>: 그날 조력 가능한 레벨 3 인원이 1명 이상 있을 때만 배정됩니다.'],
-    eff: '조력자는 전날 정규 당직자가 아닌 레벨 3 중 가장 오래 쉰 인원으로 정합니다. 조력 근무는 정규 근무 횟수와 휴무 간격에 반영되지 않습니다.' },
+    eff: '조력자는 전날 정규 당직자가 아닌 레벨 3 중 가장 오래 쉰 인원으로 정합니다. 조력 근무는 정규 근무 횟수와 배정 제외일에 반영되지 않습니다.' },
   weight: { t: '가중치 — 근무량 배분 비율 (기본 1.0)', items: [
     '기대 근무수는 <b>배정일수 × 본인 가중치 ÷ 전체 가중치 합</b>으로 계산합니다. 결과 통계표의 "기대" 열입니다.',
     '배정 점수에서 카테고리별(휴일 / 목·금 / 월~수) 누적 근무수를 가중치로 나눕니다. 가중치가 클수록 같은 근무수에서도 먼저 뽑힙니다.',
@@ -2256,7 +2272,7 @@ const TIPS = {
   wish: { t: '희망일 — 0순위 (최우선)', items: [
     '그날 배정 가능한 후보 중 희망일인 인원을 가장 먼저 고려합니다.',
     '<b>쿼터 보호</b>: 남은 한도가 앞으로 남은 희망일 수 이하가 되면, 희망일이 아닌 날에는 배정을 보류해 한도를 아껴 둡니다. 그날 후보가 아무도 없으면 보호를 풀어 배정합니다.',
-    '휴무 간격·한도·기피일 규칙이 희망일보다 우선합니다. 따라서 희망일이 항상 보장되지는 않습니다.'],
+    '배정 제외일·한도·기피일 규칙이 희망일보다 우선합니다. 따라서 희망일이 항상 보장되지는 않습니다.'],
     eff: 'DFI M3(선호도 충족률) 중 8점이 희망일 반영률입니다. 같은 날을 여러 명이 희망하면 반영률이 떨어집니다(사전 점검에 표시).' },
   avail: { t: '가능일 — 2순위', items: [
     '희망일·희망요일에 해당하는 사람이 없을 때 다음으로 고려합니다.',
