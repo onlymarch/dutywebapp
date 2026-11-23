@@ -157,19 +157,21 @@ th[data-tip]:hover,th[data-tip]:focus{color:var(--accent);outline:none}
 .pc-err{color:var(--bad)} .pc-warn{color:var(--warn)} .pc-ok{color:var(--ok);font-weight:600} .pc-info{color:var(--sub)}
 
 /* ---------- 8. 결과 ---------- */
-.results-grid{display:grid;grid-template-columns:1fr;gap:14px}
+/* 그리드 열은 minmax(0,1fr): 1fr만 쓰면 열 최소 너비가 가장 넓은 내용(예: 통계표 640px)을 따라가
+   좁은 화면에서 결과 영역 전체가 가로로 넘칩니다. 넓은 표는 자기 칸(.table-wrap) 안에서만 스크롤됩니다. */
+.results-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
 /* 달력과 DFI 카드는 별도 묶음(.cal-row) 안에서만 2열로 배치합니다.
    DFI 카드의 sticky 범위가 이 묶음으로 한정되므로, 아래 통계표 위로 겹쳐 내려오지 않습니다. */
-.cal-row{display:grid;grid-template-columns:1fr;gap:14px;align-items:start}
+.cal-row{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start}
 @media (min-width:1000px){
-  .cal-row{grid-template-columns:1.5fr 1fr}
+  .cal-row{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
   #dfiCard{position:sticky;top:58px}   /* 달력을 내려도 DFI가 보이도록 고정 (묶음 안에서만) */
 }
 .stale{background:#fff4e5;border:1px solid #ffcc80;color:#7a4a00;border-radius:12px;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
 .placeholder{color:var(--sub);font-size:13px;margin:0}
 .sel-tag{background:var(--accent);color:#fff;border-radius:6px;padding:1px 7px;font-size:12px}
 /* 8-1. 상위 3개 안 카드 */
-.cand-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.cand-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:12px}
 .cand{border:2px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;background:#fff;display:flex;flex-direction:column;gap:6px;transition:border-color .15s,box-shadow .15s}
 .cand:hover{border-color:#b9c6f5}
 .cand.sel{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
@@ -875,8 +877,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.9.3', APP_BUILD = '2026-11-22';
+const APP_VERSION = '1.9.4', APP_BUILD = '2026-11-22';
 const CHANGELOG = [
+  '1.9.4 인터페이스 오류 수정: 생성 중 프로필 전환 시 이전 결과 표시, 삭제 실행 취소가 다른 프로필 명단에 섞임, JSON 복원 시 같은 이름 프로필 무확인 덮어쓰기와 손상 데이터 처리, 연월 변경 시 날짜 팝오버 잔류, 저장 전 입력 유실, 같은 이름으로 이름 변경 시 오류 안내, 좁은 화면 결과 영역 가로 넘침',
   '1.9.3 용어 변경: 최소 휴무일·휴무 간격 → 배정 제외일(당직 다음 날부터 n일간 배정하지 않음). 슬라이더 아래 의미 예시 추가',
   '1.9.2 강조 시 조력 근무를 정규 당직보다 연한 색으로 표시, 요약 막대에 정규·조력 색 범례 추가',
   '1.9.1 근무자별 통계표 열 정렬 수정(머리글·값 가운데 정렬, 열 폭 고정), 화면을 내릴 때 DFI 카드가 통계표를 덮는 문제 수정',
@@ -1053,11 +1056,38 @@ function serialize(){
     p: state.people.map(p => [p.name, +p.level, +p.weight, p.wish, p.avail, p.avoid, mask(p.wishDow), mask(p.exDow), p.max]) };
 }
 function deserialize(o){
-  if (!o) return false;
-  state.settings = Object.assign(defaultSettings(), o.s || {});
-  state.people = (o.p || []).map(a => ({ name: a[0] || '', level: a[1] || 3, weight: a[2] ?? 1, wish: a[3] || '', avail: a[4] || '', avoid: a[5] || '',
-    wishDow: unmask(a[6] || 0), exDow: unmask(a[7] || 0), max: a[8] ?? '' }));
+  if (!o || typeof o !== 'object') return false;
+  state.settings = normalizeSettings(o.s);
+  state.people = (Array.isArray(o.p) ? o.p : []).filter(Array.isArray).map(a => normalizePerson({
+    name: a[0], level: a[1], weight: a[2], wish: a[3], avail: a[4], avoid: a[5], wishDow: unmask(+a[6] || 0), exDow: unmask(+a[7] || 0), max: a[8] }));
   return true;
+}
+/*
+ * 외부에서 들어온 값(저장소·JSON 백업)을 화면이 기대하는 형태로 맞춥니다.
+ * 손상되었거나 다른 버전의 데이터여도 화면 오류 없이 열리게 하는 것이 목적입니다.
+ *   - 문자열이어야 할 칸(이름·날짜·한도)은 문자열로, 배열이면 쉼표로 이어 붙임
+ *   - 레벨은 1~4 정수, 요일은 길이 7의 0/1 배열
+ *   - 설정은 알려진 키만 받고, 연월이 이상하면 기본값(다음 달)
+ */
+function normalizePerson(x){
+  const str = v => v == null ? '' : Array.isArray(v) ? v.join(', ') : String(v);
+  const dow = v => Array.from({ length: 7 }, (_, i) => (Array.isArray(v) && v[i]) ? 1 : 0);
+  const lv = Math.round(+x.level);
+  return {
+    name: str(x.name), level: (lv >= 1 && lv <= 4) ? lv : 3,
+    weight: (x.weight === '' || x.weight == null || isNaN(+x.weight)) ? 1 : +x.weight,
+    wish: str(x.wish), avail: str(x.avail), avoid: str(x.avoid),
+    wishDow: dow(x.wishDow), exDow: dow(x.exDow), max: str(x.max)
+  };
+}
+function normalizeSettings(s){
+  const d = defaultSettings(), o = Object.assign({}, d);
+  if (!s || typeof s !== 'object') return o;
+  const y = Math.round(+s.year), m = Math.round(+s.month);
+  if (y >= 2000 && y <= 2100 && m >= 1 && m <= 12){ o.year = y; o.month = m; o.holidays = builtinStr(y, m); }
+  if (s.holidays != null) o.holidays = String(s.holidays);
+  for (const k of ['restW', 'restH', 'minDFI', 'maxAttempts']) if (s[k] !== '' && s[k] != null && !isNaN(+s[k])) o[k] = +s[k];
+  return o;
 }
 
 /* ─────────────────────────── §4 공통 유틸 ─────────────────────────── */
@@ -1094,6 +1124,7 @@ function ask(msg, opt = {}){
 
 /** 실행 취소 막대. 8초 뒤 자동으로 사라집니다. 새로 호출하면 이전 취소 기회는 없어집니다. */
 let undoTimer = null;
+function hideUndo(){ clearTimeout(undoTimer); $('#undoBar').classList.add('hidden'); $('#undoBtn').onclick = null; }
 function showUndo(msg, undoFn){
   const bar = $('#undoBar'); $('#undoMsg').textContent = msg; bar.classList.remove('hidden');
   $('#undoBtn').onclick = () => { undoFn(); bar.classList.add('hidden'); clearTimeout(undoTimer); };
@@ -1189,7 +1220,10 @@ function scheduleSave(){
   saveTimer = setTimeout(() => { saveNow(); refreshDerived(); }, 400);
 }
 /** 대기 중인 자동 저장을 즉시 실행합니다(프로필 전환 직전 등). */
-function flushSave(){ if (saveTimer){ clearTimeout(saveTimer); saveTimer = null; if (state.profile) saveNow(); } }
+function flushSave(){
+  if (!saveTimer) return;
+  clearTimeout(saveTimer); saveNow();               // 프로필 이름이 없으면 saveNow가 '기본'으로 저장
+}
 
 function saveNow(){
   saveTimer = null;
@@ -1241,6 +1275,7 @@ function renderYM(){
 $('#ym').addEventListener('change', e => {
   const [y, m] = e.target.value.split('-').map(Number);
   state.settings.year = y; state.settings.month = m;
+  closeDP();                                        // 열린 날짜 팝오버는 이전 달 기준이므로 닫음
   const bi = builtinHolidays(y, m);
   state.settings.holidays = builtinStr(y, m);
   $('#holidays').value = state.settings.holidays;
@@ -1324,6 +1359,8 @@ $('#holHint').addEventListener('click', e => {
 /* ─────────────────────────── §7 프로필 ─────────────────────────── */
 /** 결과·진행 표시를 비웁니다(프로필 전환·새 프로필·삭제 시). */
 function clearResults(){
+  if (isRunning()) stopRun();                       // 다른 프로필로 바뀌면 진행 중인 생성은 버림
+  hideUndo();                                       // 이전 프로필에 대한 실행 취소가 새 프로필에 적용되지 않도록
   Object.assign(state, { result: null, cands: null, hl: -1, genSig: null });
   $('#results').classList.add('hidden'); $('#emptyResults').classList.remove('hidden'); $('#genBadge').classList.add('hidden');
   $('#progBar').style.width = '0%'; $('#progText').textContent = '대기 중';
@@ -1350,9 +1387,9 @@ function applyProfile(name, quiet){
   return true;
 }
 /** 새 이름 입력. 빈 이름·중복 이름이면 null */
-async function askNewName(msg, value){
+async function askNewName(msg, value, keep){
   const name = await ask(msg, { input: true, value: value || '', placeholder: '예: 가정의학과 전공의' });
-  if (name == null) return null;
+  if (name == null || (keep && name === keep)) return null;   // 취소 또는 이름 그대로(변경 없음)
   if (!name){ toast('이름을 입력하십시오.'); return null; }
   if (Store.list().includes(name)){ toast(`'${name}' 프로필이 이미 있습니다.`); return null; }
   return name;
@@ -1383,7 +1420,7 @@ $('#btnProfileSaveAs').addEventListener('click', async () => {
 // 이름 변경 = 새 이름으로 저장 후 이전 이름 삭제
 $('#btnProfileRename').addEventListener('click', async () => {
   const old = state.profile; if (!old){ toast('저장된 프로필이 없습니다.'); return; }
-  const name = await askNewName(`'${old}' 프로필의 새 이름`, old); if (!name) return;
+  const name = await askNewName(`'${old}' 프로필의 새 이름`, old, old); if (!name) return;
   clearTimeout(saveTimer);
   state.profile = name; saveNow(); Store.remove(old); Store.setLast(name); refreshProfileUI();
   toast(`'${old}' → '${name}'로 이름을 바꿨습니다.`);
@@ -1505,7 +1542,9 @@ $('#roster').addEventListener('click', e => {
   if (ds.op === 'del'){
     const removed = P.splice(i, 1)[0];
     showUndo(`${personLabel(removed, i)} 근무자를 삭제했습니다.`, () => {
-      state.people.splice(Math.min(i, state.people.length), 0, removed); renderRoster(); scheduleSave();
+      // 그사이 샘플·복원·프로필 전환으로 명단 자체가 바뀌었으면 되돌리지 않습니다(다른 명단에 섞임 방지).
+      if (state.people !== P){ toast('명단이 바뀌어 삭제를 되돌릴 수 없습니다.'); return; }
+      P.splice(Math.min(i, P.length), 0, removed); renderRoster(); scheduleSave();
     });
   }
   renderRoster(); scheduleSave();
@@ -1673,7 +1712,11 @@ function renderPrecheck(){
    1순위: 엔진 소스로 인라인 Web Worker를 만들어 실행 (화면이 멈추지 않음)
    2순위: Worker 생성이 막힌 환경(일부 미리보기·file://)에서는 메인 스레드에서
           30ms씩 나눠 실행하고 setTimeout으로 화면에 양보합니다. */
-let worker = null, workerURL = null, fallbackCancel = false, cfgSnapshot = null;
+let worker = null, workerURL = null, cfgSnapshot = null;
+/* 실행 번호: 생성할 때마다 1 증가합니다. 중단·프로필 전환 때도 증가시켜,
+   이전 실행이 늦게 보내는 진행률·완료 메시지는 번호가 달라 무시됩니다.
+   (예: 생성 중 다른 프로필로 바꾸면 이전 프로필의 결과가 새 화면에 나타나던 문제 방지) */
+let runId = 0;
 
 /**
  * 입력 원문(state) → 엔진 입력(cfg)
@@ -1722,12 +1765,20 @@ function cleanupWorker(){
   if (worker){ worker.terminate(); worker = null; }
   if (workerURL){ URL.revokeObjectURL(workerURL); workerURL = null; }
 }
-function runFallback(cfg){
+/**
+ * 진행 중인 생성을 멈춥니다. Worker는 종료하고, 대체 실행은 실행 번호가 바뀌어 다음 tick에서 스스로 멈춥니다.
+ * @param {string} [msg] 진행 표시줄에 남길 문구 (없으면 그대로 둠)
+ */
+function stopRun(msg){
+  runId++; cleanupWorker(); setRunning(false);
+  if (msg) $('#progText').textContent = msg;
+}
+const isRunning = () => $('#btnGenerate').disabled;
+function runFallback(cfg, id){
   $('#engineMode').textContent = '엔진: 메인 스레드 분할 실행(Worker 사용 불가)';
-  fallbackCancel = false;
   const it = Engine.simulate(cfg);
   (function tick(){
-    if (fallbackCancel){ setRunning(false); $('#progText').textContent = '사용자가 중단했습니다.'; return; }
+    if (id !== runId) return;                       // 중단되었거나 새 실행이 시작됨
     const t0 = performance.now(); let r;
     while (performance.now() - t0 < 30){ r = it.next(); if (r.done) return onDone(r.value); onProgress(r.value); }
     setTimeout(tick, 0);
@@ -1736,24 +1787,26 @@ function runFallback(cfg){
 function generate(){
   const cfg = buildCfg();
   if (!cfg.year || !cfg.month || cfg.month < 1 || cfg.month > 12){ showError('대상 연도와 월을 확인하십시오.'); return; }
+  if (isRunning()) return;                          // 연타·키보드 반복 입력 방지
+  const id = ++runId;
   closeDP(); cfgSnapshot = cfg; setRunning(true);
   $('#progBar').style.width = '0%'; $('#progText').textContent = '연산 시작…';
   try {
     workerURL = URL.createObjectURL(new Blob([ENGINE_SRC], { type: 'text/javascript' }));
-    worker = new Worker(workerURL);
+    const w = worker = new Worker(workerURL);
     $('#engineMode').textContent = '';
-    worker.onmessage = e => { if (e.data.type === 'progress') onProgress(e.data.p); else onDone(e.data.result); };
+    w.onmessage = e => {
+      if (id !== runId) return;                     // 이전 실행의 늦은 메시지
+      if (e.data.type === 'progress') onProgress(e.data.p); else onDone(e.data.result);
+    };
     // Worker가 생성은 됐지만 실행 중 실패하는 경우(CSP 등)도 대체 실행으로 넘깁니다.
-    worker.onerror = err => { err.preventDefault && err.preventDefault(); cleanupWorker(); runFallback(cfg); };
-    worker.postMessage(cfg);
-  } catch(e){ cleanupWorker(); runFallback(cfg); }
+    w.onerror = err => { err.preventDefault && err.preventDefault(); if (id !== runId) return; cleanupWorker(); runFallback(cfg, id); };
+    w.postMessage(cfg);
+  } catch(e){ cleanupWorker(); runFallback(cfg, id); }
 }
 $('#btnGenerate').addEventListener('click', generate);
 $('#btnRegen').addEventListener('click', () => { $('#genCard').scrollIntoView({ behavior: 'smooth', block: 'start' }); generate(); });
-$('#btnCancel').addEventListener('click', () => {
-  if (worker){ cleanupWorker(); setRunning(false); $('#progText').textContent = '사용자가 중단했습니다.'; }
-  else fallbackCancel = true;
-});
+$('#btnCancel').addEventListener('click', () => stopRun('사용자가 중단했습니다.'));
 
 /* ─────────────────────────── §13 결과 화면 ───────────────────────────
    renderResults()  : 선택된 안 기준으로 카드·달력·통계·DFI를 모두 다시 그림
@@ -2075,18 +2128,33 @@ $('#btnExportJSON').addEventListener('click', () => {
 $('#btnImportJSON').addEventListener('click', () => $('#fileJSON').click());
 $('#fileJSON').addEventListener('change', e => {
   const f = e.target.files[0]; if (!f) return;
-  const fix7 = a => (a || []).slice(0, 7).concat([0, 0, 0, 0, 0, 0, 0]).slice(0, 7);   // 요일 배열 길이 보정
   const rd = new FileReader();
-  rd.onload = () => {
-    try {
-      const o = JSON.parse(rd.result);
-      if (!o.settings || !Array.isArray(o.people)) throw new Error('형식 오류');
-      state.settings = Object.assign(defaultSettings(), o.settings);
-      state.people = o.people.map(p => Object.assign(blankPerson(), p, { wishDow: fix7(p.wishDow), exDow: fix7(p.exDow) }));
-      if (o.profile) state.profile = o.profile;
-      saveNow(); renderAll(); toast('JSON을 복원했습니다.');
-    } catch(err){ showError('올바른 백업 파일이 아닙니다.'); }
+  rd.onload = async () => {
     e.target.value = '';                                  // 같은 파일을 다시 고를 수 있도록 초기화
+    // 1) 해석·검증: 실패하면 현재 상태를 전혀 바꾸지 않습니다.
+    let o;
+    try { o = JSON.parse(rd.result); } catch(err){ o = null; }
+    if (!o || typeof o !== 'object' || !o.settings || typeof o.settings !== 'object' || !Array.isArray(o.people)){
+      showError('올바른 백업 파일이 아닙니다.'); return;
+    }
+    const settings = normalizeSettings(o.settings);
+    const people = o.people.filter(x => x && typeof x === 'object').map(normalizePerson);
+
+    // 2) 저장할 프로필 이름 결정: 이 브라우저의 다른 프로필을 묻지 않고 덮어쓰지 않습니다.
+    let target = (typeof o.profile === 'string' && o.profile.trim()) || state.profile || '기본';
+    if (target === state.profile){
+      if (state.people.length && !(await ask(`현재 프로필 '${target}'의 설정과 명단을 백업 내용으로 바꿀까요?`, { yes: '바꾸기' }))) return;
+    } else if (Store.list().includes(target)){
+      if (!(await ask(`백업의 '${target}' 프로필이 이 브라우저에 이미 있습니다. 덮어쓸까요? [취소]를 누르면 새 이름으로 복원합니다.`, { yes: '덮어쓰기' }))){
+        target = await askNewName('복원할 새 프로필 이름', target + ' (복원)'); if (!target) return;
+      }
+    }
+
+    // 3) 반영
+    flushSave();
+    if (target !== state.profile) clearResults();         // 다른 프로필의 결과는 버림 (같은 프로필이면 '결과 낡음'으로 표시)
+    Object.assign(state, { profile: target, settings, people });
+    saveNow(); renderAll(); toast(`'${target}' 프로필로 복원했습니다. (${people.length}명)`);
   };
   rd.readAsText(f, 'utf-8');
 });
