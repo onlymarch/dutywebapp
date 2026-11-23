@@ -72,23 +72,49 @@ button.primary:hover{filter:brightness(1.06)}
 button.danger{color:var(--bad)}
 button.link{border:none;background:none;color:var(--accent);padding:0 2px;font-size:12px;text-decoration:underline}
 button.big{padding:10px 22px;font-size:15px}
+/* iOS Safari는 글자 16px 미만 입력칸을 누르면 화면을 확대합니다. 좁은 화면에서는 16px로 맞춥니다. */
+@media (max-width:760px){ input[type=text],input[type=number],select{font-size:16px;padding:8px 10px} }
 /* 입력칸 아래 날짜 해석 결과 (예: ✓ 3, 15, 20~22 (5일)) */
 .ph{font-size:10.5px;line-height:1.3;margin-top:2px}
 .ph:empty{display:none}
 .ph .ok{color:var(--ok)} .ph .bad{color:var(--bad);font-weight:700}
 
 /* ---------- 4. 설정: 프로필·공휴일 ---------- */
-.grid-ctrl{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
-.profile-bar{display:grid;grid-template-columns:minmax(180px,280px) 1fr;gap:8px;align-items:end;margin-bottom:12px;padding-bottom:12px;border-bottom:1px dashed var(--line)}
-.profile-bar .muted{grid-column:1/-1;margin:0}
-@media (max-width:640px){.profile-bar{grid-template-columns:1fr}}
-.mini-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-top:6px;max-width:280px}
+/* 설정은 4개 묶음(.set-group)으로 나눕니다.
+   넓은 화면(≥761px): 프로필(전체 폭) / 대상 기간(왼쪽) · 배정 규칙+생성 옵션(오른쪽)
+   좁은 화면: 프로필 → 대상 기간 → 배정 규칙 → 생성 옵션 순으로 한 열 */
+.set-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+.set-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.set-group{border:1px solid var(--line);border-radius:10px;padding:8px 12px 12px;margin:0;min-width:0;display:flex;flex-direction:column;gap:12px;background:#fcfcfd}
+.set-group>legend{font-size:12px;font-weight:700;color:var(--ink);padding:0 6px}
+.set-note{font-size:12px;color:var(--sub);margin:0}
+.set-sub{font-weight:400}
+.help{font-size:11px;color:var(--sub)}
+.pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}   /* 짧은 숫자 칸 2개를 한 줄에 */
+.range-label{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.profile-row{display:grid;grid-template-columns:minmax(160px,260px) 1fr;gap:8px;align-items:center}
+.profile-actions{display:flex;flex-wrap:wrap;gap:6px}
+@media (min-width:761px){
+  .set-layout{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .sg-profile{grid-column:1/-1}
+}
+.mini-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-top:6px;max-width:320px}
 .mini-cal div,.mini-cal button{font-size:11px;text-align:center;padding:4px 0;border-radius:4px;user-select:none}
 .mini-cal .h{color:var(--sub);font-weight:600}
 .mini-cal button.d{cursor:pointer;background:#f3f4f7;border:none;min-width:0}
 .mini-cal button.d.sat{background:var(--sat)} .mini-cal button.d.sun{background:var(--sun)}
 .mini-cal button.d.pub{background:#e53935;color:#fff;font-weight:700}
-.hol-hint{font-size:12px;color:var(--sub);margin-top:4px}
+.hol-hint{font-size:12px;color:var(--sub);margin-top:6px}
+/* 좁은 화면: 버튼은 2×2로 같은 폭, 달력은 전체 폭·큰 칸(누르기 쉽게) */
+@media (max-width:760px){
+  .profile-row{grid-template-columns:1fr}
+  .profile-actions{display:grid;grid-template-columns:1fr 1fr}
+  .profile-actions button{padding:9px 6px}
+  .mini-cal{max-width:none;gap:3px}
+  .mini-cal button.d{padding:9px 0;font-size:13px}
+  .mini-cal div{font-size:12px}
+  input[type=range]{height:28px}
+}
 
 /* ---------- 5. 명단 표 ---------- */
 table{border-collapse:collapse;width:100%}
@@ -311,34 +337,48 @@ body.printing-sheet #printSheet{display:block}
 <!-- ===================== 1. 설정 ===================== -->
 <section class="card" id="ctrlCard">
   <h2><span class="step">1</span>⚙️ 설정</h2>
-  <div class="profile-bar">
-    <div class="field">
-      <label for="profileSelect">프로필</label>
-      <select id="profileSelect"></select>
-    </div>
-    <div class="row">
-      <button id="btnProfileNew" type="button">＋ 새 프로필</button>
-      <button id="btnProfileSaveAs" type="button">다른 이름으로 저장</button>
-      <button id="btnProfileRename" type="button">이름 변경</button>
-      <button id="btnProfileDelete" type="button" class="danger">삭제</button>
-    </div>
-    <p class="muted">설정과 명단은 입력할 때마다 이 브라우저에 자동 저장됩니다. 다음 실행 때 마지막 프로필을 자동으로 불러옵니다.</p>
-  </div>
+  <!-- data-s 속성: state.settings의 키와 연결된 입력칸 (§6에서 일괄 처리) -->
+  <div class="set-layout">
+    <fieldset class="set-group sg-profile">
+      <legend>프로필</legend>
+      <div class="profile-row">
+        <select id="profileSelect" aria-label="프로필 선택"></select>
+        <div class="profile-actions">
+          <button id="btnProfileNew" type="button">＋ 새 프로필</button>
+          <button id="btnProfileSaveAs" type="button">다른 이름으로 저장</button>
+          <button id="btnProfileRename" type="button">이름 변경</button>
+          <button id="btnProfileDelete" type="button" class="danger">삭제</button>
+        </div>
+      </div>
+      <p class="set-note">설정과 명단은 입력할 때마다 이 브라우저에 자동 저장되고, 다음 실행 때 마지막 프로필을 불러옵니다.</p>
+    </fieldset>
 
-  <!-- data-s 속성: state.settings의 키와 연결된 입력칸 (bindSettingInputs에서 일괄 처리) -->
-  <div class="grid-ctrl">
-    <div class="field"><label for="ym">대상 연월</label><select id="ym"></select></div>
-    <div class="field"><label for="restW">평일 당직 후 배정 제외일: <b class="range-val" id="restWVal">1</b>일</label><input type="range" id="restW" data-s="restW" min="0" max="5" step="1" aria-describedby="restWEx"><div class="range-ticks"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div><div class="range-ex" id="restWEx"></div></div>
-    <div class="field"><label for="restH">휴일 당직 후 배정 제외일: <b class="range-val" id="restHVal">2</b>일</label><input type="range" id="restH" data-s="restH" min="0" max="5" step="1" aria-describedby="restHEx"><div class="range-ticks"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div><div class="range-ex" id="restHEx"></div></div>
-    <div class="field"><label for="minDFI">목표 DFI (당직 공정성 지수, 0–100)</label><input type="number" id="minDFI" data-s="minDFI" min="0" max="100"></div>
-    <div class="field"><label for="maxAttempts">시뮬레이션 횟수 (최대 10,000)</label><input type="number" id="maxAttempts" data-s="maxAttempts" min="1" max="10000" step="100"></div>
-  </div>
-  <div class="field" style="margin-top:10px">
-    <label for="holidays">공휴일 — 대상 연월을 고르면 내장 공휴일이 자동 입력됩니다. 달력을 눌러 추가·해제할 수 있습니다.</label>
-    <input type="text" id="holidays" data-s="holidays" placeholder="예: 25 또는 1, 28~30">
-    <div class="ph" id="ph-holidays"></div>
-    <div class="hol-hint" id="holHint"></div>
-    <div class="mini-cal" id="miniCal"></div>
+    <fieldset class="set-group sg-period">
+      <legend>대상 기간</legend>
+      <div class="field"><label for="ym">대상 연월</label><select id="ym"></select></div>
+      <div class="field">
+        <label for="holidays">공휴일 <span class="set-sub">— 연월을 고르면 자동 입력되며, 달력을 눌러 추가·해제할 수 있습니다</span></label>
+        <input type="text" id="holidays" data-s="holidays" placeholder="예: 25 또는 1, 28~30">
+        <div class="ph" id="ph-holidays"></div>
+        <div class="mini-cal" id="miniCal"></div>
+        <div class="hol-hint" id="holHint"></div>
+      </div>
+    </fieldset>
+
+    <div class="set-col">
+      <fieldset class="set-group sg-rule">
+        <legend>배정 규칙</legend>
+        <div class="field"><label for="restW" class="range-label"><span>평일 당직 후 배정 제외일</span><b class="range-val"><span id="restWVal">1</span>일</b></label><input type="range" id="restW" data-s="restW" min="0" max="5" step="1" aria-describedby="restWEx"><div class="range-ticks"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div><div class="range-ex" id="restWEx"></div></div>
+        <div class="field"><label for="restH" class="range-label"><span>휴일 당직 후 배정 제외일</span><b class="range-val"><span id="restHVal">2</span>일</b></label><input type="range" id="restH" data-s="restH" min="0" max="5" step="1" aria-describedby="restHEx"><div class="range-ticks"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div><div class="range-ex" id="restHEx"></div></div>
+      </fieldset>
+      <fieldset class="set-group sg-gen">
+        <legend>생성 옵션</legend>
+        <div class="pair">
+          <div class="field"><label for="minDFI">목표 DFI</label><input type="number" id="minDFI" data-s="minDFI" min="0" max="100" inputmode="numeric"><span class="help">당직 공정성 지수 0–100</span></div>
+          <div class="field"><label for="maxAttempts">시뮬레이션 횟수</label><input type="number" id="maxAttempts" data-s="maxAttempts" min="1" max="10000" step="100" inputmode="numeric"><span class="help">최대 10,000회</span></div>
+        </div>
+      </fieldset>
+    </div>
   </div>
 </section>
 
@@ -877,8 +917,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.9.4', APP_BUILD = '2026-11-22';
+const APP_VERSION = '1.9.5', APP_BUILD = '2026-11-22';
 const CHANGELOG = [
+  '1.9.5 설정 영역을 4개 묶음(프로필·대상 기간·배정 규칙·생성 옵션)으로 재배치, 모바일: 프로필 버튼 2×2, 숫자 칸 2열, 공휴일 달력 전체 폭, 입력칸 16px(iOS 확대 방지)',
   '1.9.4 인터페이스 오류 수정: 생성 중 프로필 전환 시 이전 결과 표시, 삭제 실행 취소가 다른 프로필 명단에 섞임, JSON 복원 시 같은 이름 프로필 무확인 덮어쓰기와 손상 데이터 처리, 연월 변경 시 날짜 팝오버 잔류, 저장 전 입력 유실, 같은 이름으로 이름 변경 시 오류 안내, 좁은 화면 결과 영역 가로 넘침',
   '1.9.3 용어 변경: 최소 휴무일·휴무 간격 → 배정 제외일(당직 다음 날부터 n일간 배정하지 않음). 슬라이더 아래 의미 예시 추가',
   '1.9.2 강조 시 조력 근무를 정규 당직보다 연한 색으로 표시, 요약 막대에 정규·조력 색 범례 추가',
