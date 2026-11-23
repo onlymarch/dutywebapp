@@ -1,0 +1,2322 @@
+<!DOCTYPE html>
+<html lang="ko">
+<!--
+  당직배정 웹앱 (단일 HTML 파일)
+  ─────────────────────────────────────────────────────────────
+  파일 구조
+    1. <style>                 화면 스타일 (아래 목차 참고)
+    2. <body> 마크업           1 설정 → 2 명단 → 3 생성 → 4 결과 → 5 출력·저장
+    3. <script id="engineSrc"> 배정 엔진 (Web Worker와 메인 스레드가 공유)
+    4. <script>                메인 애플리케이션 (상태·화면·저장·출력)
+
+  외부 라이브러리와 서버 없이 동작합니다.
+  데이터는 브라우저의 쿠키와 localStorage에만 저장됩니다.
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>당직배정 웹앱</title>
+<style>
+/* ===========================================================================
+   스타일 목차
+   1. 디자인 토큰·기본 요소   2. 레이아웃·카드   3. 폼 요소·버튼
+   4. 설정(프로필·공휴일)     5. 명단 표(+모바일 카드)   6. 날짜 선택 팝오버
+   7. 생성·사전 점검         8. 결과(안 비교·달력·통계·DFI)
+   9. 모달·토스트·툴팁       10. 인쇄
+   =========================================================================== */
+
+/* ---------- 1. 디자인 토큰·기본 요소 ---------- */
+:root{
+  --bg:#f6f7f9; --card:#fff; --ink:#1d2330; --sub:#5b6474; --line:#dfe3ea;
+  --accent:#2f5bea; --accent-weak:#e8eefe;
+  --ok:#1b8a5a; --warn:#c77700; --bad:#c62828;
+  --sun:#ffebee; --sat:#e3f2fd;          /* 일요일·공휴일 / 토요일 배경 */
+  --hl:#ffe082; --hl-weak:#fff8e1;       /* 근무자 강조: 정규 당직 / 강조 행·요약 막대 배경 */
+  --hl-soft:#fff3c4;                      /* 근무자 강조: 조력 근무 (정규보다 연하게) */
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.45}
+.hidden{display:none!important}
+.muted{color:var(--sub);font-size:12px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+
+/* ---------- 2. 레이아웃·카드 ---------- */
+header.top{position:sticky;top:0;z-index:20;background:#1d2330;color:#fff;padding:10px 16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+header.top h1{font-size:16px;margin:0;font-weight:700}
+.ver{font-size:11px;font-weight:600;background:#38415a;color:#cfd8ff;border-radius:999px;padding:2px 8px;margin-left:4px;vertical-align:middle}
+.badges{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.badge{display:inline-block;padding:3px 8px;border-radius:999px;background:#38415a;color:#fff;white-space:nowrap;border:none;font:inherit;font-size:12px}
+button.badge{cursor:pointer} button.badge:hover{background:#4a5574}
+.badge.ok{background:var(--ok)} .badge.warn{background:var(--warn)} .badge.bad{background:var(--bad)}
+main{max-width:1280px;margin:0 auto;padding:14px;display:flex;flex-direction:column;gap:14px}
+section.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+section.card>h2{font-size:15px;margin:0 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.step{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#1d2330;color:#fff;font-size:11px;font-weight:700}
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+/* ---------- 3. 폼 요소·버튼 ---------- */
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:12px;color:var(--sub)}
+input[type=text],input[type=number],select{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;background:#fff;min-width:0;width:100%}
+input:focus,select:focus{outline:2px solid var(--accent-weak);border-color:var(--accent)}
+input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 0}
+.range-ticks{display:flex;justify-content:space-between;font-size:10px;color:var(--sub);padding:0 2px}
+.range-val{color:var(--accent);font-size:13px}
+button{font:inherit;border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;color:var(--ink)}
+button:hover{background:#f0f2f6}
+button:disabled{opacity:.5;cursor:not-allowed}
+button:focus-visible,[role=button]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button.primary:hover{filter:brightness(1.06)}
+button.danger{color:var(--bad)}
+button.link{border:none;background:none;color:var(--accent);padding:0 2px;font-size:12px;text-decoration:underline}
+button.big{padding:10px 22px;font-size:15px}
+/* 입력칸 아래 날짜 해석 결과 (예: ✓ 3, 15, 20~22 (5일)) */
+.ph{font-size:10.5px;line-height:1.3;margin-top:2px}
+.ph:empty{display:none}
+.ph .ok{color:var(--ok)} .ph .bad{color:var(--bad);font-weight:700}
+
+/* ---------- 4. 설정: 프로필·공휴일 ---------- */
+.grid-ctrl{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.profile-bar{display:grid;grid-template-columns:minmax(180px,280px) 1fr;gap:8px;align-items:end;margin-bottom:12px;padding-bottom:12px;border-bottom:1px dashed var(--line)}
+.profile-bar .muted{grid-column:1/-1;margin:0}
+@media (max-width:640px){.profile-bar{grid-template-columns:1fr}}
+.mini-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-top:6px;max-width:280px}
+.mini-cal div,.mini-cal button{font-size:11px;text-align:center;padding:4px 0;border-radius:4px;user-select:none}
+.mini-cal .h{color:var(--sub);font-weight:600}
+.mini-cal button.d{cursor:pointer;background:#f3f4f7;border:none;min-width:0}
+.mini-cal button.d.sat{background:var(--sat)} .mini-cal button.d.sun{background:var(--sun)}
+.mini-cal button.d.pub{background:#e53935;color:#fff;font-weight:700}
+.hol-hint{font-size:12px;color:var(--sub);margin-top:4px}
+
+/* ---------- 5. 명단 표 ---------- */
+table{border-collapse:collapse;width:100%}
+th,td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:top}
+th{font-size:12px;color:var(--sub);font-weight:600;background:#fafbfc;white-space:nowrap;vertical-align:middle}
+th[data-tip]{cursor:help}
+th[data-tip]:hover,th[data-tip]:focus{color:var(--accent);outline:none}
+.tip-i{font-style:normal;font-size:11px;color:var(--accent);opacity:.8}
+#roster th,#roster td{padding:5px 4px}
+#roster td input[type=text]{min-width:78px}
+#roster td input[type=number]{width:64px}
+#roster td select{min-width:128px}
+#roster tr.empty-row td{text-align:center;padding:26px 8px;color:var(--sub);vertical-align:middle}
+.dow{display:inline-flex;gap:2px}
+.dow button{padding:2px 5px;font-size:11px;border-radius:5px;min-width:22px}
+.dow button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.dow.ex button.on{background:var(--bad);border-color:var(--bad)}
+.ops{white-space:nowrap}
+.ops button{padding:2px 7px}
+.btn-dp{padding:4px 8px;white-space:nowrap}
+/* 데스크톱: 행 번호 칸의 관리 버튼(모바일용)과 '달력' 글자를 숨김 */
+@media (min-width:761px){ .ops-mob,.dp-lbl{display:none} }
+/* 모바일(≤760px): 표를 사람별 카드로 바꿈. td의 data-label을 제목으로 표시 */
+@media (max-width:760px){
+  #rosterWrap{overflow:visible}
+  #roster thead{display:none}
+  #roster,#roster tbody{display:block}
+  #roster tr{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px}
+  #roster tr.empty-row{display:block}
+  #roster td{display:block;border:none;padding:0}
+  #roster td[data-label]::before{content:attr(data-label);display:block;font-size:11px;color:var(--sub);margin-bottom:2px}
+  #roster td.c-no{grid-column:1/-1;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+  #roster td.c-wide{grid-column:1/-1}
+  #roster td.ops-desk{display:none}
+  #roster td input,#roster td select{min-width:0!important;width:100%!important}
+  .dow button{padding:5px 8px;font-size:12px;min-width:32px}
+}
+
+/* ---------- 6. 날짜 선택 팝오버 ---------- */
+.dp{position:fixed;z-index:65;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.22);padding:12px;width:310px;max-width:94vw}
+.dp-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px;gap:8px}
+.dp-head button{padding:2px 8px}
+.seg{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap}
+.seg button{padding:3px 10px;font-size:12px}
+.seg button.on{font-weight:700;box-shadow:inset 0 0 0 2px var(--ink)}
+.seg .s-wish{color:var(--accent)} .seg .s-avail{color:var(--ok)} .seg .s-avoid{color:var(--bad)}
+.dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.dp-grid .h{font-size:11px;text-align:center;color:var(--sub);font-weight:700}
+.dp-grid button{padding:7px 0;font-size:12px;border-radius:6px;min-width:0}
+.dp-grid button.sun,.dp-grid button.pub{color:var(--bad)}
+.dp-grid button.sat{color:var(--accent)}
+.dp-grid button.ex{background:repeating-linear-gradient(45deg,#f3f4f7,#f3f4f7 4px,#e3e6ec 4px,#e3e6ec 8px);color:#999}
+/* 지정 상태는 요일 색보다 뒤에 두어 우선 적용 */
+.dp-grid button.wish{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700}
+.dp-grid button.avail{background:#e6f4ea;border-color:var(--ok);color:var(--ok);font-weight:700}
+.dp-grid button.avoid{background:var(--bad);color:#fff;border-color:var(--bad);font-weight:700}
+.dp-foot{font-size:11px;color:var(--sub);margin-top:8px;line-height:1.5}
+
+/* ---------- 7. 생성·사전 점검 ---------- */
+.progress{height:10px;background:#e9ecf2;border-radius:999px;overflow:hidden;flex:1;min-width:160px}
+.progress>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),#6b8cff);transition:width .15s}
+.precheck{margin-top:12px;font-size:12px;border-top:1px dashed var(--line);padding-top:10px}
+.precheck ul{margin:4px 0 0;padding:0;list-style:none}
+.precheck li{padding:2px 0}
+.precheck summary{cursor:pointer;font-weight:600}
+.pc-err{color:var(--bad)} .pc-warn{color:var(--warn)} .pc-ok{color:var(--ok);font-weight:600} .pc-info{color:var(--sub)}
+
+/* ---------- 8. 결과 ---------- */
+.results-grid{display:grid;grid-template-columns:1fr;gap:14px}
+/* 달력과 DFI 카드는 별도 묶음(.cal-row) 안에서만 2열로 배치합니다.
+   DFI 카드의 sticky 범위가 이 묶음으로 한정되므로, 아래 통계표 위로 겹쳐 내려오지 않습니다. */
+.cal-row{display:grid;grid-template-columns:1fr;gap:14px;align-items:start}
+@media (min-width:1000px){
+  .cal-row{grid-template-columns:1.5fr 1fr}
+  #dfiCard{position:sticky;top:58px}   /* 달력을 내려도 DFI가 보이도록 고정 (묶음 안에서만) */
+}
+.stale{background:#fff4e5;border:1px solid #ffcc80;color:#7a4a00;border-radius:12px;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
+.placeholder{color:var(--sub);font-size:13px;margin:0}
+.sel-tag{background:var(--accent);color:#fff;border-radius:6px;padding:1px 7px;font-size:12px}
+/* 8-1. 상위 3개 안 카드 */
+.cand-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.cand{border:2px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;background:#fff;display:flex;flex-direction:column;gap:6px;transition:border-color .15s,box-shadow .15s}
+.cand:hover{border-color:#b9c6f5}
+.cand.sel{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
+.cand-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cand-rank{font-weight:800;font-size:15px}
+.cand-score{font-size:22px;font-weight:800;margin-left:auto}
+.cand .grade{width:30px;height:30px;font-size:14px;border-radius:8px}
+.sel-pill{font-size:11px;padding:2px 8px;border-radius:999px;background:var(--accent);color:#fff}
+.pick-pill{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--sub)}
+.cand-m{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.cand-m div{font-size:10px;text-align:center;background:#f5f6f9;border-radius:6px;padding:3px 0}
+.cand-m b{display:block;font-size:12px}
+.cand-m .best{background:#e6f4ea}                    /* 세 안 중 그 지표 최고점 */
+.cand-sum{font-size:12px;color:var(--sub)}
+.cand-diff{font-size:12px;color:#8a5a00;background:var(--hl-weak);border-radius:6px;padding:4px 8px}
+.mini-cal2{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}
+.mini-cal2 .h{font-size:10px;text-align:center;color:var(--sub);font-weight:700}
+.mini-cal2 .c{font-size:11px;border:1px solid #eceff4;border-radius:4px;padding:1px 3px;min-height:34px;line-height:1.25;overflow:hidden}
+.mini-cal2 .c.sun,.mini-cal2 .c.pub{background:var(--sun)} .mini-cal2 .c.sat{background:var(--sat)} .mini-cal2 .c.e{border:none}
+.mini-cal2 .c.diff{box-shadow:inset 0 0 0 2px #ffb74d}  /* 1안과 다른 날 */
+.mini-cal2 .dn{font-size:9px;color:var(--sub)}
+.mini-cal2 .nm{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.mini-cal2 .nm.highlight-bold{padding:0 1px}
+.mini-cal2.has-hl .nm{opacity:.35} .mini-cal2.has-hl .nm.highlight-bold{opacity:1}
+.mini-cal2 .as{display:block;font-size:9px;color:var(--sub);white-space:nowrap;overflow:hidden}
+/* 8-2. 월간 달력 */
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cal .hd{text-align:center;font-size:12px;font-weight:700;color:var(--sub);padding:4px 0}
+.cal .hd.sun{color:var(--bad)} .cal .hd.sat{color:var(--accent)}
+.cell{min-height:74px;border:1px solid var(--line);border-radius:8px;padding:4px 5px;background:#fff;display:flex;flex-direction:column;gap:2px;position:relative;min-width:0}
+.cell.sun,.cell.pub{background:var(--sun)} .cell.sat{background:var(--sat)}
+.cell.empty{border:none;background:transparent}
+.cell.unfilled{outline:2px dashed var(--bad)}
+.cell.edited::after{content:"수정";position:absolute;right:4px;bottom:3px;font-size:9px;color:var(--warn)}
+.cell-top{display:flex;justify-content:space-between;align-items:center;gap:2px;min-width:0}
+.dnum{font-size:12px;font-weight:700;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hname{color:var(--bad);font-size:10px;font-weight:600;margin-left:2px}
+.edit-btn{border:none;background:transparent;padding:0 3px;font-size:13px;color:var(--sub);cursor:pointer}
+.nm-btn{border:none;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left;border-radius:4px;max-width:100%}
+.duty-name{font-size:13px;color:#2a3140;word-break:keep-all}
+.assist-name{font-size:11px;color:var(--sub)}
+.cal.has-hl .duty-name{opacity:.35}
+.cal.has-hl .duty-name.highlight-bold{opacity:1}
+.highlight-bold{font-weight:800!important;color:#000!important;background:var(--hl)!important;border-radius:4px;padding:0 3px}
+/* 조력 근무 강조: 정규 당직(진한 노랑)보다 연하게 구분 — 옅은 배경 + 얇은 테두리 + 덜 굵은 글씨 */
+.assist-name.highlight-bold{background:var(--hl-soft)!important;color:#6b5800!important;font-weight:600!important;box-shadow:inset 0 0 0 1px var(--hl)}
+.hl-sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:3px}
+.hl-sw.duty{background:var(--hl)} .hl-sw.assist{background:var(--hl-soft);box-shadow:inset 0 0 0 1px var(--hl)}
+.hl-info{font-size:12px;background:var(--hl-weak);border:1px solid var(--hl);border-radius:8px;padding:6px 10px;margin:0 0 8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.hl-info button{padding:2px 8px;font-size:12px}
+@media (max-width:520px){.cell{min-height:58px;padding:3px}.duty-name{font-size:12px}.dnum{font-size:11px}.hname{display:none}}
+/* 8-3. 통계 */
+th.c-sat{color:var(--accent)} th.c-sun{color:var(--bad)}
+/* 숫자 열: 머리글과 값을 모두 가운데 정렬해 열을 맞추고, 숫자 폭을 고정(tabular-nums)해 자릿수가 달라도 세로로 정렬되게 함.
+   성명 열만 넓게, 나머지 열은 같은 폭으로 나눔 */
+#stats{table-layout:fixed;min-width:640px}
+#stats th,#stats td{text-align:center}
+#stats th:first-child,#stats td:first-child{text-align:left;width:18%}
+td.num{font-variant-numeric:tabular-nums}
+.stats-name{text-decoration:underline dotted}
+tr.hl-row td{background:var(--hl-weak)}
+.d-pos{color:var(--warn);font-weight:700} .d-neg{color:var(--accent);font-weight:700}   /* 기대보다 많음 / 적음 */
+/* 8-4. DFI */
+.dfi-intro{font-size:12px;color:var(--sub);margin:0 0 10px;line-height:1.6}
+.dfi-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px}
+.dfi-score{font-size:34px;font-weight:800}
+.grade{font-size:18px;font-weight:800;width:40px;height:40px;border-radius:10px;display:grid;place-items:center;color:#fff}
+.grade.S{background:#6a1b9a}.grade.A{background:var(--ok)}.grade.B{background:var(--warn)}.grade.C{background:var(--bad)}
+.gauge{display:grid;grid-template-columns:150px 1fr 70px;gap:8px;align-items:center;margin:6px 0}
+@media (max-width:520px){.gauge{grid-template-columns:110px 1fr 60px}}
+.gauge .bar{height:12px;background:#e9ecf2;border-radius:999px;overflow:hidden}
+.gauge .bar i{display:block;height:100%;border-radius:999px}
+.gauge .lbl{font-size:12px}
+.gauge .val{font-size:12px;text-align:right;font-variant-numeric:tabular-nums}
+.gauge-desc{font-size:11px;color:var(--ink);margin:-4px 0 1px}
+.diag-box{margin:4px 0 10px;padding:10px 12px;border-radius:10px;background:#fff4e5;border:1px solid #ffe0b2;font-size:12px;line-height:1.6}
+.diag-box ul{margin:4px 0;padding-left:18px}
+.warn-list{color:var(--warn);font-size:12px}
+.dfi-more{margin-top:10px;font-size:12px;border-top:1px dashed var(--line);padding-top:8px}
+.dfi-more summary{cursor:pointer;color:var(--accent);font-weight:600}
+.dfi-more ul{padding-left:18px;margin:6px 0}
+.dfi-more li{margin:3px 0}
+/* 8-5. 출력·저장 */
+.out-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:16px}
+@media (max-width:760px){.out-grid{grid-template-columns:1fr}}
+.out-title{font-weight:700;font-size:13px}
+
+/* ---------- 9. 모달·토스트·툴팁 ---------- */
+dialog{border:none;border-radius:14px;padding:18px;max-width:min(520px,94vw);box-shadow:0 20px 60px rgba(0,0,0,.25)}
+dialog::backdrop{background:rgba(20,24,33,.45)}
+dialog h3{margin:0 0 10px;font-size:16px}
+dialog ul{padding-left:18px;margin:6px 0}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#1d2330;color:#fff;padding:9px 14px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:50;max-width:92vw}
+.toast.show{opacity:1}
+.undo-bar{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#1d2330;color:#fff;padding:8px 10px 8px 14px;border-radius:10px;font-size:13px;z-index:60;display:flex;gap:10px;align-items:center;max-width:92vw}
+.undo-bar button{background:#fff;color:#1d2330;border:none;padding:4px 10px;font-weight:700}
+.tip{position:fixed;z-index:70;max-width:min(360px,92vw);background:#1d2330;color:#fff;border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.55;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .12s}
+.tip.show{opacity:1}
+.tip b.t{display:block;font-size:13px;margin-bottom:4px;color:#9db4ff}
+.tip ul{margin:4px 0 0;padding-left:16px}
+.tip li{margin:2px 0}
+.tip .eff{margin-top:6px;padding-top:6px;border-top:1px solid #3a4359;color:#ffd27a}
+
+/* ---------- 10. 인쇄 ----------
+   [당직표 출력] 버튼은 별도 A4 양식(PRINT_CSS)을 사용합니다.
+   아래 규칙은 사용자가 브라우저 메뉴로 이 화면을 직접 인쇄할 때와,
+   iframe 인쇄가 막혀 printViaSheet()로 대체 인쇄할 때 적용됩니다. */
+#printSheet{display:none}
+body.printing-sheet > *:not(#printSheet){display:none!important}
+body.printing-sheet #printSheet{display:block}
+@media print{
+  @page{size:A4 landscape;margin:10mm}
+  body{background:#fff;font-size:11px}
+  header.top,.no-print,#ctrlCard,#rosterCard,#genCard,#outCard,.stale,#emptyResults,.cand-section,.tip,.hl-info{display:none!important}
+  main{padding:0;max-width:none}
+  section.card{border:none;padding:0;break-inside:avoid}
+  .cal-row{grid-template-columns:1fr}
+  #dfiCard{position:static}
+  .cell{min-height:58px}
+  .edit-btn{display:none}
+  .cal.has-hl .duty-name{opacity:1}
+  .cell.sun,.cell.pub,.cell.sat,.highlight-bold,.gauge .bar i,.grade{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>🩺 당직배정 웹앱 <span class="ver" id="appVer"></span></h1>
+  <div class="badges">
+    <button class="badge" id="profileBadge" type="button" title="프로필 선택으로 이동">프로필: -</button>
+    <span class="badge" id="storeBadge">저장소 확인 중</span>
+    <span class="badge hidden" id="genBadge"></span>
+  </div>
+</header>
+
+<main>
+<!-- ===================== 1. 설정 ===================== -->
+<section class="card" id="ctrlCard">
+  <h2><span class="step">1</span>⚙️ 설정</h2>
+  <div class="profile-bar">
+    <div class="field">
+      <label for="profileSelect">프로필</label>
+      <select id="profileSelect"></select>
+    </div>
+    <div class="row">
+      <button id="btnProfileNew" type="button">＋ 새 프로필</button>
+      <button id="btnProfileSaveAs" type="button">다른 이름으로 저장</button>
+      <button id="btnProfileRename" type="button">이름 변경</button>
+      <button id="btnProfileDelete" type="button" class="danger">삭제</button>
+    </div>
+    <p class="muted">설정과 명단은 입력할 때마다 이 브라우저에 자동 저장됩니다. 다음 실행 때 마지막 프로필을 자동으로 불러옵니다.</p>
+  </div>
+
+  <!-- data-s 속성: state.settings의 키와 연결된 입력칸 (bindSettingInputs에서 일괄 처리) -->
+  <div class="grid-ctrl">
+    <div class="field"><label for="ym">대상 연월</label><select id="ym"></select></div>
+    <div class="field"><label for="restW">평일 근무 후 최소 휴무일: <b class="range-val" id="restWVal">1</b>일</label><input type="range" id="restW" data-s="restW" min="0" max="5" step="1"><div class="range-ticks"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div></div>
+    <div class="field"><label for="restH">휴일 근무 후 최소 휴무일: <b class="range-val" id="restHVal">2</b>일</label><input type="range" id="restH" data-s="restH" min="0" max="5" step="1"><div class="range-ticks"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div></div>
+    <div class="field"><label for="minDFI">목표 DFI (당직 공정성 지수, 0–100)</label><input type="number" id="minDFI" data-s="minDFI" min="0" max="100"></div>
+    <div class="field"><label for="maxAttempts">시뮬레이션 횟수 (최대 10,000)</label><input type="number" id="maxAttempts" data-s="maxAttempts" min="1" max="10000" step="100"></div>
+  </div>
+  <div class="field" style="margin-top:10px">
+    <label for="holidays">공휴일 — 대상 연월을 고르면 내장 공휴일이 자동 입력됩니다. 달력을 눌러 추가·해제할 수 있습니다.</label>
+    <input type="text" id="holidays" data-s="holidays" placeholder="예: 25 또는 1, 28~30">
+    <div class="ph" id="ph-holidays"></div>
+    <div class="hol-hint" id="holHint"></div>
+    <div class="mini-cal" id="miniCal"></div>
+  </div>
+</section>
+
+<!-- ===================== 2. 근무자 명단 ===================== -->
+<section class="card" id="rosterCard">
+  <h2><span class="step">2</span>👥 근무자 명단 <span class="muted">날짜 입력 예: 3, 15, 20~22 · 📅 버튼으로 달력에서 고를 수 있습니다</span></h2>
+  <div class="table-wrap" id="rosterWrap">
+    <table id="roster">
+      <!-- data-tip: TIPS 객체의 키. 머리글에 마우스를 올리거나 포커스하면 설명 툴팁 표시 -->
+      <thead><tr>
+        <th>#</th><th>성명</th><th data-tip="level" tabindex="0">레벨 <i class="tip-i">ⓘ</i></th><th data-tip="weight" tabindex="0">가중치 <i class="tip-i">ⓘ</i></th><th data-tip="wish" tabindex="0">희망일(0순위) <i class="tip-i">ⓘ</i></th><th data-tip="avail" tabindex="0">가능일(2순위) <i class="tip-i">ⓘ</i></th><th data-tip="avoid" tabindex="0">기피일(불가) <i class="tip-i">ⓘ</i></th><th>달력</th>
+        <th data-tip="wishDow" tabindex="0">희망요일(1순위) <i class="tip-i">ⓘ</i></th><th data-tip="exDow" tabindex="0">제외요일(불가) <i class="tip-i">ⓘ</i></th><th data-tip="max" tabindex="0">월 최대 <i class="tip-i">ⓘ</i></th><th>관리</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div class="row" style="margin-top:8px"><button id="btnAddRow" type="button">＋ 근무자 추가</button><button id="btnSample" type="button">샘플 데이터 불러오기</button><span class="muted" id="rosterInfo"></span></div>
+</section>
+
+<!-- ===================== 3. 생성 ===================== -->
+<section class="card" id="genCard">
+  <h2><span class="step">3</span>▶ 당직표 생성</h2>
+  <div class="row">
+    <button class="primary big" id="btnGenerate" type="button">▶ 당직표 생성</button>
+    <button id="btnCancel" type="button" class="hidden danger">중단</button>
+    <span class="muted" id="engineMode"></span>
+  </div>
+  <div class="row" style="margin-top:10px">
+    <div class="progress"><i id="progBar"></i></div>
+    <span class="muted" id="progText">대기 중</span>
+  </div>
+  <div class="precheck" id="precheck" aria-live="polite"></div>
+</section>
+
+<!-- ===================== 4. 결과 ===================== -->
+<!-- 생성 전 자리 표시 (단계 번호가 1·2·3·5로 건너뛰지 않도록) -->
+<section class="card" id="emptyResults">
+  <h2><span class="step">4</span>🏆 결과</h2>
+  <p class="placeholder">당직표를 생성하면 DFI 상위 3개 안, 월간 달력, 공정성 지수, 근무자별 통계가 여기에 표시됩니다.</p>
+</section>
+
+<div class="results-grid hidden" id="results">
+  <div class="stale hidden" id="staleBar" role="alert">
+    <span>⚠️ 생성 후 명단 또는 설정이 바뀌었습니다. 아래 결과는 <b>이전 입력 기준</b>입니다.</span>
+    <button class="primary" id="btnRegen" type="button">다시 생성</button>
+  </div>
+  <section class="card cand-section">
+    <h2><span class="step">4</span>🏆 DFI 상위 3개 안 <span class="muted">카드를 눌러 출력할 안을 선택합니다.</span>
+      <button type="button" class="link" id="btnMiniToggle" style="margin-left:auto">미니 달력 펼치기</button></h2>
+    <div class="cand-grid" id="candGrid"></div>
+  </section>
+  <div class="cal-row">
+  <section class="card">
+    <h2>📅 <span class="sel-tag" id="selTag">1안</span> <span id="calTitle">월간 당직</span> <span class="muted">이름 클릭 → 강조 · 빈 곳 클릭 → 해제 · ✎ → 수동 교체</span></h2>
+    <div class="hl-info hidden" id="hlInfo"></div>
+    <div class="cal" id="cal"></div>
+  </section>
+  <section class="card" id="dfiCard">
+    <h2>⚖️ 당직 공정성 지수 <span class="muted">DFI · Duty Fairness Index</span></h2>
+    <p class="dfi-intro">DFI는 당직이 근무자 사이에 <b>얼마나 공정하게</b> 나뉘었는지를 100점 만점으로 나타낸 점수입니다. 근무량, 휴일 부담, 개인 선호, 근무 간격, 요일 분포의 5개 지표를 더합니다. 미배정일이 있으면 총점에 배정률을 곱합니다.</p>
+    <div class="dfi-head">
+      <div class="dfi-score" id="dfiTotal">-</div>
+      <div class="grade" id="dfiGrade">-</div>
+      <div class="muted" id="dfiMeta"></div>
+    </div>
+    <div class="diag-box hidden" id="dfiDiag"></div>
+    <div id="gauges"></div>
+    <div class="warn-list" id="dfiWarn"></div>
+    <details class="dfi-more">
+      <summary>등급 기준과 계산 방법 보기</summary>
+      <p><b>등급</b>: S 90점 이상(매우 공정) · A 80점 이상(공정) · B 70점 이상(보통, 일부 쏠림) · C 70점 미만(불균형, 조정 권장)</p>
+      <ul id="dfiHow"></ul>
+      <p class="muted">SD는 표준편차, RMSE는 평균제곱근오차입니다. 값이 작을수록 고르게 나뉜 것입니다.</p>
+    </details>
+  </section>
+  </div>
+  <section class="card">
+    <h2>📊 근무자별 통계 <span class="muted">기대 = 배정일수 × 본인 가중치 ÷ 가중치 합 · 차이가 ±1 이상이면 색으로 표시합니다</span></h2>
+    <div class="table-wrap"><table id="stats"></table></div>
+  </section>
+</div>
+
+<!-- ===================== 5. 출력·저장 ===================== -->
+<section class="card no-print" id="outCard">
+  <h2><span class="step">5</span>🖨 출력 · 저장</h2>
+  <div class="out-grid">
+    <div>
+      <div class="out-title">당직표 출력 <span class="muted" id="outTarget">— 생성된 당직표가 없습니다</span></div>
+      <div class="row muted" style="gap:12px;margin:4px 0 8px">
+        <span>출력 옵션:</span>
+        <label><input type="checkbox" id="poStats" checked> 통계표</label>
+        <label><input type="checkbox" id="poDFI" checked> DFI 요약</label>
+        <label><input type="checkbox" id="poHL" checked> 강조한 근무자 표시</label>
+        <label><input type="checkbox" id="poSign" checked> 결재란</label>
+      </div>
+      <!-- data-needs-result: 결과가 없으면 비활성화 (updateOutBar) -->
+      <div class="row">
+        <button id="btnPrint" type="button" class="primary" data-needs-result>🖨 당직표 출력</button>
+        <button id="btnPrintFile" type="button" data-needs-result title="인쇄용 HTML을 내려받습니다. 열어서 인쇄하거나 PDF로 저장하면 됩니다.">인쇄용 파일 저장</button>
+        <button id="btnCSV" type="button" data-needs-result>CSV 다운로드</button>
+      </div>
+    </div>
+    <div>
+      <div class="out-title">설정·명단 백업 <span class="muted">— 다른 기기로 옮기거나 보관할 때</span></div>
+      <div class="row" style="margin-top:8px">
+        <button id="btnExportJSON" type="button">JSON 백업</button>
+        <button id="btnImportJSON" type="button">JSON 복원</button><input type="file" id="fileJSON" accept=".json,application/json" class="hidden">
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<!-- ===================== 모달·떠 있는 요소 ===================== -->
+<!-- 미배정·오류 알림 -->
+<dialog id="diagDialog">
+  <h3 id="diagTitle">⚠️ 확인이 필요합니다</h3>
+  <div id="diagBody"></div>
+  <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="primary" id="diagClose" type="button">확인</button></div>
+</dialog>
+
+<!-- 수동 교체 -->
+<dialog id="editDialog">
+  <h3 id="editTitle">수동 교체</h3>
+  <div class="field"><label for="editDuty">정규 당직자</label><select id="editDuty"></select></div>
+  <div class="field" id="editAssistWrap" style="margin-top:8px"><label for="editAssist">조력자 (레벨 3)</label><select id="editAssist"></select></div>
+  <div class="warn-list" id="editWarn" style="margin-top:8px"></div>
+  <div class="row" style="justify-content:flex-end;margin-top:12px">
+    <button id="editCancel" type="button">취소</button><button class="primary" id="editApply" type="button">적용 · DFI 재계산</button>
+  </div>
+</dialog>
+
+<!-- 확인·입력 (브라우저 confirm/prompt 대체: 앱 미리보기·샌드박스에서 차단되는 경우가 있음) -->
+<dialog id="askDialog">
+  <h3 id="askMsg">확인</h3>
+  <input type="text" id="askInput" class="hidden" autocomplete="off">
+  <div class="row" style="justify-content:flex-end;margin-top:12px">
+    <button id="askNo" type="button">취소</button><button class="primary" id="askYes" type="button">확인</button>
+  </div>
+</dialog>
+<div class="dp hidden" id="dp" role="dialog" aria-label="날짜 지정"></div>
+<div class="undo-bar hidden" id="undoBar"><span id="undoMsg"></span><button id="undoBtn" type="button">실행 취소</button></div>
+<div class="toast" id="toast" role="status"></div>
+<div class="tip" id="tip" role="tooltip"></div>
+<div id="printSheet"></div>
+
+<script type="text/plain" id="engineSrc">
+"use strict";
+/* =============================================================================
+ * 당직 배정 엔진
+ * -----------------------------------------------------------------------------
+ * 이 블록은 type="text/plain"이므로 브라우저가 직접 실행하지 않습니다.
+ * 같은 소스를 두 곳에서 사용합니다.
+ *   1) 메인 스레드: new Function()으로 평가해 Engine 객체로 사용합니다.
+ *      (달력 생성, 수동 교체 후 DFI 재계산, Worker를 못 쓸 때의 대체 실행)
+ *   2) Web Worker: Blob URL로 띄워 simulate()를 백그라운드에서 실행합니다.
+ *      화면이 멈추지 않게 하기 위함입니다.
+ * 따라서 이 블록에서는 DOM(document, window)을 사용하면 안 됩니다.
+ *
+ * 전체 흐름
+ *   simulate(cfg)
+ *     ├─ buildCalendar()   : 날짜별 요일·휴일·카테고리 계산
+ *     ├─ precompute()      : 시도마다 변하지 않는 값(불가일, 희망일 등)을 한 번만 계산
+ *     └─ maxAttempts회 반복
+ *          ├─ runAttempt() : 무작위 동점 처리를 포함한 탐욕적(greedy) 배정 1회
+ *          ├─ computeDFI() : 공정성 점수 계산
+ *          └─ 상위 3개 안 갱신
+ * ============================================================================= */
+
+/** 해당 월의 일수를 반환합니다. m은 1~12입니다. (Date의 0일 = 전월 말일) */
+function daysInMonth(y, m){ return new Date(y, m, 0).getDate(); }
+
+/**
+ * 월 달력을 만듭니다.
+ * days[d]는 1일부터 N일까지 채우며, days[0]은 비워 둡니다(날짜와 인덱스를 일치시키기 위함).
+ *
+ * cat(근무 카테고리)은 부담이 비슷한 날끼리 묶은 것입니다.
+ *   'H'  : 휴일(토·일·공휴일)
+ *   'TF' : 목·금 (주말과 이어져 부담이 큰 평일)
+ *   'MW' : 월~수
+ * 배정 시 카테고리별 누적 근무수를 비교해 같은 종류의 날을 고르게 돌립니다.
+ *
+ * @param {number} y         연도
+ * @param {number} m         월 (1~12)
+ * @param {number[]} holidays 공휴일 날짜 목록 (예: [25])
+ */
+function buildCalendar(y, m, holidays){
+  const N = daysInMonth(y, m), hs = new Set(holidays || []), days = [null];
+  for (let d = 1; d <= N; d++){
+    const dow = new Date(y, m - 1, d).getDay();          // 0=일 … 6=토
+    const isPub = hs.has(d), isWkd = (dow === 0 || dow === 6), isHol = isPub || isWkd;
+    days.push({ d, dow, isPub, isWkd, isHol,
+      cat: isHol ? 'H' : ((dow === 4 || dow === 5) ? 'TF' : 'MW') });
+  }
+  return { N, days };
+}
+
+/**
+ * 시도(attempt)마다 변하지 않는 값을 미리 계산합니다.
+ * 이전 버전은 매 시도·매 날짜마다 Set 조회, 클로저 생성, 남은 희망일 수 계산을 반복했습니다.
+ * 같은 값을 여기서 한 번만 계산하면 시도당 연산량이 크게 줄어듭니다.
+ *
+ * 반환값
+ *   people[i].blocked[d]   : 1이면 d일에 배정 불가 (기피일 또는 제외요일)
+ *   people[i].isWish[d]    : 1이면 d일이 희망일 (0순위)
+ *   people[i].isAvail[d]   : 1이면 d일이 가능일 (2순위)
+ *   people[i].wishAfter[d] : d일 "이후"(d+1 ~ N)에 남은 희망일 수 (희망일 쿼터 보호에 사용)
+ *   helpersOn[d]           : d일에 조력자가 될 수 있는 레벨 3 인원의 인덱스 목록 (오름차순)
+ *                            단, "전날 정규 당직자 제외" 조건은 시도마다 달라지므로 실행 중에 확인합니다.
+ */
+function precompute(cfg, cal){
+  const N = cal.N;
+  const people = cfg.people.map(p => {
+    const blocked = new Uint8Array(N + 1), isWish = new Uint8Array(N + 1), isAvail = new Uint8Array(N + 1);
+    const wishAfter = new Int16Array(N + 1);
+    const inMonth = d => d >= 1 && d <= N;
+    p.avoid.forEach(d => { if (inMonth(d)) blocked[d] = 1; });
+    for (let d = 1; d <= N; d++) if (p.exDow[cal.days[d].dow]) blocked[d] = 1;
+    p.wish.forEach(d => { if (inMonth(d)) isWish[d] = 1; });
+    p.avail.forEach(d => { if (inMonth(d)) isAvail[d] = 1; });
+    // 뒤에서부터 누적: wishAfter[d] = (d보다 뒤에 있는 희망일 수)
+    for (let d = N, c = 0; d >= 1; d--){ wishAfter[d] = c; if (isWish[d]) c++; }
+    return { blocked, isWish, isAvail, wishAfter };
+  });
+  const helpersOn = [null];
+  for (let d = 1; d <= N; d++){
+    const list = [];
+    cfg.people.forEach((p, i) => { if (p.level === 3 && !people[i].blocked[d]) list.push(i); });
+    helpersOn.push(list);
+  }
+  return { people, helpersOn };
+}
+
+/**
+ * 탐욕적 배정을 1회 실행합니다. 1일부터 말일까지 하루씩 정규 당직자 1명을 고릅니다.
+ *
+ * [1단계] 기본 후보: 다음 조건을 모두 통과한 사람
+ *   - 월 최대 한도 미만
+ *   - 기피일·제외요일이 아님
+ *   - 휴무 간격 충족: 마지막 근무일이 휴일이면 restH, 평일이면 restW일을 초과해 쉬었음
+ *     (레벨 1은 특례로 이 규칙을 적용하지 않음)
+ *   - 레벨 4는 그날 조력 가능한 레벨 3이 1명 이상 있어야 함
+ *
+ * [2단계] 희망일 쿼터 보호
+ *   남은 한도 ≤ 앞으로 남은 희망일 수 이면, 희망일이 아닌 오늘은 후보에서 뺍니다.
+ *   (한도를 희망일용으로 아껴 둠) 이렇게 해서 후보가 0명이 되면 보호를 풀고 1단계 후보를 씁니다.
+ *
+ * [3단계] 우선순위: 희망일(0) > 희망요일(1) > 가능일(2) > 일반(3)
+ *   가장 높은 순위의 사람들 중 점수가 가장 낮은 사람을 뽑습니다.
+ *   점수 = (그 카테고리 누적 근무수 ÷ 가중치) + (그 요일 누적 근무수 × 2) + 무작위 0~0.1
+ *   → 가중치가 클수록, 그 종류·그 요일 근무가 적을수록 먼저 뽑힙니다.
+ *   → 무작위 항은 동점을 깨고 시도마다 다른 배정을 만들기 위한 것입니다.
+ *
+ * [4단계] 레벨 4가 뽑히면 조력자(레벨 3)를 붙입니다.
+ *   조건: 기피일·제외요일 아님, 전날 정규 당직자 아님
+ *   선택: 마지막 근무(정규·조력 포함) 이후 가장 오래 쉰 사람 → 조력 횟수가 적은 사람 → 무작위
+ *   조력은 정규 근무수와 휴무 간격 계산에 포함하지 않습니다.
+ *
+ * ※ Math.random() 호출 순서는 v1.8.0과 같습니다. 같은 난수열이면 같은 결과가 나옵니다.
+ *
+ * @returns {{duty:number[], assist:number[], unfilled:number[]}}
+ *   duty[d]   : d일 정규 당직자 인덱스 (-1 = 미배정)
+ *   assist[d] : d일 조력자 인덱스 (-1 = 없음)
+ */
+function runAttempt(cfg, cal, pre){
+  const P = cfg.people, N = cal.N, n = P.length, X = pre.people;
+
+  // ---- 시도별 상태 (사람 인덱스로 접근하는 typed array) ----
+  const count      = new Int16Array(n);            // 정규 근무 횟수
+  const last       = new Int16Array(n).fill(-99);  // 마지막 정규 근무일 (-99 = 아직 없음)
+  const lastAny    = new Int16Array(n).fill(-99);  // 마지막 근무일 (정규 + 조력)
+  const lastWasHol = new Uint8Array(n);            // 마지막 정규 근무가 휴일이었는지
+  const assistCnt  = new Int16Array(n);            // 조력 횟수
+  const catCnt     = { H: new Int16Array(n), TF: new Int16Array(n), MW: new Int16Array(n) };
+  const dowCnt     = new Int16Array(n * 7);        // dowCnt[i*7 + 요일]
+
+  const duty = new Array(N + 1).fill(-1), assist = new Array(N + 1).fill(-1), unfilled = [];
+  const base = [], quota = [], rank = new Int8Array(n);   // 날마다 재사용하는 작업 배열
+
+  for (let d = 1; d <= N; d++){
+    const day = cal.days[d], prev = d > 1 ? duty[d - 1] : -1;
+    const helpers = pre.helpersOn[d];
+    // 전날 정규 당직자를 제외하고도 조력자가 남는지
+    const anyHelper = helpers.length > 1 || (helpers.length === 1 && helpers[0] !== prev);
+
+    // ---- 1단계: 기본 후보 ----
+    base.length = 0;
+    for (let i = 0; i < n; i++){
+      const p = P[i];
+      if (count[i] >= p.max) continue;
+      if (X[i].blocked[d]) continue;
+      if (p.level !== 1 && last[i] > 0){
+        const rest = lastWasHol[i] ? cfg.restH : cfg.restW;
+        if (d - last[i] <= rest) continue;
+      }
+      if (p.level >= 4 && !anyHelper) continue;
+      base.push(i);
+    }
+
+    // ---- 2단계: 희망일 쿼터 보호 (후보가 0명이면 해제) ----
+    quota.length = 0;
+    for (const i of base){
+      const p = P[i];
+      if (p.max >= 999 || X[i].isWish[d] || (p.max - count[i]) > X[i].wishAfter[d]) quota.push(i);
+    }
+    const cand = quota.length ? quota : base;
+    if (!cand.length){ unfilled.push(d); continue; }
+
+    // ---- 3단계: 우선순위가 가장 높은 사람 중 점수 최저 ----
+    let minR = 4;
+    for (const i of cand){
+      const r = X[i].isWish[d] ? 0 : P[i].wishDow[day.dow] ? 1 : X[i].isAvail[d] ? 2 : 3;
+      rank[i] = r; if (r < minR) minR = r;
+    }
+    const catArr = catCnt[day.cat];
+    let pick = -1, bestScore = Infinity;
+    for (const i of cand){
+      if (rank[i] !== minR) continue;
+      const sc = catArr[i] / P[i].weight + dowCnt[i * 7 + day.dow] * 2 + Math.random() * 0.1;
+      if (sc < bestScore){ bestScore = sc; pick = i; }
+    }
+
+    // 배정 반영
+    count[pick]++; last[pick] = d; lastAny[pick] = d; lastWasHol[pick] = day.isHol ? 1 : 0;
+    catArr[pick]++; dowCnt[pick * 7 + day.dow]++;
+    duty[d] = pick;
+
+    // ---- 4단계: 레벨 4의 조력자 ----
+    if (P[pick].level >= 4){
+      let bestH = -1, bGap = 0, bAs = 0, bRnd = 0;
+      for (const j of helpers){
+        if (j === prev) continue;
+        const gap = d - lastAny[j], as = -assistCnt[j], rnd = Math.random();
+        // 사전식 비교: 쉰 기간(큰 쪽) → 조력 횟수(적은 쪽) → 무작위
+        if (bestH < 0 || gap > bGap || (gap === bGap && (as > bAs || (as === bAs && rnd > bRnd)))){
+          bestH = j; bGap = gap; bAs = as; bRnd = rnd;
+        }
+      }
+      if (bestH >= 0){ assist[d] = bestH; assistCnt[bestH]++; lastAny[bestH] = d; }
+    }
+  }
+  return { duty, assist, unfilled };
+}
+
+/** 모표준편차(분모 n). 원소가 2개 미만이면 0입니다. */
+function sd(arr){
+  if (arr.length < 2) return 0;
+  let m = 0; for (const v of arr) m += v; m /= arr.length;
+  let s = 0; for (const v of arr) s += (v - m) * (v - m);
+  return Math.sqrt(s / arr.length);
+}
+/** 배열 평균. 빈 배열이면 0입니다. */
+function mean(arr){ if (!arr.length) return 0; let s = 0; for (const v of arr) s += v; return s / arr.length; }
+
+/**
+ * DFI(Duty Fairness Index, 당직 공정성 지수)를 계산합니다. 100점 만점입니다.
+ *
+ *   M1 양적 정확도 (25) : 가중치 비례 기대 근무수와 실제 근무수의 RMSE.     25 − RMSE×8
+ *   M2 질적 배분성 (25) : 개인별 휴일 근무수의 표준편차.                    25 − SD×12
+ *   M3 선호도 충족 (20) : 희망일 8 + 희망요일 4 + 가능일 4 + 기피일 회피 4 (각 반영률 × 배점)
+ *   M4 간격 규칙성 (15) : 3회 이상 근무자의 근무 간격 SD 평균.             15 − 평균SD×3
+ *   M5 요일 다양성 (15) : 개인별 7개 요일 근무수 SD 평균.                  15 − 평균SD×5
+ *   각 지표는 0점 아래로 내려가지 않습니다.
+ *
+ *   총점 = (M1+…+M5) × 배정률(채운 날 ÷ 전체 일수), 소수 첫째 자리 반올림
+ *   등급 = S ≥ 90 · A ≥ 80 · B ≥ 70 · C < 70
+ *
+ * 수동 교체 후 재계산에도 쓰이므로 assist 인자를 받지만, 현재 점수에는 조력 근무를 반영하지 않습니다.
+ */
+function computeDFI(cfg, cal, duty, assist){
+  const P = cfg.people, N = cal.N, n = P.length;
+
+  // 사람별 정규 근무일 목록
+  const days = P.map(() => []);
+  let filled = 0;
+  for (let d = 1; d <= N; d++) if (duty[d] >= 0){ days[duty[d]].push(d); filled++; }
+  const counts = days.map(a => a.length);
+
+  // ---- M1 양적 정확도: 기대 근무수 = 채운 일수 × 본인 가중치 ÷ 가중치 합 ----
+  const W = P.reduce((a, p) => a + p.weight, 0) || 1;
+  let se = 0;
+  P.forEach((p, i) => { const e = filled * p.weight / W; se += (counts[i] - e) * (counts[i] - e); });
+  const rmse = n ? Math.sqrt(se / n) : 0;
+  const m1 = Math.max(0, 25 - rmse * 8);
+
+  // ---- M2 질적 배분성: 휴일 근무수의 SD ----
+  const holCounts = days.map(a => a.filter(d => cal.days[d].isHol).length);
+  const holSD = sd(holCounts);
+  const m2 = Math.max(0, 25 - holSD * 12);
+
+  // ---- M3 선호도 충족률 ----
+  // wT/wH: 희망일 분모/적중, dT/dH: 희망요일, aT/aH: 가능일, vT/vV: 기피일 총수/위반수
+  let wT = 0, wH = 0, dT = 0, dH = 0, aT = 0, aH = 0, vT = 0, vV = 0;
+  P.forEach((p, i) => {
+    const mine = days[i];
+    const wish = p.wish.filter(x => x >= 1 && x <= N);
+    if (wish.length){
+      // 희망일이 한도보다 많으면 한도만큼만 분모로 잡습니다 (모두 들어줄 수 없으므로)
+      const denom = Math.min(wish.length, p.max), hit = wish.filter(x => duty[x] === i).length;
+      wT += denom; wH += Math.min(hit, denom);
+    }
+    if (p.wishDow.some(Boolean)) mine.forEach(x => { dT++; if (p.wishDow[cal.days[x].dow]) dH++; });
+    if (p.avail.length){
+      const ok = new Set(p.avail.concat(p.wish));        // 희망일도 "가능"으로 인정
+      mine.forEach(x => { aT++; if (ok.has(x)) aH++; });
+    }
+    p.avoid.forEach(x => { if (x >= 1 && x <= N){ vT++; if (duty[x] === i) vV++; } });
+  });
+  const ratio = (h, t) => t ? h / t : 1;                // 해당 항목이 없으면 만점
+  const m3parts = { wish: 8 * ratio(wH, wT), wishDow: 4 * ratio(dH, dT), avail: 4 * ratio(aH, aT), avoid: 4 * (vT ? 1 - vV / vT : 1) };
+  const m3 = m3parts.wish + m3parts.wishDow + m3parts.avail + m3parts.avoid;
+
+  // ---- M4 간격 규칙성: 3회 이상 근무자의 근무 간격 SD 평균 ----
+  const gapSDs = [];
+  days.forEach(a => {
+    if (a.length < 3) return;
+    const g = []; for (let k = 1; k < a.length; k++) g.push(a[k] - a[k - 1]);
+    gapSDs.push(sd(g));
+  });
+  const gapAvg = mean(gapSDs);
+  const m4 = Math.max(0, 15 - gapAvg * 3);
+
+  // ---- M5 요일 다양성: 개인별 요일 분포 SD 평균 ----
+  const dowSDs = [];
+  days.forEach(a => {
+    if (!a.length) return;
+    const c = [0, 0, 0, 0, 0, 0, 0]; a.forEach(x => { c[cal.days[x].dow]++; });
+    dowSDs.push(sd(c));
+  });
+  const dowAvg = mean(dowSDs);
+  const m5 = Math.max(0, 15 - dowAvg * 5);
+
+  // ---- 총점 ----
+  const raw = m1 + m2 + m3 + m4 + m5;
+  const coverage = N ? filled / N : 0;
+  const total = Math.round(raw * coverage * 10) / 10;
+  const grade = total >= 90 ? 'S' : total >= 80 ? 'A' : total >= 70 ? 'B' : 'C';
+  return {
+    total, grade, coverage,
+    metrics: [
+      { key: 'M1', name: '양적 정확도', short: '가중치 비례 근무량', desc: '각자 가중치에 비례한 몫만큼 근무했는가', how: '기대 근무수(배정일수 × 본인 가중치 ÷ 가중치 합)와 실제 근무수의 차이를 RMSE로 계산합니다. 25 − RMSE × 8.', score: m1, max: 25, detail: 'RMSE ' + rmse.toFixed(2) },
+      { key: 'M2', name: '질적 배분성', short: '휴일 근무 균등', desc: '부담이 큰 주말·공휴일 근무가 고르게 나뉘었는가', how: '개인별 휴일(토·일·공휴일) 근무수의 표준편차입니다. 25 − SD × 12.', score: m2, max: 25, detail: '휴일 SD ' + holSD.toFixed(2) },
+      { key: 'M3', name: '선호도 충족률', short: '희망·기피 반영', desc: '희망일·희망요일·가능일을 얼마나 반영하고 기피일을 피했는가', how: '희망일 8점 + 희망요일 4점 + 가능일 4점 + 기피일 회피 4점의 반영률 합입니다.', score: m3, max: 20, detail: '희망일 ' + m3parts.wish.toFixed(1) + '/8 · 희망요일 ' + m3parts.wishDow.toFixed(1) + '/4 · 가능일 ' + m3parts.avail.toFixed(1) + '/4 · 기피회피 ' + m3parts.avoid.toFixed(1) + '/4' },
+      { key: 'M4', name: '간격 규칙성', short: '근무 간격 일정', desc: '한 사람의 당직이 몰리지 않고 일정한 간격으로 배치되었는가', how: '3회 이상 근무한 사람의 근무 간격 표준편차 평균입니다. 15 − 평균 SD × 3.', score: m4, max: 15, detail: '평균 간격 SD ' + gapAvg.toFixed(2) },
+      { key: 'M5', name: '요일 다양성', short: '요일 분산', desc: '한 사람이 특정 요일에만 반복 배정되지 않았는가', how: '개인별 7개 요일 근무수 분포의 표준편차 평균입니다. 15 − 평균 SD × 5.', score: m5, max: 15, detail: '평균 요일 SD ' + dowAvg.toFixed(2) }
+    ]
+  };
+}
+
+/**
+ * 시뮬레이션 제너레이터입니다. maxAttempts회 배정을 시도하고 서로 다른 상위 3개 안을 남깁니다.
+ * - 진행률: 전체의 약 1%마다 { attempt, total, best }를 yield합니다.
+ * - 반환값: { top: [안…], best: top[0], attempts } 또는 { error: '메시지' }
+ *
+ * 순위 기준: 미배정일이 적은 안 → DFI가 높은 안 → 먼저 찾은 안
+ * 같은 배정(정규·조력 모두 동일)은 한 번만 남깁니다.
+ */
+function* simulate(cfg){
+  const cal = buildCalendar(cfg.year, cfg.month, cfg.holidays);
+
+  // 사전 검증: 명단이 비었거나, 한도 합계로 한 달을 채울 수 없으면 시작하지 않습니다.
+  if (!cfg.people.length) return { error: '근무자 명단이 비어 있습니다.' };
+  const sumMax = cfg.people.reduce((a, p) => a + Math.min(p.max, 999), 0);
+  if (sumMax < cal.N) return { error: '월 최대 한도 합계(' + sumMax + '일)가 해당 월 총 일수(' + cal.N + '일)보다 작습니다. 한도를 늘리거나 인원을 추가하십시오.' };
+
+  const pre = precompute(cfg, cal);
+  const TOPN = 3, top = [], step = Math.max(1, Math.floor(cfg.maxAttempts / 100));
+  const better = (x, y) => x.unfilled.length !== y.unfilled.length ? x.unfilled.length < y.unfilled.length : x.dfi.total > y.dfi.total;
+
+  for (let a = 1; a <= cfg.maxAttempts; a++){
+    const r = runAttempt(cfg, cal, pre), dfi = computeDFI(cfg, cal, r.duty, r.assist);
+    const c = { duty: r.duty, assist: r.assist, unfilled: r.unfilled, dfi, attempt: a };
+    // 상위권에 들 수 있을 때만 중복 검사용 키(문자열)를 만듭니다. 대부분의 시도는 여기서 걸러집니다.
+    if (top.length < TOPN || better(c, top[top.length - 1])){
+      const key = r.duty.join(',') + '|' + r.assist.join(',');
+      if (!top.some(t => t.key === key)){
+        c.key = key; top.push(c);
+        top.sort((x, y) => better(x, y) ? -1 : better(y, x) ? 1 : x.attempt - y.attempt);
+        if (top.length > TOPN) top.pop();
+      }
+    }
+    if (a % step === 0 || a === cfg.maxAttempts) yield { attempt: a, total: cfg.maxAttempts, best: top[0].dfi.total };
+  }
+  top.forEach(t => { delete t.key; });     // Worker → 메인 스레드 전송량 절감
+  return { top, best: top[0], attempts: cfg.maxAttempts };
+}
+
+/* Web Worker 진입점: Worker 안에서 평가될 때만 메시지 수신기를 등록합니다.
+   메인 스레드에서 new Function()으로 평가될 때는 실행되지 않습니다. */
+if (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope){
+  self.onmessage = e => {
+    const it = simulate(e.data);
+    let r;
+    while (!(r = it.next()).done) self.postMessage({ type: 'progress', p: r.value });
+    self.postMessage({ type: 'done', result: r.value });
+  };
+}
+</script>
+
+<!-- ===================== 메인 애플리케이션 ===================== -->
+<script>
+"use strict";
+/* =============================================================================
+ * 목차
+ *   §0  DOM 헬퍼·상수·버전
+ *   §1  내장 공휴일
+ *   §2  저장소(Store): 쿠키 + localStorage
+ *   §3  앱 상태(state)와 직렬화
+ *   §4  공통 유틸: 이스케이프, 토스트, 확인창, 실행 취소, 날짜 해석·표기, 복사, 다운로드
+ *   §5  자동 저장과 파생 정보(사전 점검·결과 낡음) 갱신
+ *   §6  설정 패널: 연월, 휴무일, 공휴일
+ *   §7  프로필: 새로 만들기·복사·이름 변경·삭제
+ *   §8  명단 표
+ *   §9  달력형 날짜 선택 팝오버
+ *   §10 샘플 데이터
+ *   §11 생성 전 사전 점검
+ *   §12 엔진 실행 (Web Worker / 메인 스레드 대체 실행)
+ *   §13 결과 화면: 3개 안, 달력, 통계, DFI, 강조
+ *   §14 수동 교체
+ *   §15 알림 모달
+ *   §16 내보내기: JSON 백업·복원, CSV
+ *   §17 당직표 출력 (A4 세로 1장)
+ *   §18 명단 머리글 툴팁
+ *   §19 초기화
+ *
+ * 데이터 흐름 요약
+ *   입력 이벤트 → state 변경 → scheduleSave() (400ms 묶음 처리)
+ *                               ├─ saveNow()        : 프로필 저장
+ *                               └─ refreshDerived() : 사전 점검·결과 낡음 배너 갱신
+ *   [생성] → buildCfg() → Worker(simulate) → onDone() → state.cands → renderResults()
+ * ============================================================================= */
+
+/* ─────────────────────────── §0 DOM 헬퍼·상수·버전 ─────────────────────────── */
+const $  = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+/* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
+const APP_VERSION = '1.9.2', APP_BUILD = '2026-11-22';
+const CHANGELOG = [
+  '1.9.2 강조 시 조력 근무를 정규 당직보다 연한 색으로 표시, 요약 막대에 정규·조력 색 범례 추가',
+  '1.9.1 근무자별 통계표 열 정렬 수정(머리글·값 가운데 정렬, 열 폭 고정), 화면을 내릴 때 DFI 카드가 통계표를 덮는 문제 수정',
+  '1.9.0 코드 구조 정리·주석 보강. 엔진 사전 계산으로 시도당 연산 감소(결과 동일), 강조 표시 부분 갱신, 통계 캐시, 입력 중 결과 낡음 검사 지연 처리',
+  '1.8.0 UX 개선: 결과 낡음 경고, 날짜 해석 표시, 생성 전 사전 점검, 목표 미달 진단을 DFI 카드에 표시, 수동 교체 실행 취소, 내장 공휴일(2026–2027), 달력형 날짜 선택, 통계 기대·차이 열, 프로필 메뉴 단순화, 모바일 카드형 명단, 근무일 복사 등',
+  '1.7.1 버전 배지의 변경 이력 툴팁 제거',
+  '1.7.0 제목 변경, DFI(당직 공정성 지수) 설명 추가, 버전 표시',
+  '1.6.0 통계 열: 월~수·목·금·토·일·공휴일·정규·조력',
+  '1.5.0 작업 순서대로 화면 재배치 (생성 → 명단 아래, 출력·저장 → 최하단)',
+  '1.4.0 DFI 상위 3개 안 비교·출력할 안 선택',
+  '1.3.0 명단 머리글 툴팁, A4 1장 출력·결재란 상단 우측',
+  '1.2.0 연월 드롭다운(−2~+6개월), 최소 휴무일 슬라이더',
+  '1.1.0 근무자 삭제 오류 수정(실행 취소), 당직표 출력',
+  '1.0.0 최초 버전: 배정 엔진, DFI, 쿠키 프로필 저장'
+];
+
+const DOW    = ['일', '월', '화', '수', '목', '금', '토'];
+const LEVELS = { 1: 'Lv1 특례', 2: 'Lv2 숙련', 3: 'Lv3 일반(조력)', 4: 'Lv4 초보' };
+const DATE_FIELDS = ['wish', 'avail', 'avoid'];                 // 날짜 목록을 입력하는 명단 필드
+const FLABEL = { wish: '희망일', avail: '가능일', avoid: '기피일' };
+const UNLIMITED = 999;                                           // 월 최대 빈칸 = 무제한
+
+/* 엔진 소스를 메인 스레드에서도 평가해 둡니다 (달력 생성, DFI 재계산, Worker 대체 실행용). */
+const ENGINE_SRC = $('#engineSrc').textContent;
+const Engine = new Function(ENGINE_SRC + '\nreturn { simulate, computeDFI, buildCalendar, daysInMonth };')();
+
+/* ─────────────────────────── §1 내장 공휴일 ───────────────────────────
+   기준일 2026-11-22. 관공서의 공휴일에 관한 규정과 우주항공청 2027년 월력요항 보도로 확인했습니다.
+   - 2026년부터 노동절(5/1)·제헌절(7/17)이 공휴일에 포함됩니다.
+   - 2026년 6월 3일은 제9회 전국동시지방선거일입니다.
+   - 2027년 선거일·임시공휴일은 월력요항에 없으므로 지정되면 직접 추가해야 합니다.
+   형식: KR_HOLIDAYS[연][월] = [[일, 이름], …]  (일요일과 겹친 공휴일도 이름 표시를 위해 포함) */
+const KR_HOLIDAYS = {
+  2026: {1:[[1,'신정']], 2:[[16,'설날 연휴'],[17,'설날'],[18,'설날 연휴']], 3:[[1,'삼일절'],[2,'대체공휴일']],
+         5:[[1,'노동절'],[5,'어린이날'],[24,'부처님오신날'],[25,'대체공휴일']], 6:[[3,'지방선거일'],[6,'현충일']], 7:[[17,'제헌절']],
+         8:[[15,'광복절'],[17,'대체공휴일']], 9:[[24,'추석 연휴'],[25,'추석'],[26,'추석 연휴']],
+         10:[[3,'개천절'],[5,'대체공휴일'],[9,'한글날']], 12:[[25,'성탄절']]},
+  2027: {1:[[1,'신정']], 2:[[6,'설날 연휴'],[7,'설날'],[8,'설날 연휴'],[9,'대체공휴일']], 3:[[1,'삼일절']],
+         5:[[1,'노동절'],[3,'대체공휴일'],[5,'어린이날'],[13,'부처님오신날']], 6:[[6,'현충일']], 7:[[17,'제헌절'],[19,'대체공휴일']],
+         8:[[15,'광복절'],[16,'대체공휴일']], 9:[[14,'추석 연휴'],[15,'추석'],[16,'추석 연휴']],
+         10:[[3,'개천절'],[4,'대체공휴일'],[9,'한글날'],[11,'대체공휴일']], 12:[[25,'성탄절'],[27,'대체공휴일']]}
+};
+/** 내장 공휴일 목록. 그 연도 자료가 없으면 null, 있으면 배열(공휴일 없는 달은 빈 배열)을 반환합니다. */
+function builtinHolidays(y, m){ const Y = KR_HOLIDAYS[y]; return Y ? (Y[m] || []) : null; }
+/** 공휴일 이름. 사용자가 직접 추가한 날처럼 내장 자료에 없으면 '공휴일'을 반환합니다. */
+function holName(y, m, d){ const h = (builtinHolidays(y, m) || []).find(x => x[0] === d); return h ? h[1] : '공휴일'; }
+/** 공휴일 입력칸에 넣을 문자열 (예: "24, 25") */
+function builtinStr(y, m){ const b = builtinHolidays(y, m); return b ? b.map(x => x[0]).join(', ') : ''; }
+
+/* ─────────────────────────── §2 저장소 ───────────────────────────
+   쿠키와 localStorage에 같은 내용을 함께 저장합니다(미러링).
+   - 쿠키: 1개당 약 4KB 제한이 있어 3,000자 단위로 나눠(청크) 저장하고, 기록 후 다시 읽어 검증합니다.
+   - Chrome·Edge는 file://로 연 페이지의 쿠키를 저장하지 않습니다. 이때는 localStorage만 사용합니다.
+   - 읽을 때는 쿠키를 먼저 보고, 없으면 localStorage를 봅니다.
+   키 구성
+     쿠키: dfiDuty_p<이름해시>_0.._n, dfiDuty_list_*, dfiDuty_last
+     localStorage: dfiDuty:p:<이름>, dfiDuty:list, dfiDuty:last */
+const Store = {
+  P: 'dfiDuty_', CHUNK: 3000, DAYS: 365,
+  cookieOK: false, lsOK: false,
+
+  /** 실제로 써 보고 사용 가능 여부를 판정합니다. */
+  init(){
+    try {
+      document.cookie = this.P + 't=1; max-age=60; path=/; SameSite=Lax';
+      this.cookieOK = document.cookie.indexOf(this.P + 't=1') >= 0;
+      document.cookie = this.P + 't=; max-age=0; path=/';
+    } catch(e){ this.cookieOK = false; }
+    try { localStorage.setItem('__t', '1'); localStorage.removeItem('__t'); this.lsOK = true; } catch(e){ this.lsOK = false; }
+  },
+
+  // ---- 쿠키 저수준 함수 ----
+  /** 프로필 이름 → 쿠키 키에 쓸 짧은 해시 (djb2) */
+  hash(s){ let h = 5381; for (const c of s) h = ((h << 5) + h + c.codePointAt(0)) >>> 0; return h.toString(36); },
+  setC(k, v){ document.cookie = k + '=' + v + '; max-age=' + (this.DAYS * 86400) + '; path=/; SameSite=Lax'; },
+  getC(k){ const m = document.cookie.split('; ').find(x => x.indexOf(k + '=') === 0); return m ? m.slice(k.length + 1) : null; },
+  delC(k){ document.cookie = k + '=; max-age=0; path=/; SameSite=Lax'; },
+  /** 긴 문자열을 청크로 나눠 기록합니다. 이전보다 청크 수가 줄면 남은 청크를 지웁니다. 기록 성공 여부를 반환합니다. */
+  writeChunked(key, str){
+    const enc = encodeURIComponent(str), n = Math.ceil(enc.length / this.CHUNK) || 1;
+    const old = parseInt(this.getC(key + '_n') || '0', 10);
+    for (let i = 0; i < n; i++) this.setC(key + '_' + i, enc.slice(i * this.CHUNK, (i + 1) * this.CHUNK));
+    for (let i = n; i < old; i++) this.delC(key + '_' + i);
+    this.setC(key + '_n', String(n));
+    return this.readChunked(key) === str;
+  },
+  readChunked(key){
+    const n = parseInt(this.getC(key + '_n') || '0', 10); if (!n) return null;
+    let s = '';
+    for (let i = 0; i < n; i++){ const c = this.getC(key + '_' + i); if (c == null) return null; s += c; }
+    try { return decodeURIComponent(s); } catch(e){ return null; }
+  },
+  removeChunked(key){
+    const n = parseInt(this.getC(key + '_n') || '0', 10);
+    for (let i = 0; i < n; i++) this.delC(key + '_' + i);
+    this.delC(key + '_n');
+  },
+
+  // ---- 공개 API ----
+  /** 프로필 저장. 마지막 사용 프로필과 목록도 함께 갱신합니다. 반환: { cookie, ls } 각 저장 성공 여부 */
+  save(name, obj){
+    const json = JSON.stringify(obj); let c = false, l = false;
+    if (this.cookieOK) c = this.writeChunked(this.P + 'p' + this.hash(name), json);
+    if (this.lsOK){ try { localStorage.setItem('dfiDuty:p:' + name, json); l = true; } catch(e){} }
+    this.setLast(name); this.addToList(name);
+    return { cookie: c, ls: l };
+  },
+  load(name){
+    let s = this.cookieOK ? this.readChunked(this.P + 'p' + this.hash(name)) : null;
+    if (!s && this.lsOK) s = localStorage.getItem('dfiDuty:p:' + name);
+    try { return s ? JSON.parse(s) : null; } catch(e){ return null; }
+  },
+  remove(name){
+    if (this.cookieOK) this.removeChunked(this.P + 'p' + this.hash(name));
+    if (this.lsOK) localStorage.removeItem('dfiDuty:p:' + name);
+    this.writeList(this.list().filter(x => x !== name));
+    if (this.getLast() === name){
+      if (this.cookieOK) this.delC(this.P + 'last');
+      if (this.lsOK) localStorage.removeItem('dfiDuty:last');
+    }
+  },
+  list(){
+    let s = this.cookieOK ? this.readChunked(this.P + 'list') : null;
+    if (!s && this.lsOK) s = localStorage.getItem('dfiDuty:list');
+    try { return s ? JSON.parse(s) : []; } catch(e){ return []; }
+  },
+  writeList(arr){
+    const s = JSON.stringify(arr);
+    if (this.cookieOK) this.writeChunked(this.P + 'list', s);
+    if (this.lsOK) localStorage.setItem('dfiDuty:list', s);
+  },
+  addToList(name){ const l = this.list(); if (!l.includes(name)){ l.push(name); this.writeList(l); } },
+  setLast(name){
+    if (this.cookieOK) this.setC(this.P + 'last', encodeURIComponent(name));
+    if (this.lsOK) localStorage.setItem('dfiDuty:last', name);
+  },
+  getLast(){
+    const c = this.cookieOK ? this.getC(this.P + 'last') : null;
+    if (c){ try { return decodeURIComponent(c); } catch(e){} }
+    return this.lsOK ? localStorage.getItem('dfiDuty:last') : null;
+  }
+};
+
+/* ─────────────────────────── §3 앱 상태와 직렬화 ─────────────────────────── */
+/** 오늘 기준 다음 달 {y, m} */
+function nextMonth(){ const t = new Date(); const m = t.getMonth() + 2; return m > 12 ? { y: t.getFullYear() + 1, m: 1 } : { y: t.getFullYear(), m }; }
+function defaultSettings(){
+  const nm = nextMonth();
+  return { year: nm.y, month: nm.m, holidays: builtinStr(nm.y, nm.m), restW: 1, restH: 2, minDFI: 75, maxAttempts: 3000 };
+}
+/** 명단 1행의 기본값. 날짜 필드는 사용자가 입력한 원문 문자열 그대로 보관합니다(해석은 buildCfg에서). */
+function blankPerson(){ return { name: '', level: 3, weight: 1.0, wish: '', avail: '', avoid: '', wishDow: [0,0,0,0,0,0,0], exDow: [0,0,0,0,0,0,0], max: '' }; }
+
+/**
+ * 앱 전체 상태 (단일 객체)
+ *   profile  : 현재 프로필 이름 ('' = 아직 저장 전)
+ *   settings : 설정 패널 값 (입력 원문)
+ *   people   : 명단 (입력 원문)
+ *   cands    : 생성된 상위 안 배열 [{rank, cfg, cal, duty, assist, unfilled, dfi, attempt, edited:Set, at}]
+ *   result   : cands 중 선택된 안 (출력·CSV·수동 교체 대상)
+ *   sel      : 선택된 안의 인덱스
+ *   hl       : 강조 중인 근무자 인덱스 (-1 = 없음)
+ *   genSig   : 생성 당시 입력의 서명 → 현재 입력과 다르면 "결과 낡음"
+ *   miniOpen : 3개 안 카드의 미니 달력 펼침 여부
+ */
+const state = { profile: '', settings: defaultSettings(), people: [], result: null, cands: null, sel: 0, hl: -1, genSig: null, miniOpen: false };
+
+/* 요일 선택 배열 [0/1 ×7] ↔ 비트마스크 정수 (저장 용량 절약) */
+const mask   = a => a.reduce((m, v, i) => m | (v ? 1 << i : 0), 0);
+const unmask = m => DOW.map((_, i) => (m >> i) & 1);
+/** 저장용 압축 형식 v1: 사람마다 배열 하나. 이전 버전과 같은 형식이므로 기존 프로필을 그대로 읽습니다. */
+function serialize(){
+  return { v: 1, s: state.settings,
+    p: state.people.map(p => [p.name, +p.level, +p.weight, p.wish, p.avail, p.avoid, mask(p.wishDow), mask(p.exDow), p.max]) };
+}
+function deserialize(o){
+  if (!o) return false;
+  state.settings = Object.assign(defaultSettings(), o.s || {});
+  state.people = (o.p || []).map(a => ({ name: a[0] || '', level: a[1] || 3, weight: a[2] ?? 1, wish: a[3] || '', avail: a[4] || '', avoid: a[5] || '',
+    wishDow: unmask(a[6] || 0), exDow: unmask(a[7] || 0), max: a[8] ?? '' }));
+  return true;
+}
+
+/* ─────────────────────────── §4 공통 유틸 ─────────────────────────── */
+/** HTML 이스케이프. innerHTML에 사용자 입력을 넣을 때 반드시 거칩니다. */
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/** 하단 중앙에 잠시 표시되는 안내 */
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+/**
+ * 확인·입력 모달 (브라우저 confirm()/prompt() 대체)
+ * @param {string} msg 질문
+ * @param {{input?:boolean, value?:string, placeholder?:string, yes?:string}} opt
+ * @returns {Promise<boolean|string|null>} input이면 입력 문자열(취소 시 null), 아니면 true/false
+ * showModal()이 실패하는 환경에서는 확인(true)으로 처리해 작업이 막히지 않게 합니다.
+ */
+function ask(msg, opt = {}){
+  return new Promise(res => {
+    const d = $('#askDialog'), inp = $('#askInput');
+    $('#askMsg').textContent = msg;
+    inp.classList.toggle('hidden', !opt.input); inp.value = opt.value || ''; inp.placeholder = opt.placeholder || '';
+    $('#askYes').textContent = opt.yes || '확인';
+    const done = v => { d.close(); $('#askYes').onclick = $('#askNo').onclick = d.oncancel = inp.onkeydown = null; res(v); };
+    const yes = () => done(opt.input ? inp.value.trim() : true);
+    const no  = () => done(opt.input ? null : false);
+    $('#askYes').onclick = yes; $('#askNo').onclick = no; d.oncancel = no;
+    inp.onkeydown = e => { if (e.key === 'Enter'){ e.preventDefault(); yes(); } };
+    try { d.showModal(); if (opt.input){ inp.focus(); inp.select(); } } catch(e){ res(opt.input ? null : true); }
+  });
+}
+
+/** 실행 취소 막대. 8초 뒤 자동으로 사라집니다. 새로 호출하면 이전 취소 기회는 없어집니다. */
+let undoTimer = null;
+function showUndo(msg, undoFn){
+  const bar = $('#undoBar'); $('#undoMsg').textContent = msg; bar.classList.remove('hidden');
+  $('#undoBtn').onclick = () => { undoFn(); bar.classList.add('hidden'); clearTimeout(undoTimer); };
+  clearTimeout(undoTimer); undoTimer = setTimeout(() => bar.classList.add('hidden'), 8000);
+}
+
+/**
+ * 날짜 목록 문자열을 해석합니다.
+ * 허용 형식: "3, 15"  "20~22"  "20-22"  "12/25"  "2026-12-25"  "12월 25일"  "25일"
+ * 구분자: 쉼표, 공백, 가운데점, 세미콜론
+ * @param {string} str 입력 원문
+ * @param {number} N   해당 월 일수 (범위를 벗어난 날짜는 bad로 분류)
+ * @returns {{days:number[], bad:string[]}} days: 오름차순·중복 제거 / bad: 해석하지 못한 토큰
+ */
+function parseDays(str, N){
+  const out = new Set(), bad = [];
+  const s = String(str || '')
+    .replace(/(\d{1,2})\s*월\s*(\d{1,2})\s*일?/g, '$2')   // "12월 25일" → "25"
+    .replace(/(\d)\s*일/g, '$1')                          // "25일" → "25"
+    .replace(/\s*([~\-–])\s*/g, '$1');                     // "20 ~ 22" → "20~22" (공백 분리 방지)
+  for (const tok of s.split(/[,\s·;、]+/)){
+    if (!tok) continue;
+    // 범위: 20~22, 20-22
+    const m = tok.match(/^(\d{1,2})[~\-–](\d{1,2})$/);
+    if (m){
+      const a = +m[1], b = +m[2];
+      if (a < 1 || b > N || a > b){ bad.push(tok); continue; }
+      for (let d = a; d <= b; d++) out.add(d);
+      continue;
+    }
+    // 날짜 표기: 2026-12-25, 12/25 → 마지막 숫자(일)만 사용
+    if (/^\d{4}[-./]\d{1,2}[-./]\d{1,2}$/.test(tok) || /^\d{1,2}[/.]\d{1,2}$/.test(tok)){
+      const nums = tok.match(/\d+/g), d = +nums[nums.length - 1];
+      (d >= 1 && d <= N) ? out.add(d) : bad.push(tok);
+      continue;
+    }
+    // 단일 숫자
+    if (/^\d{1,2}$/.test(tok)){ const d = +tok; (d >= 1 && d <= N) ? out.add(d) : bad.push(tok); continue; }
+    bad.push(tok);
+  }
+  return { days: [...out].sort((a, b) => a - b), bad };
+}
+const parseDayList = (str, N) => parseDays(str, N).days;
+
+/** [1,2,3,5,7,8] → "1~3, 5, 7, 8". 3일 이상 연속일 때만 범위로 묶습니다. */
+function fmtDays(arr){
+  const a = [...new Set(arr)].sort((x, y) => x - y), out = [];
+  for (let i = 0; i < a.length;){
+    let j = i; while (j + 1 < a.length && a[j + 1] === a[j] + 1) j++;
+    if (j - i >= 2){ out.push(a[i] + '~' + a[j]); i = j + 1; } else { out.push(a[i]); i++; }
+  }
+  return out.join(', ');
+}
+
+/** 입력칸 아래 해석 결과 HTML. 빈 입력이면 ''(CSS :empty로 숨김). */
+function hintHTML(str, N){
+  if (!String(str || '').trim()) return '';
+  const r = parseDays(str, N);
+  return (r.days.length ? `<span class="ok">✓ ${esc(fmtDays(r.days))} (${r.days.length}일)</span>` : '<span class="bad">인식된 날짜 없음</span>') +
+         (r.bad.length ? ` <span class="bad">무시: ${esc(r.bad.join(' '))}</span>` : '');
+}
+
+/** 현재 대상 월의 일수 / d일의 요일 */
+const curN  = () => Engine.daysInMonth(+state.settings.year, +state.settings.month);
+const dowOf = d => new Date(+state.settings.year, +state.settings.month - 1, d).getDay();
+const pad2  = n => String(n).padStart(2, '0');
+
+/** 클립보드 복사. Clipboard API가 막힌 환경(file://, 미리보기)에서는 execCommand로 대체합니다. */
+function copyText(text){
+  const fallback = () => {
+    const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select();
+    let ok = false; try { ok = document.execCommand('copy'); } catch(e){}
+    t.remove(); toast(ok ? '복사했습니다.' : '복사가 차단되었습니다.');
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => toast('복사했습니다.'), fallback);
+  else fallback();
+}
+
+/** Blob을 만들어 파일로 내려받습니다. */
+function download(name, content, type){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type })); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+/* ─────────────────────────── §5 자동 저장과 파생 정보 ───────────────────────────
+   입력할 때마다 저장하면 쿠키 기록이 잦아 느려집니다. 400ms 동안 입력이 없을 때 한 번만 처리합니다.
+   사전 점검과 결과 낡음 검사도 전체 입력을 다시 해석하므로 같은 시점에 묶어서 처리합니다. */
+let saveTimer = null;
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { saveNow(); refreshDerived(); }, 400);
+}
+/** 대기 중인 자동 저장을 즉시 실행합니다(프로필 전환 직전 등). */
+function flushSave(){ if (saveTimer){ clearTimeout(saveTimer); saveTimer = null; if (state.profile) saveNow(); } }
+
+function saveNow(){
+  saveTimer = null;
+  if (!state.profile) state.profile = '기본';            // 첫 실행에 이름 없이 입력하면 '기본'으로 저장
+  const r = Store.save(state.profile, serialize());
+  const time = new Date().toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  const b = $('#storeBadge');
+  if (r.cookie || r.ls){
+    b.textContent = '저장됨 · ' + time; b.className = 'badge ok';
+    b.title = '저장 위치: ' + [r.cookie && '쿠키', r.ls && 'localStorage'].filter(Boolean).join(' + ') +
+      (!Store.cookieOK ? '\n(파일로 연 페이지는 Chrome·Edge가 쿠키를 저장하지 않아 localStorage에 저장합니다.)' : '');
+  } else {
+    b.textContent = '저장 불가 — JSON 백업을 이용하십시오'; b.className = 'badge bad'; b.title = '브라우저 저장소가 차단되었습니다.';
+  }
+  refreshProfileUI();
+}
+/** 사전 점검 목록과 결과 낡음 배너를 다시 계산합니다. */
+function refreshDerived(){ renderPrecheck(); markStale(); }
+
+/* 결과 낡음 감지
+   생성 당시 cfg의 서명(JSON 문자열)을 저장해 두고, 현재 입력으로 만든 서명과 비교합니다.
+   목표 DFI와 시뮬레이션 횟수는 배정 결과 자체를 바꾸지 않으므로 서명에서 뺍니다. */
+function cfgSig(cfg){ const c = Object.assign({}, cfg); delete c.minDFI; delete c.maxAttempts; return JSON.stringify(c); }
+function isStale(){ return !!(state.cands && state.genSig && cfgSig(buildCfg()) !== state.genSig); }
+function markStale(){ $('#staleBar').classList.toggle('hidden', !isStale()); updateOutBar(); }
+/** 결과가 낡았으면 출력·저장 전에 한 번 묻습니다. */
+async function confirmIfStale(what){
+  if (!isStale()) return true;
+  return ask(`생성 후 명단 또는 설정이 바뀌었습니다. 이전 입력 기준 결과를 그대로 ${what}할까요?`, { yes: '그대로 ' + what });
+}
+
+/* ─────────────────────────── §6 설정 패널 ─────────────────────────── */
+/** 연월 선택지: 오늘 기준 전 2개월 ~ 후 6개월 */
+function ymOptions(){
+  const t = new Date(), out = [];
+  for (let k = -2; k <= 6; k++){ const d = new Date(t.getFullYear(), t.getMonth() + k, 1); out.push({ y: d.getFullYear(), m: d.getMonth() + 1, k }); }
+  return out;
+}
+function renderYM(){
+  const y = +state.settings.year, m = +state.settings.month, opts = ymOptions();
+  const label = o => `${o.y}년 ${o.m}월${o.k === 0 ? ' (이번 달)' : o.k === 1 ? ' (다음 달)' : ''}`;
+  let h = opts.map(o => `<option value="${o.y}-${o.m}" ${o.y === y && o.m === m ? 'selected' : ''}>${label(o)}</option>`).join('');
+  // 오래된 프로필처럼 저장값이 범위 밖이어도 선택값을 잃지 않도록 맨 앞에 추가
+  if (!opts.some(o => o.y === y && o.m === m) && y && m) h = `<option value="${y}-${m}" selected>${y}년 ${m}월 (저장값)</option>` + h;
+  $('#ym').innerHTML = h;
+}
+/* 연월 변경: 공휴일을 새 달의 내장값으로 바꿉니다. (이전 달 공휴일이 남으면 잘못 배정되므로)
+   명단의 날짜는 사용자의 판단이 필요하므로 바꾸지 않고 안내만 합니다. */
+$('#ym').addEventListener('change', e => {
+  const [y, m] = e.target.value.split('-').map(Number);
+  state.settings.year = y; state.settings.month = m;
+  const bi = builtinHolidays(y, m);
+  state.settings.holidays = builtinStr(y, m);
+  $('#holidays').value = state.settings.holidays;
+  renderHolidayUI(); renderRoster(); scheduleSave();
+  const hasDates = state.people.some(p => p.wish || p.avail || p.avoid);
+  const msg = bi == null ? `${y}년 내장 공휴일 정보가 없습니다. 직접 입력하십시오.`
+            : bi.length   ? `${m}월 공휴일을 자동 입력했습니다: ${bi.map(x => x[0] + '일 ' + x[1]).join(', ')}.`
+            :               `${m}월에는 내장 공휴일이 없습니다.`;
+  toast(msg + (hasDates ? ' 명단의 날짜는 새 달 기준으로 다시 확인하십시오.' : ''));
+});
+
+const clampRest = v => { v = Math.round(+v); return isNaN(v) ? 0 : Math.min(5, Math.max(0, v)); };
+function renderRangeLabels(){ $('#restWVal').textContent = state.settings.restW; $('#restHVal').textContent = state.settings.restH; }
+/** state.settings → 설정 패널 전체 반영 */
+function renderSettings(){
+  state.settings.restW = clampRest(state.settings.restW); state.settings.restH = clampRest(state.settings.restH);
+  $$('[data-s]').forEach(el => { el.value = state.settings[el.dataset.s]; });
+  renderYM(); renderRangeLabels(); renderHolidayUI();
+}
+/* data-s 입력칸 → state.settings (숫자·슬라이더는 숫자로, 빈칸은 ''로 보관) */
+$$('[data-s]').forEach(el => el.addEventListener('input', () => {
+  const k = el.dataset.s, numeric = el.type === 'number' || el.type === 'range';
+  state.settings[k] = numeric ? (el.value === '' ? '' : +el.value) : el.value;
+  if (k === 'holidays') renderHolidayUI();
+  if (el.type === 'range') renderRangeLabels();
+  scheduleSave();
+}));
+
+/** 공휴일 미니 달력, 해석 결과, 내장 공휴일 안내를 그립니다. */
+function renderHolidayUI(){
+  const y = +state.settings.year, m = +state.settings.month;
+  if (!y || !m || m < 1 || m > 12){ $('#miniCal').innerHTML = ''; return; }
+  const N = Engine.daysInMonth(y, m), first = new Date(y, m - 1, 1).getDay();
+  const hol = new Set(parseDayList(state.settings.holidays, N));
+
+  let h = DOW.map(d => `<div class="h">${d}</div>`).join('') + '<div></div>'.repeat(first);
+  for (let d = 1; d <= N; d++){
+    const w = (first + d - 1) % 7, on = hol.has(d);
+    const title = on ? esc(holName(y, m, d)) + ' · 눌러서 해제' : '눌러서 공휴일로 지정';
+    h += `<button type="button" class="d ${w === 0 ? 'sun' : w === 6 ? 'sat' : ''} ${on ? 'pub' : ''}" data-d="${d}" aria-pressed="${on}" title="${title}">${d}</button>`;
+  }
+  $('#miniCal').innerHTML = h;
+  $('#ph-holidays').innerHTML = hintHTML(state.settings.holidays, N);
+
+  const bi = builtinHolidays(y, m);
+  const same = fmtDays(parseDayList(builtinStr(y, m), N)) === fmtDays([...hol]);   // 내장값과 같은지
+  $('#holHint').innerHTML = bi == null
+    ? `${y}년 내장 공휴일 정보가 없습니다. 직접 입력하십시오.`
+    : `내장 공휴일(${y}년 ${m}월): ${bi.length ? bi.map(x => `${x[0]}일 ${esc(x[1])}`).join(' · ') : '없음'}` +
+      (same ? '' : ' <button type="button" class="link" id="btnHolReset">내장값으로 되돌리기</button>') +
+      '<br><span style="font-size:11px">기준일 2026-11-22. 임시공휴일·선거일 등 추가 지정은 직접 입력하십시오.</span>';
+}
+/** 공휴일 입력값을 바꾸고 화면·저장까지 처리 */
+function setHolidays(str){
+  state.settings.holidays = str; $('#holidays').value = str;
+  renderHolidayUI(); scheduleSave();
+}
+$('#miniCal').addEventListener('click', e => {
+  const b = e.target.closest('button[data-d]'); if (!b) return;
+  const s = new Set(parseDayList(state.settings.holidays, curN())), n = +b.dataset.d;
+  s.has(n) ? s.delete(n) : s.add(n);
+  setHolidays([...s].sort((a, b) => a - b).join(', '));
+});
+$('#holHint').addEventListener('click', e => {
+  if (e.target.id === 'btnHolReset') setHolidays(builtinStr(+state.settings.year, +state.settings.month));
+});
+
+/* ─────────────────────────── §7 프로필 ─────────────────────────── */
+/** 결과·진행 표시를 비웁니다(프로필 전환·새 프로필·삭제 시). */
+function clearResults(){
+  Object.assign(state, { result: null, cands: null, hl: -1, genSig: null });
+  $('#results').classList.add('hidden'); $('#emptyResults').classList.remove('hidden'); $('#genBadge').classList.add('hidden');
+  $('#progBar').style.width = '0%'; $('#progText').textContent = '대기 중';
+  updateOutBar();
+}
+/** state 전체를 화면에 다시 그립니다. */
+function renderAll(){ closeDP(); renderSettings(); renderRoster(); refreshProfileUI(); refreshDerived(); }
+
+function refreshProfileUI(){
+  const list = Store.list();
+  // 저장 직전 상태(목록에 아직 없음)여도 현재 이름이 드롭다운에 보이도록 추가
+  const names = (state.profile && !list.includes(state.profile)) ? list.concat(state.profile) : list;
+  $('#profileSelect').innerHTML = names.length
+    ? names.map(n => `<option value="${esc(n)}" ${n === state.profile ? 'selected' : ''}>${esc(n)}</option>`).join('')
+    : '<option value="">(저장 전 — 입력하면 \'기본\'으로 자동 저장)</option>';
+  $('#profileBadge').textContent = '프로필: ' + (state.profile || '-');
+}
+function applyProfile(name, quiet){
+  const data = Store.load(name);
+  if (!data){ toast(`'${name}' 프로필을 찾을 수 없습니다.`); return false; }
+  state.profile = name; deserialize(data); Store.setLast(name);
+  clearResults(); renderAll();
+  if (!quiet) toast(`'${name}' 프로필을 불러왔습니다.`);
+  return true;
+}
+/** 새 이름 입력. 빈 이름·중복 이름이면 null */
+async function askNewName(msg, value){
+  const name = await ask(msg, { input: true, value: value || '', placeholder: '예: 가정의학과 전공의' });
+  if (name == null) return null;
+  if (!name){ toast('이름을 입력하십시오.'); return null; }
+  if (Store.list().includes(name)){ toast(`'${name}' 프로필이 이미 있습니다.`); return null; }
+  return name;
+}
+
+$('#profileSelect').addEventListener('change', e => {
+  const n = e.target.value;
+  if (n && n !== state.profile){ flushSave(); applyProfile(n); }
+});
+$('#profileBadge').addEventListener('click', () => {
+  $('#ctrlCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(() => $('#profileSelect').focus(), 300);
+});
+// 새 프로필: 빈 명단과 기본 설정으로 시작
+$('#btnProfileNew').addEventListener('click', async () => {
+  const name = await askNewName('새 프로필 이름 (빈 명단으로 시작합니다)'); if (!name) return;
+  flushSave();
+  Object.assign(state, { profile: name, settings: defaultSettings(), people: [] });
+  clearResults(); saveNow(); renderAll();
+  toast(`'${name}' 프로필을 만들었습니다.`);
+});
+// 다른 이름으로 저장: 현재 설정·명단을 복사
+$('#btnProfileSaveAs').addEventListener('click', async () => {
+  const name = await askNewName('현재 설정과 명단을 복사해 저장할 이름', state.profile ? state.profile + ' 사본' : ''); if (!name) return;
+  flushSave(); state.profile = name; saveNow();
+  toast(`'${name}' 프로필로 저장했습니다.`);
+});
+// 이름 변경 = 새 이름으로 저장 후 이전 이름 삭제
+$('#btnProfileRename').addEventListener('click', async () => {
+  const old = state.profile; if (!old){ toast('저장된 프로필이 없습니다.'); return; }
+  const name = await askNewName(`'${old}' 프로필의 새 이름`, old); if (!name) return;
+  clearTimeout(saveTimer);
+  state.profile = name; saveNow(); Store.remove(old); Store.setLast(name); refreshProfileUI();
+  toast(`'${old}' → '${name}'로 이름을 바꿨습니다.`);
+});
+// 삭제: 남은 프로필이 있으면 첫 번째를 불러오고, 없으면 빈 상태로 돌아갑니다.
+$('#btnProfileDelete').addEventListener('click', async () => {
+  const name = state.profile; if (!name){ toast('저장된 프로필이 없습니다.'); return; }
+  if (!(await ask(`'${name}' 프로필을 삭제할까요? 설정과 명단이 이 브라우저에서 지워집니다.`, { yes: '삭제' }))) return;
+  clearTimeout(saveTimer); Store.remove(name);
+  const rest = Store.list();
+  if (rest.length) applyProfile(rest[0], true);
+  else { Object.assign(state, { profile: '', settings: defaultSettings(), people: [] }); clearResults(); renderAll(); }
+  toast(`'${name}' 프로필을 삭제했습니다.` + (rest.length ? ` '${rest[0]}' 프로필을 불러왔습니다.` : ''));
+});
+
+/* ─────────────────────────── §8 명단 표 ───────────────────────────
+   행 전체 다시 그리기(renderRoster)는 추가·삭제·순서 변경·연월 변경 때만 합니다.
+   일반 입력은 state만 바꾸고, 해석 결과 한 칸만 갱신합니다(입력 포커스 유지). */
+const personLabel = (p, i) => p.name || (i + 1) + '번';
+
+/** 요일 토글 버튼 묶음. ex=true이면 제외요일(빨간색) */
+function dowGroup(idx, field, arr, ex){
+  return `<span class="dow ${ex ? 'ex' : ''}" role="group">` + DOW.map((d, i) =>
+    `<button type="button" class="${arr[i] ? 'on' : ''}" aria-pressed="${!!arr[i]}" aria-label="${d}요일 ${ex ? '제외' : '희망'}" data-i="${idx}" data-dow="${field}" data-k="${i}">${d}</button>`).join('') + '</span>';
+}
+/** 명단 아래 요약: 인원, 한도 합계 / 월 일수 */
+function rosterSummary(){
+  if (!state.people.length) return '';
+  const sum = state.people.reduce((a, p) => a + (p.max === '' || p.max == null ? UNLIMITED : +p.max), 0);
+  return `총 ${state.people.length}명 · 한도 합계 ${sum >= UNLIMITED ? '무제한 포함' : sum + '일'} / ${curN()}일`;
+}
+const EMPTY_ROW = `<tr class="empty-row"><td colspan="12">
+  <div style="font-weight:600;margin-bottom:8px">명단이 비어 있습니다</div>
+  <div class="row" style="justify-content:center">
+    <button type="button" class="primary" data-empty="sample">샘플로 시작</button>
+    <button type="button" data-empty="add">＋ 직접 추가</button>
+    <button type="button" data-empty="json">JSON 복원</button>
+  </div></td></tr>`;
+
+function renderRoster(){
+  const tb = $('#roster tbody'), N = curN();
+  $('#rosterInfo').textContent = rosterSummary();
+  if (!state.people.length){ tb.innerHTML = EMPTY_ROW; return; }
+
+  // 행 구성 요소. data-label은 모바일 카드형에서 칸 제목으로 쓰입니다.
+  const dateCell = (p, i, f, label) =>
+    `<td data-label="${label}"><input type="text" data-i="${i}" data-f="${f}" value="${esc(p[f])}" aria-label="${esc(personLabel(p, i))} ${label}">` +
+    `<div class="ph" id="ph-${i}-${f}">${hintHTML(p[f], N)}</div></td>`;
+  const ops = i => `<button type="button" data-op="up" data-i="${i}" title="위로" aria-label="위로">↑</button>` +
+                   `<button type="button" data-op="down" data-i="${i}" title="아래로" aria-label="아래로">↓</button>` +
+                   `<button type="button" data-op="del" data-i="${i}" class="danger" title="삭제" aria-label="삭제">✕</button>`;
+  const levelOpts = lv => [1, 2, 3, 4].map(l => `<option value="${l}" ${+lv === l ? 'selected' : ''}>${LEVELS[l]}</option>`).join('');
+
+  tb.innerHTML = state.people.map((p, i) => `<tr>
+    <td class="c-no"><span>${i + 1}</span><span class="ops ops-mob">${ops(i)}</span></td>
+    <td data-label="성명"><input type="text" data-i="${i}" data-f="name" value="${esc(p.name)}" aria-label="${i + 1}번 성명"></td>
+    <td data-label="레벨"><select data-i="${i}" data-f="level" aria-label="레벨">${levelOpts(p.level)}</select></td>
+    <td data-label="가중치"><input type="number" step="0.1" min="0.1" data-i="${i}" data-f="weight" value="${esc(p.weight)}" aria-label="가중치"></td>
+    ${dateCell(p, i, 'wish', '희망일(0순위)')}${dateCell(p, i, 'avail', '가능일(2순위)')}${dateCell(p, i, 'avoid', '기피일(불가)')}
+    <td data-label="달력에서 고르기"><button type="button" class="btn-dp" data-dp="${i}" aria-label="${esc(personLabel(p, i))} 날짜를 달력에서 지정" title="달력에서 날짜 지정">📅<span class="dp-lbl"> 달력</span></button></td>
+    <td data-label="희망요일(1순위)" class="c-wide">${dowGroup(i, 'wishDow', p.wishDow, false)}</td>
+    <td data-label="제외요일(불가)" class="c-wide">${dowGroup(i, 'exDow', p.exDow, true)}</td>
+    <td data-label="월 최대"><input type="number" min="0" data-i="${i}" data-f="max" value="${esc(p.max)}" placeholder="무제한" aria-label="월 최대"></td>
+    <td class="ops ops-desk">${ops(i)}</td>
+  </tr>`).join('');
+}
+/** 한 사람의 날짜 입력칸 값과 해석 결과만 갱신 (달력 팝오버에서 사용) */
+function updateDateCells(i){
+  const p = state.people[i], N = curN();
+  for (const f of DATE_FIELDS){
+    const inp = $(`#roster input[data-i="${i}"][data-f="${f}"]`); if (inp) inp.value = p[f];
+    const ph = $(`#ph-${i}-${f}`); if (ph) ph.innerHTML = hintHTML(p[f], N);
+  }
+}
+
+// 입력: state 반영 + 해석 결과 칸 갱신
+$('#roster').addEventListener('input', e => {
+  const el = e.target, i = el.dataset.i, f = el.dataset.f;
+  if (i == null || !f) return;
+  state.people[i][f] = (f === 'level') ? +el.value : el.value;
+  if (FLABEL[f]){
+    const ph = $(`#ph-${i}-${f}`); if (ph) ph.innerHTML = hintHTML(el.value, curN());
+    if (DP.i === +i) renderDP();                     // 열린 팝오버와 동기화
+  }
+  if (f === 'max') $('#rosterInfo').textContent = rosterSummary();
+  scheduleSave();
+});
+// select는 브라우저에 따라 input 이벤트가 없을 수 있어 change도 처리
+$('#roster').addEventListener('change', e => {
+  if (e.target.dataset.f === 'level'){ state.people[e.target.dataset.i].level = +e.target.value; scheduleSave(); }
+});
+// 클릭: 빈 명단 버튼 / 달력 팝오버 / 요일 토글 / 순서·삭제
+$('#roster').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const ds = b.dataset;
+
+  if (ds.empty){ ({ sample: () => $('#btnSample').click(), add: () => $('#btnAddRow').click(), json: () => $('#fileJSON').click() })[ds.empty](); return; }
+  if (ds.dp != null){ openDP(+ds.dp, b); return; }
+
+  const i = +ds.i, P = state.people;
+  if (ds.dow){
+    const arr = P[i][ds.dow], k = +ds.k;
+    arr[k] = arr[k] ? 0 : 1;
+    b.classList.toggle('on', !!arr[k]); b.setAttribute('aria-pressed', !!arr[k]);
+    // 같은 요일을 희망·제외에 동시에 둘 수 없으므로 반대쪽을 끕니다.
+    const other = ds.dow === 'wishDow' ? 'exDow' : 'wishDow';
+    if (arr[k] && P[i][other][k]){
+      P[i][other][k] = 0; renderRoster();
+      toast(`${DOW[k]}요일은 희망요일과 제외요일에 동시에 넣을 수 없어 반대쪽을 해제했습니다.`);
+    }
+    if (DP.i === i) renderDP();
+    scheduleSave(); return;
+  }
+
+  if (!ds.op) return;
+  closeDP();
+  if (ds.op === 'up' && i > 0) [P[i - 1], P[i]] = [P[i], P[i - 1]];
+  if (ds.op === 'down' && i < P.length - 1) [P[i + 1], P[i]] = [P[i], P[i + 1]];
+  if (ds.op === 'del'){
+    const removed = P.splice(i, 1)[0];
+    showUndo(`${personLabel(removed, i)} 근무자를 삭제했습니다.`, () => {
+      state.people.splice(Math.min(i, state.people.length), 0, removed); renderRoster(); scheduleSave();
+    });
+  }
+  renderRoster(); scheduleSave();
+});
+$('#btnAddRow').addEventListener('click', () => {
+  state.people.push(blankPerson()); renderRoster(); scheduleSave();
+  const ins = $$('#roster input[data-f=name]'); if (ins.length) ins[ins.length - 1].focus();
+});
+
+/* ─────────────────────────── §9 달력형 날짜 선택 팝오버 ───────────────────────────
+   위쪽에서 [희망/가능/기피/지우기] 중 하나를 고른 뒤 날짜를 누르면 그 항목으로 지정합니다.
+   같은 항목인 날을 다시 누르면 해제합니다. 한 날짜는 세 항목 중 하나에만 속합니다.
+   결과는 명단의 텍스트 입력칸에 "1~3, 5" 형식으로 써 넣습니다(텍스트가 원본). */
+const DP = { i: -1, mode: 'wish', anchor: null };   // i: 대상 행, anchor: 위치 기준이 되는 📅 버튼
+
+function openDP(i, anchor){ Object.assign(DP, { i, anchor }); $('#dp').classList.remove('hidden'); renderDP(); placeDP(); }
+function closeDP(){ DP.i = -1; DP.anchor = null; $('#dp').classList.add('hidden'); }
+/** 기준 버튼 아래에 띄우고, 화면 밖으로 나가면 위쪽으로 올립니다. */
+function placeDP(){
+  const dp = $('#dp'), a = DP.anchor; if (!a || !document.body.contains(a)) return;
+  const r = a.getBoundingClientRect(), w = dp.offsetWidth, h = dp.offsetHeight;
+  const left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8);
+  let top = r.bottom + 6; if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
+  dp.style.left = left + 'px'; dp.style.top = top + 'px';
+}
+/** 한 사람의 희망·가능·기피 날짜를 Set으로 */
+function personDateSets(p, N){ return { wish: new Set(parseDayList(p.wish, N)), avail: new Set(parseDayList(p.avail, N)), avoid: new Set(parseDayList(p.avoid, N)) }; }
+
+function renderDP(){
+  const p = state.people[DP.i]; if (!p){ closeDP(); return; }
+  const y = +state.settings.year, m = +state.settings.month, N = curN(), first = new Date(y, m - 1, 1).getDay();
+  const S = personDateSets(p, N), hol = new Set(parseDayList(state.settings.holidays, N));
+  const modes = [['wish', '희망일'], ['avail', '가능일'], ['avoid', '기피일'], ['clear', '지우기']];
+
+  let h = `<div class="dp-head"><b>${esc(personLabel(p, DP.i))} · ${y}년 ${m}월</b><button type="button" data-dpx aria-label="닫기">✕</button></div>
+    <div class="seg" role="radiogroup" aria-label="지정할 항목">${modes.map(([k, l]) =>
+      `<button type="button" role="radio" aria-checked="${DP.mode === k}" class="s-${k} ${DP.mode === k ? 'on' : ''}" data-mode="${k}">${l}</button>`).join('')}</div>
+    <div class="dp-grid">${DOW.map(d => `<div class="h">${d}</div>`).join('')}${'<div></div>'.repeat(first)}`;
+  for (let d = 1; d <= N; d++){
+    const w = (first + d - 1) % 7;
+    const st = S.wish.has(d) ? 'wish' : S.avail.has(d) ? 'avail' : S.avoid.has(d) ? 'avoid' : '';
+    const ex = p.exDow[w] ? 'ex' : '';
+    const tip = [st && FLABEL[st], ex && '제외요일', hol.has(d) && holName(y, m, d)].filter(Boolean).join(' · ');
+    const dayCls = hol.has(d) ? 'pub' : w === 0 ? 'sun' : w === 6 ? 'sat' : '';
+    h += `<button type="button" data-dd="${d}" class="${dayCls} ${ex} ${st}" title="${esc(tip)}" aria-label="${d}일${tip ? ' ' + esc(tip) : ''}">${d}</button>`;
+  }
+  h += `</div><div class="dp-foot">위에서 항목을 고른 뒤 날짜를 누르면 지정되고, 다시 누르면 해제됩니다. 빗금은 제외요일입니다.<br>희망 ${S.wish.size}일 · 가능 ${S.avail.size}일 · 기피 ${S.avoid.size}일</div>`;
+  $('#dp').innerHTML = h;
+}
+$('#dp').addEventListener('click', e => {
+  if (e.target.closest('[data-dpx]')){ closeDP(); return; }
+  const mb = e.target.closest('[data-mode]'); if (mb){ DP.mode = mb.dataset.mode; renderDP(); return; }
+  const db = e.target.closest('[data-dd]'); if (!db) return;
+
+  const i = DP.i, p = state.people[i], d = +db.dataset.dd, S = personDateSets(p, curN());
+  const wasSame = DP.mode !== 'clear' && S[DP.mode].has(d);   // 같은 항목을 다시 누르면 해제
+  Object.values(S).forEach(s => s.delete(d));
+  if (DP.mode !== 'clear' && !wasSame) S[DP.mode].add(d);
+  for (const f of DATE_FIELDS) p[f] = fmtDays([...S[f]]);
+  updateDateCells(i); renderDP(); scheduleSave();
+});
+// 바깥 클릭·Esc로 닫기, 스크롤·크기 변경 시 위치 재계산
+document.addEventListener('mousedown', e => { if (DP.i >= 0 && !e.target.closest('#dp') && !e.target.closest('[data-dp]')) closeDP(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && DP.i >= 0){ const a = DP.anchor; closeDP(); a && a.focus(); } });
+window.addEventListener('resize', () => { if (DP.i >= 0) placeDP(); });
+window.addEventListener('scroll', () => { if (DP.i >= 0) placeDP(); }, true);
+
+/* ─────────────────────────── §10 샘플 데이터 ─────────────────────────── */
+$('#btnSample').addEventListener('click', async () => {
+  if (state.people.length && !(await ask('현재 명단을 샘플 데이터로 바꿀까요?', { yes: '바꾸기' }))) return;
+  const P = (n, lv, w, o = {}) => Object.assign(blankPerson(), { name: n, level: lv, weight: w }, o);
+  const D = s => DOW.map(d => s.includes(d) ? 1 : 0);          // '토일' → [1,0,0,0,0,0,1]
+  const nm = nextMonth();
+  Object.assign(state.settings, { year: nm.y, month: nm.m, holidays: builtinStr(nm.y, nm.m), restW: 1, restH: 2, minDFI: 75, maxAttempts: 3000 });
+  state.people = [
+    P('김민수', 1, 1.2, { wish: '24', exDow: D('일') }),
+    P('이서연', 2, 1.0, { wish: '5, 19', avoid: '25' }),
+    P('박지훈', 2, 1.0, { wishDow: D('금'), avoid: '31' }),
+    P('최유진', 2, 1.0, { avail: '1~10', exDow: D('토') }),
+    P('임채원', 2, 0.8, { wishDow: D('월화'), max: '3' }),
+    P('정하늘', 3, 1.0, { wish: '12', avoid: '24, 25' }),
+    P('강도윤', 3, 1.0, { wishDow: D('수') }),
+    P('윤서아', 3, 1.0, { avail: '15~31', avoid: '1, 2' }),
+    P('조현우', 3, 1.0, { exDow: D('일') }),
+    P('서지우', 3, 0.9, { wish: '31', wishDow: D('목') }),
+    P('한지민', 4, 0.7, { max: '3', exDow: D('토일') }),
+    P('오세훈', 4, 0.7, { max: '3', avoid: '20~23' })
+  ];
+  closeDP(); renderSettings(); renderRoster(); scheduleSave();
+  toast(`샘플 데이터(${nm.y}년 ${nm.m}월, 12명)를 불러왔습니다.`);
+});
+
+/* ─────────────────────────── §11 생성 전 사전 점검 ───────────────────────────
+   엔진을 돌리기 전에 입력끼리의 충돌을 찾아 3단계 카드에 표시합니다.
+   반환: [['err'|'warn'|'info', 메시지], …]
+     err  : 생성이 불가능하거나, 확실히 미배정·배정 불가가 생기는 문제
+     warn : 생성은 되지만 의도와 다르게 반영될 수 있는 문제 */
+function precheck(){
+  const cfg = buildCfg(), P = cfg.people, N = curN(), items = [];
+  if (!P.length) return [['info', '근무자를 1명 이상 추가하십시오.']];
+  const err = t => items.push(['err', t]), warn = t => items.push(['warn', t]);
+
+  // 1) 한도 합계 (엔진도 같은 조건으로 시작을 거부합니다)
+  const sumMax = P.reduce((a, p) => a + Math.min(p.max, UNLIMITED), 0);
+  if (sumMax < N) err(`월 최대 한도 합계(${sumMax}일)가 ${N}일보다 작아 생성할 수 없습니다. 한도를 늘리거나 인원을 추가하십시오.`);
+
+  // 2) 해석할 수 없는 입력, 빈 이름, 중복 이름 (원문 state.people 기준)
+  const hb = parseDays(state.settings.holidays, N).bad;
+  if (hb.length) warn(`공휴일: 해석할 수 없는 값 ${hb.join(', ')} — 무시됩니다.`);
+  const byName = new Map();
+  state.people.forEach((p, i) => {
+    const n = (p.name || '').trim();
+    if (!n) warn(`${i + 1}번 근무자의 이름이 비어 있습니다. '근무자${i + 1}'로 표시됩니다.`);
+    else byName.set(n, (byName.get(n) || []).concat(i + 1));
+    for (const f of DATE_FIELDS){
+      const bad = parseDays(p[f], N).bad;
+      if (bad.length) warn(`${n || (i + 1) + '번'} ${FLABEL[f]}: 해석할 수 없는 값 ${bad.join(', ')} — 무시됩니다.`);
+    }
+  });
+  byName.forEach((rows, n) => { if (rows.length > 1) warn(`이름 중복: ${n} (${rows.join(', ')}번) — 결과에서 구분되지 않습니다.`); });
+
+  // 3) 개인 입력 내부 충돌
+  const avoidSet = P.map(p => new Set(p.avoid));
+  P.forEach((p, i) => {
+    const both = p.wish.filter(d => avoidSet[i].has(d));
+    if (both.length) warn(`${p.name}: ${fmtDays(both)}일이 희망일이자 기피일입니다. 기피일이 우선합니다.`);
+    const onEx = p.wish.filter(d => p.exDow[dowOf(d)] && !avoidSet[i].has(d));
+    if (onEx.length) warn(`${p.name}: 희망일 ${fmtDays(onEx)}일이 제외요일이라 배정되지 않습니다.`);
+    if (p.max < UNLIMITED && p.wish.length > p.max) warn(`${p.name}: 희망일 ${p.wish.length}일이 월 최대 ${p.max}회보다 많습니다. 일부만 반영됩니다.`);
+  });
+
+  // 4) 같은 날 희망자 중복 (하루 1명만 배정되므로)
+  const wishBy = new Map();
+  P.forEach(p => p.wish.forEach(d => wishBy.set(d, (wishBy.get(d) || []).concat(p.name))));
+  [...wishBy].sort((a, b) => a[0] - b[0]).forEach(([d, names]) => {
+    if (names.length > 1) warn(`${d}일 희망자 ${names.length}명(${names.join(', ')}) — 1명만 반영됩니다.`);
+  });
+
+  // 5) 레벨 4 조력 구조
+  if (P.some(p => p.level >= 4) && !P.some(p => p.level === 3))
+    err('레벨 4는 레벨 3 조력자가 있어야 배정됩니다. 레벨 3 인원이 없어 레벨 4는 배정되지 않습니다.');
+
+  // 6) 누구도 설 수 없는 날 (휴무 간격은 배정 결과에 따라 달라지므로 제외하고, 확정적인 조건만 봅니다)
+  const none = [];
+  for (let d = 1; d <= N; d++){
+    const w = dowOf(d), free = i => !avoidSet[i].has(d) && !P[i].exDow[w];
+    const helper = P.some((h, i) => h.level === 3 && free(i));
+    if (!P.some((p, i) => p.max > 0 && free(i) && (p.level < 4 || helper))) none.push(d);
+  }
+  if (none.length) err(`${fmtDays(none)}일에는 배정 가능한 사람이 없습니다(기피일·제외요일·한도). 미배정으로 남습니다.`);
+  return items;
+}
+function renderPrecheck(){
+  const items = precheck(), box = $('#precheck');
+  if (!items.length){ box.innerHTML = '<span class="pc-ok">✓ 사전 점검 통과 — 입력 충돌이 없습니다.</span>'; return; }
+  if (items.length === 1 && items[0][0] === 'info'){ box.innerHTML = `<span class="pc-info">${esc(items[0][1])}</span>`; return; }
+  const ne = items.filter(x => x[0] === 'err').length, nw = items.length - ne;
+  const li = items.map(([k, t]) => `<li class="pc-${k}">${k === 'err' ? '⛔' : '⚠️'} ${esc(t)}</li>`).join('');
+  const head = [ne && `<span class="pc-err">오류 ${ne}건</span>`, nw && `<span class="pc-warn">주의 ${nw}건</span>`].filter(Boolean).join(' · ');
+  // 오류가 있거나 항목이 적으면 펼친 상태로, 경고만 많으면 접어서 표시
+  box.innerHTML = `<details ${ne || items.length <= 5 ? 'open' : ''}><summary>사전 점검: ${head}</summary><ul>${li}</ul></details>`;
+}
+
+/* ─────────────────────────── §12 엔진 실행 ───────────────────────────
+   1순위: 엔진 소스로 인라인 Web Worker를 만들어 실행 (화면이 멈추지 않음)
+   2순위: Worker 생성이 막힌 환경(일부 미리보기·file://)에서는 메인 스레드에서
+          30ms씩 나눠 실행하고 setTimeout으로 화면에 양보합니다. */
+let worker = null, workerURL = null, fallbackCancel = false, cfgSnapshot = null;
+
+/**
+ * 입력 원문(state) → 엔진 입력(cfg)
+ * 날짜 문자열을 숫자 배열로 해석하고, 숫자 범위를 보정합니다.
+ * 월 최대 빈칸 = 999(무제한), 가중치 최솟값 0.1, 이름 빈칸 = '근무자n'
+ */
+function buildCfg(){
+  const s = state.settings, N = Engine.daysInMonth(+s.year, +s.month);
+  return {
+    year: +s.year, month: +s.month, holidays: parseDayList(s.holidays, N),
+    restW: Math.max(0, +s.restW || 0), restH: Math.max(0, +s.restH || 0),
+    minDFI: Math.min(100, Math.max(0, +s.minDFI || 0)),
+    maxAttempts: Math.min(10000, Math.max(1, Math.floor(+s.maxAttempts || 1))),
+    people: state.people.map((p, i) => ({
+      name: (p.name || '').trim() || `근무자${i + 1}`, level: +p.level || 3,
+      weight: Math.max(0.1, parseFloat(p.weight) || 1),
+      wish: parseDayList(p.wish, N), avail: parseDayList(p.avail, N), avoid: parseDayList(p.avoid, N),
+      wishDow: p.wishDow.slice(), exDow: p.exDow.slice(),
+      max: (p.max === '' || p.max == null) ? UNLIMITED : Math.max(0, parseInt(p.max, 10) || 0)
+    }))
+  };
+}
+function setRunning(on){ $('#btnGenerate').disabled = on; $('#btnRegen').disabled = on; $('#btnCancel').classList.toggle('hidden', !on); }
+function onProgress(p){
+  const pct = Math.round(p.attempt / p.total * 100);
+  $('#progBar').style.width = pct + '%';
+  $('#progText').textContent = `${p.attempt.toLocaleString()} / ${p.total.toLocaleString()} (${pct}%) · 현재 최고 DFI ${p.best.toFixed(1)}`;
+}
+/** 시뮬레이션 완료: 결과를 state.cands로 옮기고 화면을 그립니다. */
+function onDone(res){
+  setRunning(false); cleanupWorker();
+  if (res.error){ $('#progText').textContent = '중단: 사전 검증 실패'; showError(res.error); return; }
+  const cal = Engine.buildCalendar(cfgSnapshot.year, cfgSnapshot.month, cfgSnapshot.holidays), at = new Date();
+  state.cands = res.top.map((t, i) => ({ rank: i + 1, cfg: cfgSnapshot, cal, duty: t.duty, assist: t.assist, unfilled: t.unfilled,
+    dfi: t.dfi, attempt: t.attempt, edited: new Set(), at }));
+  Object.assign(state, { sel: 0, result: state.cands[0], hl: -1, genSig: cfgSig(cfgSnapshot) });
+
+  $('#progText').textContent = `완료 · ${res.attempts.toLocaleString()}회 시도 중 상위 ${state.cands.length}개 안 (최고 DFI ${res.best.dfi.total.toFixed(1)})`;
+  const gb = $('#genBadge'); gb.textContent = '생성: ' + at.toLocaleString('ko-KR', { hour12: false }); gb.classList.remove('hidden');
+  renderResults(); markStale();
+  try { $('#results').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e){}
+  // 미배정일이 있을 때만 모달로 알림 (목표 미달은 DFI 카드 안에 표시)
+  if (res.best.unfilled.length) showUnfilled();
+}
+function cleanupWorker(){
+  if (worker){ worker.terminate(); worker = null; }
+  if (workerURL){ URL.revokeObjectURL(workerURL); workerURL = null; }
+}
+function runFallback(cfg){
+  $('#engineMode').textContent = '엔진: 메인 스레드 분할 실행(Worker 사용 불가)';
+  fallbackCancel = false;
+  const it = Engine.simulate(cfg);
+  (function tick(){
+    if (fallbackCancel){ setRunning(false); $('#progText').textContent = '사용자가 중단했습니다.'; return; }
+    const t0 = performance.now(); let r;
+    while (performance.now() - t0 < 30){ r = it.next(); if (r.done) return onDone(r.value); onProgress(r.value); }
+    setTimeout(tick, 0);
+  })();
+}
+function generate(){
+  const cfg = buildCfg();
+  if (!cfg.year || !cfg.month || cfg.month < 1 || cfg.month > 12){ showError('대상 연도와 월을 확인하십시오.'); return; }
+  closeDP(); cfgSnapshot = cfg; setRunning(true);
+  $('#progBar').style.width = '0%'; $('#progText').textContent = '연산 시작…';
+  try {
+    workerURL = URL.createObjectURL(new Blob([ENGINE_SRC], { type: 'text/javascript' }));
+    worker = new Worker(workerURL);
+    $('#engineMode').textContent = '';
+    worker.onmessage = e => { if (e.data.type === 'progress') onProgress(e.data.p); else onDone(e.data.result); };
+    // Worker가 생성은 됐지만 실행 중 실패하는 경우(CSP 등)도 대체 실행으로 넘깁니다.
+    worker.onerror = err => { err.preventDefault && err.preventDefault(); cleanupWorker(); runFallback(cfg); };
+    worker.postMessage(cfg);
+  } catch(e){ cleanupWorker(); runFallback(cfg); }
+}
+$('#btnGenerate').addEventListener('click', generate);
+$('#btnRegen').addEventListener('click', () => { $('#genCard').scrollIntoView({ behavior: 'smooth', block: 'start' }); generate(); });
+$('#btnCancel').addEventListener('click', () => {
+  if (worker){ cleanupWorker(); setRunning(false); $('#progText').textContent = '사용자가 중단했습니다.'; }
+  else fallbackCancel = true;
+});
+
+/* ─────────────────────────── §13 결과 화면 ───────────────────────────
+   renderResults()  : 선택된 안 기준으로 카드·달력·통계·DFI를 모두 다시 그림
+                      (안 선택, 수동 교체, 실행 취소 때 호출)
+   applyHighlight() : 근무자 강조만 바뀔 때 클래스만 바꿈 (전체 다시 그리기 없음) */
+
+/**
+ * 근무자별 통계. 결과 객체에 캐시합니다(R._stats).
+ * 배정이 바뀌면(수동 교체·실행 취소) invalidate(R)로 캐시를 지워야 합니다.
+ *   exp  : 기대 근무수 = 배정된 일수 × 본인 가중치 ÷ 가중치 합 (DFI M1과 같은 기준)
+ *   diff : 실제 − 기대
+ * 반환 배열은 레벨 → 이름 순으로 정렬되어 있으며, 원래 인덱스는 i에 있습니다.
+ */
+function getStats(R){
+  if (R._stats) return R._stats;
+  const P = R.cfg.people, W = P.reduce((a, p) => a + p.weight, 0) || 1;
+  let filled = 0; for (let d = 1; d <= R.cal.N; d++) if (R.duty[d] >= 0) filled++;
+  const st = P.map((p, i) => ({ i, name: p.name, level: p.level, mw: 0, thu: 0, fri: 0, sat: 0, sun: 0, pub: 0, total: 0, assist: 0, exp: filled * p.weight / W, diff: 0 }));
+  for (let d = 1; d <= R.cal.N; d++){
+    const day = R.cal.days[d], k = R.duty[d];
+    if (k >= 0){
+      const s = st[k]; s.total++;
+      // 공휴일이 우선, 그다음 요일별 분류 (공휴일인 토요일은 '공휴일'로 집계)
+      if (day.isPub) s.pub++; else if (day.dow === 6) s.sat++; else if (day.dow === 0) s.sun++;
+      else if (day.dow === 4) s.thu++; else if (day.dow === 5) s.fri++; else s.mw++;
+    }
+    if (R.assist[d] >= 0) st[R.assist[d]].assist++;
+  }
+  st.forEach(s => { s.diff = s.total - s.exp; });
+  return (R._stats = st.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name, 'ko')));
+}
+const invalidate = R => { R._stats = null; };
+const fmtDiff  = v => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v).toFixed(1);
+const diffCls  = v => v >= 1 ? 'd-pos' : v <= -1 ? 'd-neg' : '';
+const dayClass = day => day.isPub ? 'pub' : day.dow === 0 ? 'sun' : day.dow === 6 ? 'sat' : '';
+const hlCls    = k => state.hl === k ? 'highlight-bold' : '';
+
+/* ---- 13-1. 상위 3개 안 카드 ---- */
+function renderCandidates(){
+  const C = state.cands || [state.result], base = C[0];
+  // 지표별 최고점 (세 안 중 가장 좋은 칸을 초록색으로)
+  const bestM = [0, 1, 2, 3, 4].map(j => Math.max(...C.map(c => c.dfi.metrics[j].score)));
+  $('#btnMiniToggle').textContent = state.miniOpen ? '미니 달력 접기' : '미니 달력 펼치기';
+
+  $('#candGrid').innerHTML = C.map((R, i) => {
+    const st = getStats(R), tot = st.map(s => s.total), hol = st.map(s => s.sat + s.sun + s.pub);
+    const asTot = st.reduce((a, s) => a + s.assist, 0);
+    const diffDays = []; for (let d = 1; d <= R.cal.N; d++) if (R.duty[d] !== base.duty[d]) diffDays.push(d);
+    const D = R.dfi, sel = i === state.sel;
+
+    const metrics = D.metrics.map((m, j) => {
+      const best = C.length > 1 && m.score >= bestM[j] - 1e-9;
+      return `<div class="${best ? 'best' : ''}" title="${esc(m.name + ': ' + m.desc + ' · ' + m.detail)}">${m.key}<b>${m.score.toFixed(1)}</b>/${m.max}</div>`;
+    }).join('');
+    const diffLine = i > 0
+      ? `<div class="cand-diff">1안과 다른 날 ${diffDays.length}일${diffDays.length ? ': ' + fmtDays(diffDays) + '일' : ''}</div>`
+      : `<div class="cand-sum">${R.attempt.toLocaleString()}번째 시도에서 발견</div>`;
+
+    return `<div class="cand ${sel ? 'sel' : ''}" data-cand="${i}" role="button" tabindex="0" aria-pressed="${sel}" aria-label="${i + 1}안 DFI ${D.total.toFixed(1)} ${D.grade}등급${sel ? ' 선택됨' : ''}">
+      <div class="cand-top"><span class="cand-rank">${i + 1}안</span>${sel ? '<span class="sel-pill">✓ 출력 선택됨</span>' : '<span class="pick-pill">눌러서 선택</span>'}
+        <span class="cand-score">${D.total.toFixed(1)}</span><span class="grade ${D.grade}">${D.grade}</span></div>
+      <div class="cand-m">${metrics}</div>
+      <div class="cand-sum">정규 ${Math.min(...tot)}~${Math.max(...tot)}회 · 휴일 ${Math.min(...hol)}~${Math.max(...hol)}회 · 조력 ${asTot}회 · 미배정 ${R.unfilled.length}일${R.edited.size ? ' · 수정 ' + R.edited.size + '건' : ''}</div>
+      ${diffLine}
+      ${state.miniOpen ? miniCalendar(R, i > 0 ? new Set(diffDays) : null) : ''}
+    </div>`;
+  }).join('') + (C.length < 3 ? `<div class="muted" style="align-self:center">서로 다른 배정안이 ${C.length}개만 나왔습니다. 시뮬레이션 횟수를 늘리거나 제약을 완화하십시오.</div>` : '');
+}
+/** 카드 안의 작은 달력. diff: 1안과 다른 날(Set) → 주황 테두리 */
+function miniCalendar(R, diff){
+  const first = R.cal.days[1].dow, P = R.cfg.people;
+  let h = DOW.map(d => `<div class="h">${d}</div>`).join('') + '<div class="c e"></div>'.repeat(first);
+  for (let d = 1; d <= R.cal.N; d++){
+    const day = R.cal.days[d], k = R.duty[d], a = R.assist[d];
+    h += `<div class="c ${dayClass(day)} ${diff && diff.has(d) ? 'diff' : ''}"><span class="dn">${d}</span>` +
+      (k >= 0 ? `<span class="nm ${hlCls(k)}" data-pid="${k}">${esc(P[k].name)}</span>` : '<span class="nm" style="color:var(--bad)">미배정</span>') +
+      (a >= 0 ? `<span class="as">(${esc(P[a].name)})</span>` : '') + '</div>';
+  }
+  return `<div class="mini-cal2 ${state.hl >= 0 ? 'has-hl' : ''}">${h}</div>`;
+}
+$('#btnMiniToggle').addEventListener('click', e => { e.stopPropagation(); state.miniOpen = !state.miniOpen; renderCandidates(); });
+
+/* ---- 13-2. 월간 달력 ---- */
+function renderCalendar(R){
+  const P = R.cfg.people, first = R.cal.days[1].dow;
+  let h = DOW.map((d, i) => `<div class="hd ${i === 0 ? 'sun' : i === 6 ? 'sat' : ''}">${d}</div>`).join('') + '<div class="cell empty"></div>'.repeat(first);
+  for (let d = 1; d <= R.cal.N; d++){
+    const day = R.cal.days[d], k = R.duty[d], a = R.assist[d];
+    const hn = day.isPub ? holName(R.cfg.year, R.cfg.month, d) : '';
+    const cls = ['cell', dayClass(day), k < 0 ? 'unfilled' : '', R.edited.has(d) ? 'edited' : ''].join(' ');
+    h += `<div class="${cls}" data-day="${d}"><div class="cell-top">` +
+         `<span class="dnum" title="${esc(hn)}">${d}${hn ? `<span class="hname">${esc(hn.replace('대체공휴일', '대체'))}</span>` : ''}</span>` +
+         `<button type="button" class="edit-btn no-print" data-edit="${d}" title="수동 교체" aria-label="${R.cfg.month}월 ${d}일 수동 교체">✎</button></div>`;
+    h += k >= 0
+      ? `<button type="button" class="nm-btn duty-name ${hlCls(k)}" data-pid="${k}" aria-pressed="${state.hl === k}">${esc(P[k].name)}</button>`
+      : '<span class="muted" style="color:var(--bad)">미배정</span>';
+    if (k >= 0 && P[k].level >= 4){
+      h += a >= 0
+        ? `<button type="button" class="nm-btn assist-name ${hlCls(a)}" data-pid="${a}" aria-pressed="${state.hl === a}">(${esc(P[a].name)})</button>`
+        : '<span class="assist-name" style="color:var(--bad)">(조력자 없음)</span>';
+    }
+    h += '</div>';
+  }
+  const cal = $('#cal'); cal.innerHTML = h; cal.classList.toggle('has-hl', state.hl >= 0);
+}
+
+/* ---- 13-3. 근무자별 통계 ---- */
+function renderStats(R){
+  const head = '<thead><tr><th>성명</th><th>레벨</th><th>월~수</th><th>목</th><th>금</th><th class="c-sat">토</th><th class="c-sun">일</th><th class="c-sun">공휴일</th><th>정규</th><th>기대</th><th>차이</th><th>조력</th></tr></thead>';
+  const num = v => `<td class="num">${v}</td>`;
+  $('#stats').innerHTML = head + '<tbody>' + getStats(R).map(s =>
+    `<tr data-row="${s.i}" class="${state.hl === s.i ? 'hl-row' : ''}">` +
+    `<td><button type="button" class="nm-btn stats-name" data-pid="${s.i}">${esc(s.name)}</button></td>` + num(s.level) +
+    num(s.mw) + num(s.thu) + num(s.fri) + num(s.sat) + num(s.sun) + num(s.pub) +
+    `<td class="num"><b>${s.total}</b></td>` + num(s.exp.toFixed(1)) +
+    `<td class="num ${diffCls(s.diff)}">${fmtDiff(s.diff)}</td>` + num(s.assist) + '</tr>').join('') + '</tbody>';
+}
+
+/* ---- 13-4. DFI 카드 ---- */
+/** 목표 미달 시 가장 낮은 지표에 대한 수정 안내 */
+const GUIDE = {
+  M1: '가중치 대비 실제 근무수 편차가 큽니다. 아래 통계표의 "차이" 열에서 많이·적게 배정된 사람을 확인하십시오. 기피일·제외요일·월 최대 한도가 특정 인원의 근무를 막고 있는지 보고 가중치를 조정하십시오.',
+  M2: '휴일 근무가 일부 인원에 쏠렸습니다. 주말 제외요일 설정을 줄이거나 휴일 후 휴무일을 낮추면 휴일 배분 후보가 늘어납니다.',
+  M3: '희망일이 서로 겹치거나 한도보다 많습니다. 사전 점검의 희망일 충돌 항목을 조정하고 가능일 범위를 넓히십시오.',
+  M4: '개인별 근무 간격이 불규칙합니다. 최소 휴무일을 1일씩 늘리거나 시뮬레이션 횟수를 늘리십시오.',
+  M5: '근무가 특정 요일에 몰렸습니다. 희망요일·제외요일 지정을 줄이면 요일 분산이 개선됩니다.'
+};
+function renderDFI(R){
+  const D = R.dfi, met = D.total >= R.cfg.minDFI;
+  $('#dfiTotal').textContent = D.total.toFixed(1);
+  const g = $('#dfiGrade'); g.textContent = D.grade; g.className = 'grade ' + D.grade;
+  $('#dfiMeta').innerHTML = `목표 ${R.cfg.minDFI} · ${met ? '<b style="color:var(--ok)">달성</b>' : '<b style="color:var(--bad)">미달</b>'}` +
+    `<br>배정률 ${(D.coverage * 100).toFixed(0)}%${R.edited.size ? ' · 수동 수정 ' + R.edited.size + '건' : ''}`;
+
+  // 목표 미달 진단 (점수 비율이 가장 낮은 지표 기준)
+  const box = $('#dfiDiag');
+  if (met) box.classList.add('hidden');
+  else {
+    const weak = D.metrics.slice().sort((a, b) => a.score / a.max - b.score / b.max)[0];
+    box.innerHTML = `<b>목표 미달 (${D.total.toFixed(1)} / ${R.cfg.minDFI})</b> — 가장 낮은 지표는 <b>${weak.key} ${weak.name}</b> ${weak.score.toFixed(1)}/${weak.max} (${(weak.score / weak.max * 100).toFixed(0)}%)입니다.
+      <ul><li>${GUIDE[weak.key]}</li><li>시뮬레이션 횟수를 늘리면(최대 10,000) 더 나은 안을 찾을 가능성이 커집니다. 현재 ${R.cfg.maxAttempts.toLocaleString()}회.</li>${R.cfg.minDFI > 85 ? '<li>현재 명단 조건에서 목표가 과도할 수 있습니다. 목표 DFI를 낮추는 것도 검토하십시오.</li>' : ''}</ul>`;
+    box.classList.remove('hidden');
+  }
+
+  // 지표 막대: 85% 이상 초록, 60% 이상 주황, 그 미만 빨강
+  $('#gauges').innerHTML = D.metrics.map(m => {
+    const r = m.score / m.max, col = r >= .85 ? 'var(--ok)' : r >= .6 ? 'var(--warn)' : 'var(--bad)';
+    return `<div class="gauge" title="${esc(m.detail)}"><div class="lbl"><b>${m.key}</b> ${m.name}</div>` +
+      `<div class="bar" role="meter" aria-valuemin="0" aria-valuemax="${m.max}" aria-valuenow="${m.score.toFixed(1)}" aria-label="${m.name}"><i style="width:${(r * 100).toFixed(1)}%;background:${col}"></i></div>` +
+      `<div class="val">${m.score.toFixed(1)}/${m.max}</div></div><div class="gauge-desc">${esc(m.desc)}</div><div class="muted" style="margin:0 0 6px;font-size:11px">${esc(m.detail)}</div>`;
+  }).join('');
+  $('#dfiHow').innerHTML = D.metrics.map(m => `<li><b>${m.key} ${m.name} (${m.max}점)</b> — ${esc(m.desc)}. ${esc(m.how)}</li>`).join('');
+  $('#dfiWarn').innerHTML = R.unfilled.length ? `미배정일: ${fmtDays(R.unfilled)}일 — 총점에 배정률이 곱해집니다.` : '';
+}
+
+/* ---- 13-5. 근무자 강조 ---- */
+/** 강조 근무자의 근무일 요약 막대 (복사 버튼 포함) */
+function renderHlInfo(R){
+  const box = $('#hlInfo'), k = state.hl;
+  if (k < 0 || !R.cfg.people[k]){ box.classList.add('hidden'); return; }
+  const dd = [], aa = [];
+  for (let d = 1; d <= R.cal.N; d++){ if (R.duty[d] === k) dd.push(d); if (R.assist[d] === k) aa.push(d); }
+  const text = `${R.cfg.month}월 당직 ${R.cfg.people[k].name}: ${dd.length ? dd.join(', ') + '일' : '없음'} (정규 ${dd.length}회)` +
+               (aa.length ? ` · 조력 ${aa.join(', ')}일 (${aa.length}회)` : '');
+  // 범례: 정규 당직(진한 노랑)과 조력(연한 노랑)의 색 구분. 조력 근무가 있을 때만 표시합니다.
+  const legend = aa.length ? '<span class="muted"><i class="hl-sw duty"></i>정규 <i class="hl-sw assist" style="margin-left:6px"></i>조력</span>' : '';
+  box.innerHTML = `<span>⭐ ${esc(text)}</span>${legend}<button type="button" id="btnCopyHl">복사</button><button type="button" id="btnClearHl">강조 해제</button>`;
+  box.dataset.text = text; box.classList.remove('hidden');
+}
+/** 강조만 바뀔 때: 다시 그리지 않고 클래스만 바꿉니다. */
+function applyHighlight(){
+  const hl = state.hl, on = hl >= 0;
+  $$('#results [data-pid]').forEach(el => {
+    const me = +el.dataset.pid === hl;
+    el.classList.toggle('highlight-bold', me);
+    if (el.tagName === 'BUTTON' && !el.classList.contains('stats-name')) el.setAttribute('aria-pressed', me);
+  });
+  $('#cal').classList.toggle('has-hl', on);
+  $$('#candGrid .mini-cal2').forEach(m => m.classList.toggle('has-hl', on));
+  $$('#stats tr[data-row]').forEach(tr => tr.classList.toggle('hl-row', +tr.dataset.row === hl));
+  $$('#stats .stats-name').forEach(el => el.classList.remove('highlight-bold'));   // 표에서는 행 배경으로만 표시
+  renderHlInfo(state.result);
+}
+function setHighlight(pid){ state.hl = (state.hl === pid) ? -1 : pid; applyHighlight(); }
+$('#hlInfo').addEventListener('click', e => {
+  if (e.target.id === 'btnCopyHl') copyText($('#hlInfo').dataset.text);
+  if (e.target.id === 'btnClearHl') setHighlight(state.hl);
+});
+
+/* ---- 13-6. 전체 그리기 ---- */
+function updateOutBar(){
+  const R = state.result;
+  $$('[data-needs-result]').forEach(b => b.disabled = !R);
+  $('#outTarget').innerHTML = R
+    ? `— 출력 대상: <b>${R.rank || 1}안</b> (DFI ${R.dfi.total.toFixed(1)}, ${R.dfi.grade}) · 4단계에서 다른 안을 누르면 바뀝니다` +
+      (isStale() ? ' <b style="color:var(--bad)">· 이전 입력 기준 결과</b>' : '')
+    : '— 생성된 당직표가 없습니다';
+}
+function renderResults(){
+  const R = state.result; updateOutBar(); if (!R) return;
+  $('#results').classList.remove('hidden'); $('#emptyResults').classList.add('hidden');
+  $('#selTag').textContent = (R.rank || 1) + '안';
+  $('#calTitle').textContent = `${R.cfg.year}년 ${R.cfg.month}월 당직`;
+  renderCandidates(); renderHlInfo(R); renderCalendar(R); renderStats(R); renderDFI(R);
+}
+function selectCand(i){
+  if (!state.cands || !state.cands[i]) return;
+  state.sel = i; state.result = state.cands[i]; renderResults();
+  toast(`${i + 1}안을 선택했습니다. 출력·CSV·수동 교체는 이 안에 적용됩니다.`);
+}
+
+/* 결과 영역 클릭 위임: ✎ 수동 교체 > 이름 강조 > 안 선택 > 빈 곳(강조 해제) 순으로 판정 */
+$('#results').addEventListener('click', e => {
+  const edit = e.target.closest('[data-edit]'); if (edit){ openEdit(+edit.dataset.edit); return; }
+  const nm = e.target.closest('[data-pid]'); if (nm){ setHighlight(+nm.dataset.pid); return; }
+  const cd = e.target.closest('[data-cand]'); if (cd){ if (+cd.dataset.cand !== state.sel) selectCand(+cd.dataset.cand); return; }
+  if (state.hl >= 0 && (e.target.closest('#cal') || e.target.closest('#stats'))) setHighlight(state.hl);
+});
+/* 안 카드 키보드 조작: Enter·Space로 선택. 다시 그린 뒤에도 같은 카드에 포커스 유지 */
+$('#results').addEventListener('keydown', e => {
+  const cd = e.target.closest && e.target.closest('[data-cand]');
+  if (!cd || e.target !== cd || (e.key !== 'Enter' && e.key !== ' ')) return;
+  e.preventDefault();
+  const i = +cd.dataset.cand; if (i !== state.sel) selectCand(i);
+  setTimeout(() => { const n = $(`[data-cand="${i}"]`); n && n.focus(); }, 0);
+});
+
+/* ─────────────────────────── §14 수동 교체 ───────────────────────────
+   규칙 위반이 있어도 적용은 허용하되 경고를 보여 줍니다. 적용 후 DFI를 다시 계산하고 실행 취소를 제공합니다. */
+let editDay = 0;
+function openEdit(d){
+  const R = state.result, day = R.cal.days[d]; editDay = d;
+  $('#editTitle').textContent = `${R.cfg.month}월 ${d}일 (${DOW[day.dow]}${day.isPub ? '·' + holName(R.cfg.year, R.cfg.month, d) : ''}) 수동 교체`;
+  $('#editDuty').innerHTML = '<option value="-1">— 미배정 —</option>' +
+    R.cfg.people.map((p, i) => `<option value="${i}" ${R.duty[d] === i ? 'selected' : ''}>${esc(p.name)} (Lv${p.level})</option>`).join('');
+  fillAssist(); checkEdit();
+  $('#editDialog').showModal();
+}
+/** 정규 당직자가 레벨 4일 때만 조력자 선택칸을 보여 줍니다. */
+function fillAssist(){
+  const R = state.result, k = +$('#editDuty').value;
+  const need = k >= 0 && R.cfg.people[k].level >= 4;
+  $('#editAssistWrap').classList.toggle('hidden', !need);
+  if (!need) return;
+  const cur = R.assist[editDay];
+  $('#editAssist').innerHTML = '<option value="-1">— 없음 —</option>' +
+    R.cfg.people.map((p, i) => p.level === 3 ? `<option value="${i}" ${cur === i ? 'selected' : ''}>${esc(p.name)}</option>` : '').join('');
+}
+/** 선택한 사람이 규칙을 어기는지 확인 (엔진 1단계 조건과 같은 기준) */
+function checkEdit(){
+  const R = state.result, d = editDay, k = +$('#editDuty').value, a = +$('#editAssist').value, w = [];
+  if (k >= 0){
+    const p = R.cfg.people[k], day = R.cal.days[d];
+    if (p.avoid.includes(d)) w.push('기피일입니다.');
+    if (p.exDow[day.dow]) w.push('제외요일입니다.');
+    const cnt = R.duty.filter((x, i) => i !== d && x === k).length + 1;
+    if (cnt > p.max) w.push(`월 최대 한도(${p.max}) 초과: ${cnt}회`);
+    if (p.level !== 1){
+      // 앞쪽 가장 가까운 근무와의 간격 (앞 근무가 휴일이면 restH 적용)
+      for (let j = d - 1; j >= 1; j--) if (R.duty[j] === k){
+        const rest = R.cal.days[j].isHol ? R.cfg.restH : R.cfg.restW;
+        if (d - j <= rest) w.push(`휴무 간격 위반: ${j}일 근무 후 ${d - j}일차 (필요 > ${rest})`);
+        break;
+      }
+      // 뒤쪽 가장 가까운 근무와의 간격 (오늘이 휴일이면 restH 적용)
+      for (let j = d + 1; j <= R.cal.N; j++) if (R.duty[j] === k){
+        const rest = day.isHol ? R.cfg.restH : R.cfg.restW;
+        if (j - d <= rest) w.push(`휴무 간격 위반: 이후 ${j}일 근무와 간격 ${j - d}일`);
+        break;
+      }
+    }
+    if (p.level >= 4){
+      if (a < 0) w.push('레벨 4는 조력자가 필요합니다.');
+      else if (R.duty[d - 1] === a) w.push('조력자가 전날 정규 당직자입니다.');
+    }
+  }
+  $('#editWarn').innerHTML = w.length ? '⚠️ ' + w.map(esc).join('<br>⚠️ ') + '<br><span class="muted">경고가 있어도 적용할 수 있습니다. 적용 후 실행 취소할 수 있습니다.</span>' : '';
+}
+$('#editDuty').addEventListener('change', () => { fillAssist(); checkEdit(); });
+$('#editAssist').addEventListener('change', checkEdit);
+$('#editCancel').addEventListener('click', () => $('#editDialog').close());
+$('#editApply').addEventListener('click', () => {
+  const R = state.result, d = editDay, k = +$('#editDuty').value;
+  // 실행 취소용 스냅샷 (배열·Set은 복사본으로)
+  const snap = { duty: R.duty.slice(), assist: R.assist.slice(), unfilled: R.unfilled.slice(), edited: new Set(R.edited), dfi: R.dfi };
+  R.duty[d] = k;
+  R.assist[d] = (k >= 0 && R.cfg.people[k].level >= 4) ? +$('#editAssist').value : -1;
+  R.unfilled = []; for (let i = 1; i <= R.cal.N; i++) if (R.duty[i] < 0) R.unfilled.push(i);
+  R.edited.add(d);
+  R.dfi = Engine.computeDFI(R.cfg, R.cal, R.duty, R.assist);
+  invalidate(R);
+  $('#editDialog').close(); renderResults();
+  showUndo(`${d}일 교체 · DFI ${snap.dfi.total.toFixed(1)} → ${R.dfi.total.toFixed(1)}`, () => {
+    Object.assign(R, snap); invalidate(R); renderResults(); toast(`${d}일 교체를 취소했습니다.`);
+  });
+});
+
+/* ─────────────────────────── §15 알림 모달 ─────────────────────────── */
+function showUnfilled(){
+  const R = (state.cands && state.cands[0]) || state.result;
+  $('#diagTitle').textContent = '⚠️ 미배정일이 있습니다';
+  $('#diagBody').innerHTML = `<p style="color:var(--bad)"><b>${fmtDays(R.unfilled)}일 (${R.unfilled.length}일)</b>에 휴무 간격·기피일·제외요일·한도를 모두 통과한 후보가 없었습니다.</p>
+    <ul><li>레벨 1 인원을 늘리거나 최소 휴무일을 낮추십시오.</li><li>해당 날짜의 기피일·제외요일 설정을 확인하십시오(3단계 사전 점검 참고).</li><li>달력의 ✎ 버튼으로 직접 채울 수 있습니다.</li></ul>`;
+  $('#diagDialog').showModal();
+}
+function showError(msg){
+  $('#diagTitle').textContent = '⚠️ 생성할 수 없습니다';
+  $('#diagBody').innerHTML = `<p style="color:var(--bad)"><b>${esc(msg)}</b></p>`;
+  $('#diagDialog').showModal();
+}
+$('#diagClose').addEventListener('click', () => $('#diagDialog').close());
+
+/* ─────────────────────────── §16 내보내기 ─────────────────────────── */
+/* JSON 백업: 사람이 읽을 수 있는 풀어 쓴 형식 (쿠키용 압축 형식과 다름) */
+$('#btnExportJSON').addEventListener('click', () => {
+  const o = { app: 'dfi-duty', version: 1, appVersion: APP_VERSION, profile: state.profile, exportedAt: new Date().toISOString(), settings: state.settings, people: state.people };
+  download(`당직설정_${state.profile || '기본'}_${state.settings.year}-${pad2(state.settings.month)}.json`, JSON.stringify(o, null, 2), 'application/json');
+});
+$('#btnImportJSON').addEventListener('click', () => $('#fileJSON').click());
+$('#fileJSON').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const fix7 = a => (a || []).slice(0, 7).concat([0, 0, 0, 0, 0, 0, 0]).slice(0, 7);   // 요일 배열 길이 보정
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      const o = JSON.parse(rd.result);
+      if (!o.settings || !Array.isArray(o.people)) throw new Error('형식 오류');
+      state.settings = Object.assign(defaultSettings(), o.settings);
+      state.people = o.people.map(p => Object.assign(blankPerson(), p, { wishDow: fix7(p.wishDow), exDow: fix7(p.exDow) }));
+      if (o.profile) state.profile = o.profile;
+      saveNow(); renderAll(); toast('JSON을 복원했습니다.');
+    } catch(err){ showError('올바른 백업 파일이 아닙니다.'); }
+    e.target.value = '';                                  // 같은 파일을 다시 고를 수 있도록 초기화
+  };
+  rd.readAsText(f, 'utf-8');
+});
+
+/* CSV: 날짜별 배정 → 근무자별 통계 → DFI. Excel 한글 깨짐 방지를 위해 UTF-8 BOM을 붙입니다. */
+$('#btnCSV').addEventListener('click', async () => {
+  const R = state.result; if (!R){ toast('먼저 당직표를 생성하십시오.'); return; }
+  if (!(await confirmIfStale('저장'))) return;
+  const P = R.cfg.people, ym = `${R.cfg.year}-${pad2(R.cfg.month)}`;
+  const q = v => '"' + String(v).replace(/"/g, '""') + '"';
+  const line = arr => arr.map(q).join(',');
+  const L = [line(['날짜', '요일', '구분', '정규 당직자', '레벨', '조력자'])];
+  for (let d = 1; d <= R.cal.N; d++){
+    const day = R.cal.days[d], k = R.duty[d], a = R.assist[d];
+    L.push(line([`${ym}-${pad2(d)}`, DOW[day.dow], day.isPub ? holName(R.cfg.year, R.cfg.month, d) : day.isWkd ? '주말' : '평일',
+      k >= 0 ? P[k].name : '미배정', k >= 0 ? P[k].level : '', a >= 0 ? P[a].name : '']));
+  }
+  L.push('', line(['성명', '레벨', '월~수', '목', '금', '토', '일', '공휴일', '정규', '기대', '차이', '조력']));
+  getStats(R).forEach(s => L.push(line([s.name, s.level, s.mw, s.thu, s.fri, s.sat, s.sun, s.pub, s.total, s.exp.toFixed(1), s.diff.toFixed(1), s.assist])));
+  L.push('', [q('DFI'), R.dfi.total.toFixed(1), q(R.dfi.grade)].join(','));
+  R.dfi.metrics.forEach(m => L.push([q(m.key + ' ' + m.name), m.score.toFixed(2), m.max].join(',')));
+  download(`당직표_${ym}_${R.rank || 1}안.csv`, '﻿' + L.join('\r\n'), 'text/csv;charset=utf-8');
+});
+
+/* ─────────────────────────── §17 당직표 출력 ───────────────────────────
+   A4 세로 1장 양식: 상단 우측 결재란 → 달력 → 통계·DFI 요약.
+   출력 경로 (환경에 따라 앞의 방법이 막히면 다음으로)
+     1) 숨은 iframe에 양식을 쓰고 iframe에서 print()
+     2) printViaSheet(): 현재 문서에 양식만 남기고 print()
+     3) 둘 다 막히면 [인쇄용 파일 저장] 안내 */
+const PRINT_CSS = `
+@page{size:A4 portrait;margin:8mm}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;color:#000;font-size:10px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.sheet{width:194mm;margin:0 auto}
+.ps-head{display:flex;justify-content:space-between;align-items:flex-end;gap:6mm;border-bottom:2px solid #000;padding-bottom:2mm;margin-bottom:2.5mm}
+.ps-head h1{font-size:19px;margin:0 0 1mm}
+.ps-meta{font-size:9px;color:#333;line-height:1.4}
+.ps-sign table{border-collapse:collapse}
+.ps-sign th,.ps-sign td{border:1px solid #000;width:17mm;text-align:center;font-size:10px;padding:1px}
+.ps-sign th{background:#f0f0f0}
+.ps-sign td{height:12mm}
+table.ps-cal{width:100%;border-collapse:collapse;table-layout:fixed}
+.ps-cal th{border:1px solid #000;padding:2px;font-size:10px;background:#f0f0f0}
+.ps-cal th.sun{color:#c62828} .ps-cal th.sat{color:#1565c0}
+.ps-cal td{border:1px solid #000;height:19mm;vertical-align:top;padding:1.5px 3px}
+.ps-cal td.sun,.ps-cal td.pub{background:#ffebee} .ps-cal td.sat{background:#e3f2fd}
+.ps-cal td.blank{background:#fafafa}
+.ps-d{font-size:9px;font-weight:700}
+.ps-d .h{color:#c62828;margin-left:2px;font-weight:600}
+.ps-n{font-size:12.5px;font-weight:600;margin-top:1px;word-break:keep-all}
+.ps-a{font-size:9px;color:#444}
+.ps-n.hl{font-weight:900;background:#ffe082;padding:0 2px}
+.ps-n.dim{color:#888;font-weight:400}
+.ps-legend{font-size:9px;margin-top:1.5mm;color:#333}
+.ps-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:5mm;margin-top:3mm}
+.ps-grid.one{grid-template-columns:1fr}
+h2{font-size:11px;margin:0 0 1mm}
+table.ps-tbl{border-collapse:collapse;width:100%}
+.ps-tbl th,.ps-tbl td{border:1px solid #000;padding:1.5px 4px;text-align:center;font-size:9.5px}
+.ps-tbl th{background:#f0f0f0}
+.ps-tbl th.c-sat{color:#1565c0} .ps-tbl th.c-sun{color:#c62828}
+.ps-tbl td:first-child{text-align:left;white-space:nowrap}
+.ps-tbl tr.hl td{background:#fff8e1;font-weight:700}
+.ps-btn{position:fixed;right:12px;top:12px;padding:8px 14px;font-size:14px;border-radius:8px;border:none;background:#2f5bea;color:#fff;cursor:pointer;z-index:5}
+@media print{.ps-btn{display:none}}
+@media screen{body{background:#e9e9e9;padding:12px 0}.page{width:210mm;min-height:297mm;margin:0 auto;background:#fff;padding:8mm;box-shadow:0 2px 12px rgba(0,0,0,.18)}}
+`;
+/* 인쇄 영역 높이(A4 297mm − 위아래 여백 16mm = 281mm, 여유 2mm 제외 279mm)를 넘으면 zoom으로 축소해 1장에 맞춥니다.
+   인쇄용 파일 안에서도 실행되어야 하므로 문자열로 보관합니다. */
+const FIT_JS = `function fitSheet(){var s=document.querySelector('.sheet');if(!s)return;s.style.zoom=1;var mm=96/25.4,max=279*mm,h=s.getBoundingClientRect().height;if(h>max)s.style.zoom=(Math.floor(max/h*1000)/1000);}`;
+
+/** 출력 양식 본문(HTML). 출력 옵션 체크박스를 반영합니다. */
+function buildPrintBody(){
+  const R = state.result, P = R.cfg.people;
+  const o = { stats: $('#poStats').checked, dfi: $('#poDFI').checked, hl: $('#poHL').checked && state.hl >= 0, sign: $('#poSign').checked };
+
+  // 머리: 제목·메타 + 결재란
+  const meta = `${state.profile ? esc(state.profile) + ' · ' : ''}생성 ${R.at.toLocaleString('ko-KR', { hour12: false })}${R.edited.size ? ' · 수동 수정 ' + R.edited.size + '건' : ''}` +
+    `<br>당직배정 웹앱 v${APP_VERSION} · DFI ${R.dfi.total.toFixed(1)}점 (${R.dfi.grade}) · 휴무 규정: 평일 후 ${R.cfg.restW}일 · 휴일 후 ${R.cfg.restH}일`;
+  let html = `<div class="sheet"><div class="ps-head"><div><h1>${R.cfg.year}년 ${R.cfg.month}월 당직표 <span style="font-size:12px;font-weight:600;color:#555">(${R.rank || 1}안)</span></h1>` +
+             `<div class="ps-meta">${meta}</div></div>${o.sign ? SIGN_BLOCK : ''}</div>`;
+
+  // 달력: 7칸씩 끊어 표로 구성. 6주짜리 달은 칸 높이를 줄여 1장을 유지합니다.
+  const cells = Array(R.cal.days[1].dow).fill('<td class="blank"></td>');
+  for (let d = 1; d <= R.cal.N; d++){
+    const day = R.cal.days[d], k = R.duty[d], a = R.assist[d];
+    let c = `<td class="${dayClass(day)}"><div class="ps-d">${d}${day.isPub ? `<span class="h">${esc(holName(R.cfg.year, R.cfg.month, d))}</span>` : ''}</div>`;
+    if (k >= 0){
+      const nc = o.hl ? (k === state.hl ? 'hl' : 'dim') : '';
+      c += `<div class="ps-n ${nc}">${esc(P[k].name)}</div>`;
+      if (P[k].level >= 4) c += `<div class="ps-a">(조력: ${a >= 0 ? esc(P[a].name) : '없음'})</div>`;
+    } else c += '<div class="ps-n" style="color:#c62828">미배정</div>';
+    cells.push(c + '</td>');
+  }
+  while (cells.length % 7) cells.push('<td class="blank"></td>');
+  const cellH = cells.length / 7 >= 6 ? 16.5 : 19.5;
+  let rows = '';
+  for (let i = 0; i < cells.length; i += 7) rows += '<tr>' + cells.slice(i, i + 7).join('') + '</tr>';
+  html += `<table class="ps-cal"><thead><tr>${DOW.map((d, i) => `<th class="${i === 0 ? 'sun' : i === 6 ? 'sat' : ''}">${d}</th>`).join('')}</tr></thead>` +
+          `<tbody>${rows.replace(/<td /g, `<td style="height:${cellH}mm" `)}</tbody></table>` +
+          `<div class="ps-legend">( ) 안은 레벨 4 근무자의 조력자입니다.${o.hl ? ` 강조 표시: <b>${esc(P[state.hl].name)}</b>` : ''}</div>`;
+
+  // 하단: 통계·DFI (둘 다면 2단, 하나면 1단)
+  if (o.stats || o.dfi){
+    html += `<div class="ps-grid ${o.stats && o.dfi ? '' : 'one'}">`;
+    if (o.stats){
+      html += '<div><h2>근무자별 통계</h2><table class="ps-tbl"><thead><tr><th>성명</th><th>Lv</th><th>월~수</th><th>목</th><th>금</th><th class="c-sat">토</th><th class="c-sun">일</th><th class="c-sun">공휴일</th><th>정규</th><th>조력</th></tr></thead><tbody>' +
+        getStats(R).map(s => `<tr class="${o.hl && s.i === state.hl ? 'hl' : ''}"><td>${esc(s.name)}</td><td>${s.level}</td><td>${s.mw}</td><td>${s.thu}</td><td>${s.fri}</td><td>${s.sat}</td><td>${s.sun}</td><td>${s.pub}</td><td><b>${s.total}</b></td><td>${s.assist}</td></tr>`).join('') +
+        '</tbody></table></div>';
+    }
+    if (o.dfi){
+      html += `<div><h2>당직 공정성 지수(DFI) — ${R.dfi.total.toFixed(1)}점 (${R.dfi.grade}) · 목표 ${R.cfg.minDFI}</h2><table class="ps-tbl"><thead><tr><th>지표</th><th>점수</th><th>세부</th></tr></thead><tbody>` +
+        R.dfi.metrics.map(m => `<tr><td>${m.key} ${m.name}<br><span style="font-size:8px;color:#555">${m.short}</span></td><td>${m.score.toFixed(1)}/${m.max}</td><td style="text-align:left;font-size:8.5px">${esc(m.detail)}</td></tr>`).join('') +
+        '</tbody></table><div class="ps-legend">DFI(Duty Fairness Index): 근무량·휴일 부담·선호 반영·근무 간격·요일 분포로 당직 배분의 공정성을 100점 만점으로 평가한 지수 · 등급 S≥90, A≥80, B≥70, C&lt;70</div></div>';
+    }
+    html += '</div>';
+  }
+  return html + '</div>';
+}
+const SIGN_BLOCK = '<div class="ps-sign"><table><tr><th>작성</th><th>검토</th><th>승인</th></tr><tr><td></td><td></td><td></td></tr></table></div>';
+/** 독립 HTML 문서 (iframe 인쇄·인쇄용 파일 공용). withButton이면 화면 우측 상단에 인쇄 버튼 표시 */
+function buildPrintDoc(withButton){
+  const R = state.result;
+  return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${R.cfg.year}년 ${R.cfg.month}월 당직표</title><style>${PRINT_CSS}</style></head><body>` +
+    (withButton ? '<button class="ps-btn" onclick="window.print()">🖨 인쇄 / PDF 저장</button>' : '') +
+    `<div class="page">${buildPrintBody()}</div><script>${FIT_JS}fitSheet();window.addEventListener('load',fitSheet);window.addEventListener('beforeprint',fitSheet);<\/script></body></html>`;
+}
+/** 대체 인쇄: 숨은 iframe이 막힌 환경용. 현재 문서에 양식만 남기고 인쇄한 뒤 되돌립니다. */
+function printViaSheet(){
+  const sheet = $('#printSheet');
+  sheet.innerHTML = `<style>@media print{${PRINT_CSS.replace(/@media screen\{.*\}\s*$/s, '')}}</style>` + buildPrintBody();
+  document.body.classList.add('printing-sheet');
+  new Function(FIT_JS + 'fitSheet();')();
+  const restore = () => { document.body.classList.remove('printing-sheet'); sheet.innerHTML = ''; window.removeEventListener('afterprint', restore); };
+  window.addEventListener('afterprint', restore);
+  try { window.print(); } catch(e){ restore(); throw e; }
+  setTimeout(restore, 1500);                                // afterprint가 오지 않는 브라우저 대비
+}
+const PRINT_BLOCKED = '이 화면에서는 인쇄가 차단되었습니다. [인쇄용 파일 저장]을 이용하십시오.';
+function tryPrintViaSheet(){ try { printViaSheet(); } catch(e){ toast(PRINT_BLOCKED); } }
+
+$('#btnPrint').addEventListener('click', async () => {
+  if (!state.result){ toast('먼저 당직표를 생성하십시오.'); return; }
+  if (!(await confirmIfStale('출력'))) return;
+  toast(`${state.result.rank || 1}안을 출력합니다.`);
+  let fr = $('#printFrame'); if (fr) fr.remove();
+  fr = document.createElement('iframe'); fr.id = 'printFrame';
+  fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(fr);
+  // onload와 타이머 중 먼저 오는 쪽에서 한 번만 인쇄
+  let printed = false;
+  const tryPrint = () => {
+    if (printed) return; printed = true;
+    try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch(e){ tryPrintViaSheet(); }
+  };
+  fr.onload = () => setTimeout(tryPrint, 150);
+  try { const doc = fr.contentDocument; doc.open(); doc.write(buildPrintDoc(false)); doc.close(); setTimeout(tryPrint, 400); }
+  catch(e){ fr.remove(); tryPrintViaSheet(); }
+});
+$('#btnPrintFile').addEventListener('click', async () => {
+  const R = state.result; if (!R){ toast('먼저 당직표를 생성하십시오.'); return; }
+  if (!(await confirmIfStale('저장'))) return;
+  download(`당직표_${R.cfg.year}-${pad2(R.cfg.month)}_${R.rank || 1}안_인쇄용.html`, buildPrintDoc(true), 'text/html;charset=utf-8');
+  toast('인쇄용 파일을 저장했습니다. 열어서 [인쇄 / PDF 저장]을 누르십시오.');
+});
+
+/* ─────────────────────────── §18 명단 머리글 툴팁 ───────────────────────────
+   마우스 오버·키보드 포커스·터치(탭으로 열고 닫기)를 모두 지원합니다. 스크롤·Esc로 닫습니다. */
+const TIPS = {
+  level: { t: '레벨 — 숙련도와 근무 규칙', items: [
+    '<b>Lv1 특례(최고숙련)</b>: 휴무 간격 규정을 적용받지 않습니다. 연속 근무가 가능합니다.',
+    '<b>Lv2 숙련</b>: 단독 정규 근무를 합니다. 휴무 간격 규정을 따릅니다.',
+    '<b>Lv3 일반(조력)</b>: 단독 정규 근무를 합니다. 레벨 4 근무일의 조력자 후보가 됩니다.',
+    '<b>Lv4 초보</b>: 그날 조력 가능한 레벨 3 인원이 1명 이상 있을 때만 배정됩니다.'],
+    eff: '조력자는 전날 정규 당직자가 아닌 레벨 3 중 가장 오래 쉰 인원으로 정합니다. 조력 근무는 정규 근무 횟수와 휴무 간격에 반영되지 않습니다.' },
+  weight: { t: '가중치 — 근무량 배분 비율 (기본 1.0)', items: [
+    '기대 근무수는 <b>배정일수 × 본인 가중치 ÷ 전체 가중치 합</b>으로 계산합니다. 결과 통계표의 "기대" 열입니다.',
+    '배정 점수에서 카테고리별(휴일 / 목·금 / 월~수) 누적 근무수를 가중치로 나눕니다. 가중치가 클수록 같은 근무수에서도 먼저 뽑힙니다.',
+    '예: 1.2는 기준보다 약 20% 더 많이, 0.5는 약 절반으로 배정됩니다. 최솟값은 0.1입니다.'],
+    eff: 'DFI M1(양적 정확도, 25점)은 기대 근무수와 실제 근무수의 차이(RMSE)로 감점합니다.' },
+  wish: { t: '희망일 — 0순위 (최우선)', items: [
+    '그날 배정 가능한 후보 중 희망일인 인원을 가장 먼저 고려합니다.',
+    '<b>쿼터 보호</b>: 남은 한도가 앞으로 남은 희망일 수 이하가 되면, 희망일이 아닌 날에는 배정을 보류해 한도를 아껴 둡니다. 그날 후보가 아무도 없으면 보호를 풀어 배정합니다.',
+    '휴무 간격·한도·기피일 규칙이 희망일보다 우선합니다. 따라서 희망일이 항상 보장되지는 않습니다.'],
+    eff: 'DFI M3(선호도 충족률) 중 8점이 희망일 반영률입니다. 같은 날을 여러 명이 희망하면 반영률이 떨어집니다(사전 점검에 표시).' },
+  avail: { t: '가능일 — 2순위', items: [
+    '희망일·희망요일에 해당하는 사람이 없을 때 다음으로 고려합니다.',
+    '지정하지 않은 날도 배정될 수 있습니다(3순위 일반일). 배정을 막으려면 기피일이나 제외요일을 쓰십시오.'],
+    eff: 'DFI M3 중 4점은 본인 근무일 가운데 가능일·희망일에 해당하는 비율입니다.' },
+  avoid: { t: '기피일 — 배정 불가', items: [
+    '해당 날짜에는 정규 당직에 배정하지 않습니다. 레벨 3이면 그날 조력자로도 배정하지 않습니다.',
+    '수동 교체로 지정하면 경고가 표시됩니다(적용은 가능).'],
+    eff: '기피일이 많으면 후보가 줄어 미배정일이 생기거나 M1·M2 점수가 떨어질 수 있습니다. DFI M3 중 4점이 기피일 회피율입니다.' },
+  wishDow: { t: '희망요일 — 1순위', items: [
+    '선택한 요일에는 희망일 다음 순위(1순위)로 고려합니다.',
+    '같은 요일을 제외요일과 동시에 고를 수 없습니다. 한쪽을 켜면 다른 쪽이 꺼집니다.'],
+    eff: 'DFI M3 중 4점이 희망요일 반영률입니다. 한 요일에 몰리면 M5(요일 다양성) 점수가 떨어질 수 있습니다.' },
+  exDow: { t: '제외요일 — 배정 불가', items: [
+    '선택한 요일에는 정규 당직에 배정하지 않습니다. 레벨 3이면 그 요일 조력자로도 배정하지 않습니다.',
+    '예: 토·일을 제외하면 주말 근무가 다른 인원에게 넘어갑니다.'],
+    eff: '많은 인원이 같은 요일을 제외하면 그 요일 부담이 일부에게 몰려 M2(휴일 배분)·M5(요일 다양성) 점수가 떨어질 수 있습니다.' },
+  max: { t: '월 최대 한도 — 정규 근무 상한', items: [
+    '이번 달 정규 당직 횟수의 상한입니다. 조력 근무는 포함하지 않습니다.',
+    '빈칸이면 무제한(999)입니다. 0이면 정규 당직에 배정하지 않습니다.',
+    '희망일 쿼터 보호의 기준이 됩니다.'],
+    eff: '전체 인원의 한도 합계가 그 달 일수보다 작으면 생성을 시작하지 않습니다. 한도가 기대 근무수보다 낮으면 M1 점수가 떨어집니다.' }
+};
+(function setupHeaderTips(){
+  const tip = $('#tip'); let cur = null;
+  const html = k => { const d = TIPS[k]; return `<b class="t">${d.t}</b><ul>${d.items.map(x => `<li>${x}</li>`).join('')}</ul><div class="eff">효과: ${d.eff}</div>`; };
+  function show(th){
+    if (cur === th) return; cur = th;
+    tip.innerHTML = html(th.dataset.tip); tip.classList.add('show');
+    const r = th.getBoundingClientRect(), tw = tip.offsetWidth, tH = tip.offsetHeight;
+    const left = Math.min(Math.max(8, r.left + r.width / 2 - tw / 2), window.innerWidth - tw - 8);
+    let top = r.bottom + 8; if (top + tH > window.innerHeight - 8) top = Math.max(8, r.top - tH - 8);
+    tip.style.left = left + 'px'; tip.style.top = top + 'px';
+  }
+  function hide(){ cur = null; tip.classList.remove('show'); }
+  const head = $('#roster thead'), thOf = e => e.target.closest && e.target.closest('th[data-tip]');
+  head.addEventListener('mouseover', e => { const th = thOf(e); if (th) show(th); });
+  head.addEventListener('mouseout', e => { const th = thOf(e); if (th && !th.contains(e.relatedTarget)) hide(); });
+  head.addEventListener('focusin', e => { const th = thOf(e); if (th) show(th); });
+  head.addEventListener('focusout', hide);
+  document.addEventListener('touchstart', e => { const th = e.target.closest && e.target.closest('#roster th[data-tip]'); if (th){ cur === th ? hide() : show(th); } else hide(); }, { passive: true });
+  window.addEventListener('scroll', hide, true);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') hide(); });
+})();
+
+/* ─────────────────────────── §19 초기화 ───────────────────────────
+   저장소 확인 → 마지막 프로필 자동 불러오기 → 없으면 빈 상태로 시작 */
+(function init(){
+  $('#appVer').textContent = 'v' + APP_VERSION;
+  Store.init(); updateOutBar();
+  const b = $('#storeBadge');
+  if (Store.cookieOK || Store.lsOK){
+    b.textContent = '자동 저장 켜짐'; b.className = 'badge';
+    b.title = '저장 위치: ' + [Store.cookieOK && '쿠키', Store.lsOK && 'localStorage'].filter(Boolean).join(' + ');
+  } else { b.textContent = '저장 불가 — JSON 백업을 이용하십시오'; b.className = 'badge bad'; }
+
+  const last = Store.getLast();
+  if (last && applyProfile(last, true)) toast(`'${last}' 프로필을 불러왔습니다.`);
+  else { state.profile = ''; renderAll(); }
+})();
+</script>
+</body>
+</html>
