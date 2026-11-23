@@ -947,8 +947,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.10.2', APP_BUILD = '2026-11-22';
+const APP_VERSION = '1.10.3', APP_BUILD = '2026-11-22';
 const CHANGELOG = [
+  '1.10.3 근무자별 통계(화면·인쇄·CSV)를 명단에 입력한 순서대로 표시 (이전: 레벨 → 이름 순)',
   '1.10.2 기간의 끝 날짜가 그 달 말일을 넘으면 말일까지로 보정 (예: 2월에 15-31 → 15~28). 입력칸 아래에 보정 내용 표시',
   '1.10.1 샘플 데이터 근무자 이름을 일반적인 영어 이름으로 변경',
   '1.10.0 생성 실행 요약: 소요 시간·초당 시도 수, 마지막 개선 시점(이후 더 좋아지지 않은 시도), 최고 DFI 변화 그래프·표, 시도 횟수 조언',
@@ -2062,7 +2063,8 @@ window.addEventListener('resize', () => { clearTimeout(runChartTimer); runChartT
  * 배정이 바뀌면(수동 교체·실행 취소) invalidate(R)로 캐시를 지워야 합니다.
  *   exp  : 기대 근무수 = 배정된 일수 × 본인 가중치 ÷ 가중치 합 (DFI M1과 같은 기준)
  *   diff : 실제 − 기대
- * 반환 배열은 레벨 → 이름 순으로 정렬되어 있으며, 원래 인덱스는 i에 있습니다.
+ * 반환 배열은 근무자 명단에 입력한 순서(생성 당시 기준)이며, 명단 인덱스는 i에 있습니다.
+ * 화면 통계표·인쇄 양식·CSV가 모두 이 순서를 따릅니다.
  */
 function getStats(R){
   if (R._stats) return R._stats;
@@ -2080,7 +2082,7 @@ function getStats(R){
     if (R.assist[d] >= 0) st[R.assist[d]].assist++;
   }
   st.forEach(s => { s.diff = s.total - s.exp; });
-  return (R._stats = st.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name, 'ko')));
+  return (R._stats = st);                         // 명단 순서 그대로 (정렬하지 않음)
 }
 const invalidate = R => { R._stats = null; };
 const fmtDiff  = v => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v).toFixed(1);
