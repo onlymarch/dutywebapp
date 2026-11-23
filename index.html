@@ -947,8 +947,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.10.0', APP_BUILD = '2026-11-22';
+const APP_VERSION = '1.10.1', APP_BUILD = '2026-11-22';
 const CHANGELOG = [
+  '1.10.1 샘플 데이터 근무자 이름을 일반적인 영어 이름으로 변경',
   '1.10.0 생성 실행 요약: 소요 시간·초당 시도 수, 마지막 개선 시점(이후 더 좋아지지 않은 시도), 최고 DFI 변화 그래프·표, 시도 횟수 조언',
   '1.9.9 목표 DFI(50~100, 5 단위)와 시뮬레이션 횟수(1,000~9,000, 2,000 단위)를 슬라이더로 변경. 격자에 맞지 않는 저장값은 가장 가까운 칸으로 보정',
   '1.9.8 배정 규칙의 평일·휴일을 색 칩으로 강조',
@@ -1736,18 +1737,18 @@ $('#btnSample').addEventListener('click', async () => {
   const nm = nextMonth();
   Object.assign(state.settings, { year: nm.y, month: nm.m, holidays: builtinStr(nm.y, nm.m), restW: 1, restH: 2, minDFI: 75, maxAttempts: 3000 });
   state.people = [
-    P('김민수', 1, 1.2, { wish: '24', exDow: D('일') }),
-    P('이서연', 2, 1.0, { wish: '5, 19', avoid: '25' }),
-    P('박지훈', 2, 1.0, { wishDow: D('금'), avoid: '31' }),
-    P('최유진', 2, 1.0, { avail: '1~10', exDow: D('토') }),
-    P('임채원', 2, 0.8, { wishDow: D('월화'), max: '3' }),
-    P('정하늘', 3, 1.0, { wish: '12', avoid: '24, 25' }),
-    P('강도윤', 3, 1.0, { wishDow: D('수') }),
-    P('윤서아', 3, 1.0, { avail: '15~31', avoid: '1, 2' }),
-    P('조현우', 3, 1.0, { exDow: D('일') }),
-    P('서지우', 3, 0.9, { wish: '31', wishDow: D('목') }),
-    P('한지민', 4, 0.7, { max: '3', exDow: D('토일') }),
-    P('오세훈', 4, 0.7, { max: '3', avoid: '20~23' })
+    P('James', 1, 1.2, { wish: '24', exDow: D('일') }),
+    P('Emma', 2, 1.0, { wish: '5, 19', avoid: '25' }),
+    P('Liam', 2, 1.0, { wishDow: D('금'), avoid: '31' }),
+    P('Olivia', 2, 1.0, { avail: '1~10', exDow: D('토') }),
+    P('Noah', 2, 0.8, { wishDow: D('월화'), max: '3' }),
+    P('Ava', 3, 1.0, { wish: '12', avoid: '24, 25' }),
+    P('Ethan', 3, 1.0, { wishDow: D('수') }),
+    P('Sophia', 3, 1.0, { avail: '15~31', avoid: '1, 2' }),
+    P('Lucas', 3, 1.0, { exDow: D('일') }),
+    P('Mia', 3, 0.9, { wish: '31', wishDow: D('목') }),
+    P('Henry', 4, 0.7, { max: '3', exDow: D('토일') }),
+    P('Grace', 4, 0.7, { max: '3', avoid: '20~23' })
   ];
   closeDP(); renderSettings(); renderRoster(); scheduleSave();
   toast(`샘플 데이터(${nm.y}년 ${nm.m}월, 12명)를 불러왔습니다.`);

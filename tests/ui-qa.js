@@ -65,7 +65,7 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
  await p.selectOption('#profileSelect','P2'); await p.waitForTimeout(200);
  const vis=await p.isVisible('#undoBar'); if(vis) await p.click('#undoBtn'); await p.waitForTimeout(500);
  const names=await p.evaluate(()=>state.people.map(x=>x.name));
- log('C1 삭제 취소가 다른 프로필에 섞이지 않음',!names.includes('김민수'),'P2 명단: '+names.join(','));
+ log('C1 삭제 취소가 다른 프로필에 섞이지 않음',!names.includes('James'),'P2 명단: '+names.join(','));
  errsOK(p,'C'); await p.context().close();}
 
 // D. 잘못된 JSON 복원
