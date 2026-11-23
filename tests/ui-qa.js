@@ -2,12 +2,12 @@
  * 인터페이스 오류 탐색 테스트 (Playwright, Chromium)
  * 실행: npx playwright install chromium   (최초 1회)
  *       node tests/ui-qa.js [index.html 경로]
- * 23개 범주(A~W) 128개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
+ * 23개 범주(A~W) 135개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
  * 숫자 경계값, 극단적 명단, 날짜 팝오버, 연타·중단, Worker 차단 환경, 수동 교체, 프로필 이름,
  * 저장 전 입력 보존, 대규모 명단, 모바일 배치, 키보드 조작, 출력, 공휴일 입력, 손상된 저장값, 이전 결과 조작,
  * 기간 입력(~와 -의 변형, 날짜 형식 기간, 열린 기간 -5·20-), 실행 요약(소요 시간·개선 기록),
  * 다국어(W: en·ja·zh·fr·es 각각 화면·툴팁·팝오버·대화상자·출력·CSV에 한글이 남지 않는지, 한국어 복원,
- *   결과 표시 중 재전환, 새로 고침 후 유지, 360px 가로 넘침, 12月25日 형식 해석). 기본 언어는 한국어입니다.
+ *   결과 표시 중 재전환, 새로 고침 후 유지, 360px 가로 넘침, 12月25日 형식 해석). 첫 실행은 브라우저 언어를 감지해 저장하고, 이후에는 저장된 언어를 씁니다.
  * 각 항목은 JS 예외·콘솔 오류·브라우저 기본 대화상자 발생도 함께 실패로 기록합니다.
  */
 
@@ -16,7 +16,8 @@ const path=require('path');
 const FILE='file://'+path.resolve(process.argv[2]||path.join(__dirname,'..','index.html'));
 const results=[]; const log=(id,ok,msg)=>{results.push({id,ok,msg});console.log((ok?'PASS':'FAIL')+' '+id+' — '+msg);};
 async function fresh(b,opt={}){
-  const ctx=await b.newContext({viewport:opt.vp||{width:1280,height:900},acceptDownloads:true});
+  // 브라우저 언어: 기본 ko-KR (첫 실행 언어 감지 때문에 한국어 화면 테스트가 한국어로 시작하도록)
+  const ctx=await b.newContext({viewport:opt.vp||{width:1280,height:900},acceptDownloads:true,locale:opt.locale||'ko-KR'});
   const p=await ctx.newPage(); p.errs=[];
   p.on('pageerror',e=>p.errs.push('pageerror: '+e.message));
   p.on('console',m=>{if(m.type()==='error')p.errs.push('console: '+m.text())});
@@ -294,9 +295,13 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
  const bodyText=p=>p.evaluate(()=>{const s=document.querySelector('.lang-pick');s.style.display='none';const t=document.body.innerText;s.style.display='';return t;});
  const attrText=p=>p.evaluate(()=>[...document.querySelectorAll('body *')].filter(e=>!e.closest('script,.lang-pick'))
    .flatMap(e=>['title','aria-label','placeholder','data-label','data-edited'].map(a=>e.getAttribute(a)).filter(Boolean)).join('\n'));
- // W0. 기본 언어는 한국어(브라우저 언어를 따르지 않음)
- {const p=await fresh(b); const r=await p.evaluate(()=>[document.documentElement.lang,document.querySelector('#langSelect').value,document.querySelector('#btnGenerate').textContent]);
-  log('W0 기본 언어 한국어',r[0]==='ko'&&r[1]==='ko'&&r[2].includes('당직표 생성'),r.join(' · ')); errsOK(p,'W0'); await p.context().close();}
+ // W0. 첫 실행: 브라우저 언어 감지·저장 / 두 번째 실행: 저장된 언어 우선
+ for(const [loc,exp] of [['ko-KR','ko'],['en-US','en'],['ja-JP','ja'],['zh-TW','zh'],['fr-CA','fr'],['es-MX','es'],['de-DE','en']]){
+  const p=await fresh(b,{locale:loc}); const r=await p.evaluate(()=>[document.documentElement.lang,document.querySelector('#langSelect').value,localStorage.getItem('dfiDuty:lang')]);
+  log('W0 첫 실행 '+loc+' → '+exp,r[1]===exp&&r[2]===exp,r.join(' · ')); errsOK(p,'W0'); await p.context().close(); }
+ {const p=await fresh(b,{locale:'ja-JP'}); await p.selectOption('#langSelect','fr'); await p.reload(); await p.waitForTimeout(200);
+  const r=await p.evaluate(()=>[document.querySelector('#langSelect').value,document.querySelector('#btnGenerate').textContent]);
+  log('W0 두 번째 실행은 저장값(fr) 우선 (브라우저 ja)',r[0]==='fr'&&!/[가-힣]/.test(r[1]),r.join(' · ')); errsOK(p,'W0'); await p.context().close();}
  // W1. 중국어·일본어 날짜 표기 해석 (12月25日, 25日, 2026年12月25日)
  {const p=await fresh(b); const g=await p.evaluate(()=>['12月25日','25日','2026年12月25日','12月20日~22日','20日-22日'].map(v=>fmtDays(parseDays(v,31).days)));
   log('W1 12月25日·25日 형식',JSON.stringify(g)==='["25","25","25","20~22","20~22"]',JSON.stringify(g)); errsOK(p,'W1'); await p.context().close();}

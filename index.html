@@ -3300,8 +3300,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.14.1', APP_BUILD = '2026-11-23';
+const APP_VERSION = '1.14.2', APP_BUILD = '2026-11-23';
 const CHANGELOG = [
+  '1.14.2 첫 실행 시 브라우저 언어를 감지해 적용·저장(지원하지 않는 언어면 영어), 이후 실행은 저장된 언어 사용',
   '1.14.1 명단 열 순서: 희망일 → 희망요일 → 가능일 (우선순위 0 → 1 → 2 순). 명단 머리글 줄바꿈 허용, 영어 요일 버튼 2글자(Su Mo …)로 다른 언어의 표 넘침 축소',
   '1.14.0 다국어 지원: 한국어·English·日本語·中文·Français·Español. 머리글의 언어 선택으로 새로 고침 없이 화면 전체(설정·명단·팝오버·사전 점검·진행·실행 요약·결과·툴팁·대화상자·출력 양식·CSV)를 전환하고 브라우저에 기억. 엔진은 화면 문구 대신 오류 코드·숫자 세부값을 반환(배정 결과 동일). 날짜 입력에 12月25日·25日 형식 추가',
   '1.13.1 최소 500회 시도(목표 이상 안이 일찍 모여도 500회까지), 시간 제한 5초(느린 브라우저에서 그때까지의 결과로 멈춤, 최소 횟수보다 우선)',
@@ -3375,15 +3376,31 @@ const UNLIMITED = 999;                                           // 월 최대 �
       코드 주석, 내장 공휴일 자료(KR_HOLIDAYS의 이름은 번역 키로 쓰고 표시할 때 holName()이 번역).
       기본 프로필 이름은 처음 만들 때만 t('기본')으로 정하며, 이미 저장된 이름은 바꾸지 않습니다.
    6) 엔진은 문구를 만들지 않습니다. 오류 코드(simErrorText)와 DFI 지표 숫자(metricText)를 여기서 번역합니다.
-   7) 선택한 언어는 localStorage 'dfiDuty:lang'에 저장합니다(쿠키 미사용). 기본값은 한국어이며
-      브라우저 언어를 자동으로 따르지 않습니다.
+   7) 언어 결정: 저장된 언어(localStorage 'dfiDuty:lang', 쿠키 미사용)가 있으면 그것을 씁니다.
+      처음 실행(저장값 없음)이면 브라우저 언어 목록(navigator.languages)을 앞에서부터 보고
+      지원 언어(ko·en·ja·zh·fr·es) 중 처음 일치하는 것을 골라 바로 저장합니다. 하나도 맞지 않으면 영어.
+      예: ['de-DE','ja-JP'] → ja, ['zh-TW'] → zh, ['de-DE'] → en. 이후 드롭다운으로 바꾸면 그 값이 저장됩니다.
    8) 날짜·숫자 표기는 LOCALE의 지역 형식(Intl)을 씁니다. 소수점 점수(DFI 82.3 등)는 모든 언어에서 점(.)으로 표기합니다.
    9) 새 문구를 추가할 때: 코드에는 t('한국어 원문')으로 쓰고, I18N의 다섯 언어 사전에 같은 키를 추가합니다.
       빠뜨리면 그 언어에서 한국어 원문이 그대로 보입니다(tests/ui-qa.js의 W 범주가 한글 잔존을 검사). */
 const LANGS  = ['ko', 'en', 'ja', 'zh', 'fr', 'es'];
 const LOCALE = { ko: 'ko-KR', en: 'en-US', ja: 'ja-JP', zh: 'zh-CN', fr: 'fr-FR', es: 'es-ES' };
 const LANG_KEY = 'dfiDuty:lang';
-let LANG = (() => { try { const l = localStorage.getItem(LANG_KEY); return LANGS.includes(l) ? l : 'ko'; } catch(e){ return 'ko'; } })();
+/** 브라우저 언어 목록에서 지원 언어를 찾습니다 (주 언어 부분만 비교: 'ja-JP' → 'ja'). 없으면 영어. */
+function detectLang(){
+  const list = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || ''];
+  for (const tag of list){ const l = String(tag).toLowerCase().split('-')[0]; if (LANGS.includes(l)) return l; }
+  return 'en';
+}
+/** 시작 언어: 저장값 → (없으면) 브라우저 언어를 감지해 저장 */
+let LANG = (() => {
+  let saved = null;
+  try { saved = localStorage.getItem(LANG_KEY); } catch(e){}
+  if (LANGS.includes(saved)) return saved;
+  const l = detectLang();
+  try { localStorage.setItem(LANG_KEY, l); } catch(e){}   // 두 번째 실행부터는 이 저장값을 씁니다
+  return l;
+})();
 
 /**
  * 번역. src = 한국어 원문(키), vars = 자리표시자 값.
