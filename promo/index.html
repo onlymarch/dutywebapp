@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<!--
+  Duty Roster Generator — 20초 소개 모션그래픽 (1920×1080, 30fps)
+  모든 움직임은 CSS 애니메이션이며 지연(animation-delay)은 영상 전체 기준 절대 시각입니다.
+  렌더러(render.js)가 프레임마다 document.getAnimations()의 currentTime을 같은 값으로 맞추고
+  tick(t)로 숫자 카운터를 갱신한 뒤 캡처합니다. 그래서 끊김 없이 정확한 20초 영상이 됩니다.
+  장면: S1 문제(0–2.6) · S2 혼란(2.6–4.2) · S3 등장(4.2–6.0) · S4 입력(6.0–9.0)
+        S5 생성(9.0–11.8) · S6 결과(11.8–15.2) · S7 언어·개인정보(15.2–17.2) · S8 마무리(17.2–20.0)
+-->
+<style>
+:root{--bg:#070b18;--ink:#f4f6ff;--sub:#a9b4d6;--acc:#4d74ff;--cy:#38d9ff;--red:#ff4d5e;--grn:#36d399;--gold:#ffcc4d}
+*{box-sizing:border-box;margin:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);font-family:"Inter Display","Inter",sans-serif;color:var(--ink)}
+.stage{position:absolute;inset:0;overflow:hidden;background:radial-gradient(1200px 800px at 70% 30%,#16204a 0%,#0a0f22 55%,#05070f 100%)}
+.gridbg{position:absolute;inset:-200px;background-image:linear-gradient(rgba(77,116,255,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(77,116,255,.08) 1px,transparent 1px);background-size:80px 80px;animation:gridmove 20s linear 0s both}
+@keyframes gridmove{to{transform:translate(-160px,-80px)}}
+.sc{position:absolute;inset:0;opacity:0;animation:sIn .35s ease-out var(--s) both,sOut .3s ease-in var(--e) forwards}
+@keyframes sIn{from{opacity:0}to{opacity:1}}
+@keyframes sOut{from{opacity:1}to{opacity:0}}
+/* 공통 등장 */
+.up{animation:up .55s cubic-bezier(.2,.8,.2,1) var(--d) both}
+@keyframes up{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:none}}
+.pop{animation:pop .5s cubic-bezier(.2,1.6,.4,1) var(--d) both}
+@keyframes pop{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:scale(1)}}
+
+/* ---------- S1 문제 ---------- */
+.sheet{position:absolute;left:50%;top:50%;width:1500px;height:800px;transform:translate(-50%,-50%) perspective(1400px) rotateX(28deg);display:grid;grid-template-columns:repeat(12,1fr);grid-template-rows:repeat(10,1fr);opacity:.55}
+.sheet i{border:1px solid rgba(150,170,230,.18)}
+.sheet i.r{animation:blink .5s steps(2) var(--d) 6 both}
+@keyframes blink{0%{background:rgba(255,77,94,.0)}50%{background:rgba(255,77,94,.55)}}
+.s1t{position:absolute;left:0;right:0;text-align:center}
+.s1a{top:250px;font-size:64px;color:var(--sub);font-weight:500}
+.s1b{top:335px;font-size:76px;font-weight:700}
+.s1c{top:470px;font-size:230px;font-weight:900;color:var(--red);letter-spacing:-4px;text-shadow:0 0 60px rgba(255,77,94,.6);animation:slam .55s cubic-bezier(.2,1.4,.3,1) 1.25s both}
+@keyframes slam{from{opacity:0;transform:scale(2.8);filter:blur(12px)}to{opacity:1;transform:scale(1);filter:none}}
+.shake{animation:shake .35s linear 1.4s both}
+@keyframes shake{0%,100%{transform:none}20%{transform:translate(-14px,8px)}40%{transform:translate(12px,-10px)}60%{transform:translate(-8px,6px)}80%{transform:translate(6px,-4px)}}
+
+/* ---------- S2 혼란 ---------- */
+.chaos{position:absolute;left:50%;top:56%;transform:translate(-50%,-50%) rotate(-4deg);display:grid;grid-template-columns:repeat(7,170px);gap:10px}
+.cell{height:110px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);overflow:hidden;position:relative;padding:10px 14px}
+.cell b{font-size:16px;color:var(--sub);font-weight:600}
+.slot{position:absolute;left:14px;top:42px;height:40px;overflow:hidden}
+.slot div{font-size:30px;font-weight:700;line-height:40px;animation:slot .32s steps(4) var(--d) 6 both}
+@keyframes slot{from{transform:translateY(0)}to{transform:translateY(-160px)}}
+.x{position:absolute;right:10px;top:8px;font-size:42px;color:var(--red);font-weight:900;animation:pop .35s cubic-bezier(.2,1.6,.4,1) var(--d) both}
+.word{position:absolute;font-size:150px;font-weight:900;letter-spacing:-3px;text-shadow:0 10px 50px rgba(0,0,0,.8)}
+.w1{left:110px;top:90px;color:#fff;transform-origin:left;animation:wordin .4s cubic-bezier(.2,1.5,.3,1) 2.8s both}
+.w2{right:120px;top:300px;color:var(--gold);animation:wordin .4s cubic-bezier(.2,1.5,.3,1) 3.2s both}
+.w3{left:280px;bottom:80px;color:var(--red);animation:wordin .4s cubic-bezier(.2,1.5,.3,1) 3.6s both}
+@keyframes wordin{from{opacity:0;transform:scale(1.8) rotate(-6deg)}to{opacity:1;transform:scale(1) rotate(-3deg)}}
+.flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;animation:flash .45s ease-out 4.05s both;z-index:50}
+@keyframes flash{0%{opacity:0}25%{opacity:.95}100%{opacity:0}}
+
+/* ---------- S3 등장 ---------- */
+.logo{position:absolute;left:50%;top:300px;width:190px;height:190px;margin-left:-95px;border-radius:48px;background:linear-gradient(135deg,#4d74ff,#38d9ff);display:grid;place-items:center;font-size:110px;box-shadow:0 0 0 0 rgba(77,116,255,.0);animation:logoin .7s cubic-bezier(.2,1.5,.3,1) 4.3s both,glow 1.4s ease-in-out 5s 2 both}
+@keyframes logoin{from{opacity:0;transform:scale(.2) rotate(-30deg)}to{opacity:1;transform:none}}
+@keyframes glow{0%,100%{box-shadow:0 0 40px 0 rgba(56,217,255,.25)}50%{box-shadow:0 0 140px 30px rgba(56,217,255,.55)}}
+.title{position:absolute;left:0;right:0;top:540px;text-align:center;font-size:132px;font-weight:900;letter-spacing:-3px;background:linear-gradient(90deg,#fff 0%,#fff 40%,#9fe8ff 50%,#fff 60%,#fff 100%);background-size:300% 100%;-webkit-background-clip:text;color:transparent;animation:reveal .8s cubic-bezier(.2,.8,.2,1) 4.55s both,sweep 1.3s ease-in-out 5.0s both}
+@keyframes reveal{from{opacity:0;clip-path:inset(0 100% 0 0);transform:translateY(20px)}to{opacity:1;clip-path:inset(0 0 0 0);transform:none}}
+@keyframes sweep{from{background-position:100% 0}to{background-position:0 0}}
+.tag{position:absolute;left:0;right:0;top:720px;text-align:center;font-size:52px;color:var(--cy);font-weight:600}
+
+/* ---------- 장면 제목 (S4–S7) ---------- */
+.kick{position:absolute;left:110px;top:80px;display:flex;align-items:center;gap:22px}
+.kick .n{width:64px;height:64px;border-radius:50%;background:var(--acc);display:grid;place-items:center;font-size:34px;font-weight:800}
+.kick .t{font-size:58px;font-weight:800;letter-spacing:-1px}
+
+/* ---------- S4 입력 ---------- */
+.shot{position:absolute;border-radius:18px;box-shadow:0 40px 120px rgba(0,0,0,.6);border:3px solid rgba(255,255,255,.9);background:#fff}
+.rosterbox{position:absolute;left:720px;top:200px;width:1140px;height:700px;overflow:hidden;border-radius:18px;transform-origin:left center;animation:rosterin 1.6s cubic-bezier(.2,.8,.2,1) 6.1s both;box-shadow:0 40px 120px rgba(0,0,0,.6);border:3px solid rgba(255,255,255,.9);background:#fff}
+.rosterbox img{width:100%;display:block}
+.roster{left:560px;top:210px;width:1250px;transform-origin:left center;animation:rosterin 1.6s cubic-bezier(.2,.8,.2,1) 6.1s both}
+@keyframes rosterin{from{opacity:0;transform:perspective(1600px) translateX(500px) rotateY(-35deg) scale(.85)}to{opacity:1;transform:perspective(1600px) rotateY(-6deg)}}
+.dp{z-index:4;left:1330px;top:430px;width:520px;animation:pop .55s cubic-bezier(.2,1.6,.4,1) 7.55s both;border-color:var(--cy);box-shadow:0 0 0 8px rgba(56,217,255,.25),0 40px 120px rgba(0,0,0,.6)}
+.chips{position:absolute;z-index:3;left:110px;top:240px;display:flex;flex-direction:column;gap:20px}
+.chip{display:flex;align-items:center;gap:16px;font-size:34px;font-weight:600;padding:14px 26px 14px 18px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);width:max-content;animation:chipin .45s cubic-bezier(.2,1.4,.3,1) var(--d) both}
+.chip i{font-style:normal;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-size:24px;background:var(--c)}
+@keyframes chipin{from{opacity:0;transform:translateX(-60px)}to{opacity:1;transform:none}}
+
+/* ---------- S5 생성 ---------- */
+.speed{position:absolute;inset:0;overflow:hidden}
+.speed b{position:absolute;height:3px;width:420px;border-radius:3px;background:linear-gradient(90deg,transparent,var(--cy));opacity:0;animation:streak .5s linear var(--d) 3 both}
+@keyframes streak{0%{opacity:0;transform:translateX(2200px)}20%{opacity:.8}100%{opacity:0;transform:translateX(-600px)}}
+.gbtn{position:absolute;left:0;right:0;margin:0 auto;width:max-content;top:250px;padding:34px 74px;border-radius:26px;background:linear-gradient(135deg,#4d74ff,#2f5bea);font-size:62px;font-weight:800;box-shadow:0 20px 60px rgba(47,91,234,.6);animation:pop .5s cubic-bezier(.2,1.6,.4,1) 9.15s both,press .3s ease-in-out 9.7s both}
+@keyframes press{0%,100%{transform:scale(1)}50%{transform:scale(.9)}}
+.ring{position:absolute;left:50%;top:315px;width:200px;height:200px;margin:-100px 0 0 -100px;border-radius:50%;border:6px solid var(--cy);opacity:0;animation:ring .8s ease-out 9.8s both}
+@keyframes ring{0%{opacity:.9;transform:scale(.3)}100%{opacity:0;transform:scale(5)}}
+.count{position:absolute;left:0;right:0;top:470px;text-align:center;font-size:230px;font-weight:900;letter-spacing:-6px;font-variant-numeric:tabular-nums;animation:up .4s ease-out 9.9s both;text-shadow:0 0 60px rgba(56,217,255,.35)}
+.clabel{position:absolute;left:0;right:0;top:740px;text-align:center;font-size:52px;color:var(--sub);font-weight:600;animation:up .4s ease-out 10s both}
+.bar{position:absolute;left:460px;right:460px;top:840px;height:16px;border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden;animation:up .4s ease-out 10s both}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--acc),var(--cy));animation:fill 1.1s cubic-bezier(.3,.8,.3,1) 9.9s both}
+@keyframes fill{to{width:100%}}
+.time{position:absolute;left:0;right:0;top:900px;text-align:center;font-size:58px;font-weight:800;color:var(--grn);animation:pop .5s cubic-bezier(.2,1.6,.4,1) 11.0s both}
+
+/* ---------- S6 결과 ---------- */
+.res{left:90px;top:250px;width:1160px;transform-origin:65% 30%;animation:zoomout 1.2s cubic-bezier(.2,.8,.2,1) 11.85s both}
+@keyframes zoomout{from{opacity:0;transform:scale(2.2)}30%{opacity:1}to{opacity:1;transform:scale(1)}}
+.panel{position:absolute;left:1310px;top:230px;width:530px}
+.best{font-size:34px;color:var(--sub);font-weight:600;animation:up .4s ease-out 12.6s both}
+.score{display:flex;align-items:center;gap:26px;margin:10px 0 26px;animation:up .4s ease-out 12.6s both}
+.score .v{font-size:170px;font-weight:900;letter-spacing:-5px;font-variant-numeric:tabular-nums;line-height:1}
+.score .g{width:110px;height:110px;border-radius:26px;background:#e09a1a;display:grid;place-items:center;font-size:70px;font-weight:900;animation:pop .5s cubic-bezier(.2,1.6,.4,1) 13.6s both}
+.met{margin:14px 0;animation:up .35s ease-out var(--d) both}
+.met .l{display:flex;justify-content:space-between;font-size:26px;font-weight:600;margin-bottom:8px}
+.met .l span{color:var(--sub)}
+.met .b{height:14px;border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden}
+.met .b i{display:block;height:100%;border-radius:99px;background:var(--c);width:0;animation:grow .8s cubic-bezier(.3,.8,.3,1) var(--d) both}
+@keyframes grow{to{width:var(--w)}}
+.of{font-size:30px;color:var(--cy);font-weight:700;margin-top:26px;animation:up .4s ease-out 14.3s both}
+
+/* ---------- S7 언어·개인정보 ---------- */
+.langs{position:absolute;left:110px;top:230px;width:980px;height:560px}
+.lshot{position:absolute;left:0;top:0;width:980px;border-radius:16px;border:3px solid #fff;box-shadow:0 30px 90px rgba(0,0,0,.6);opacity:0;animation:flip .3s ease-out var(--d) both,sOut .12s linear var(--o) forwards}
+@keyframes flip{from{opacity:0;transform:perspective(1200px) rotateX(70deg) translateY(-60px)}to{opacity:1;transform:none}}
+.lname{position:absolute;left:110px;top:800px;font-size:44px;font-weight:800;color:var(--cy)}
+.lname span{position:absolute;left:0;top:0;opacity:0;white-space:nowrap;animation:sIn .1s linear var(--d) both,sOut .1s linear var(--o) forwards}
+.priv{position:absolute;left:1180px;top:270px;width:640px}
+.shield{width:170px;height:200px;animation:pop .6s cubic-bezier(.2,1.6,.4,1) 16.0s both}
+.priv h3{font-size:64px;line-height:1.1;font-weight:900;margin:30px 0 20px;letter-spacing:-1px;animation:up .5s ease-out 16.2s both}
+.priv p{font-size:36px;color:var(--sub);animation:up .5s ease-out 16.45s both}
+
+/* ---------- S8 마무리 ---------- */
+.free{position:absolute;left:110px;top:170px;font-size:210px;font-weight:900;letter-spacing:-6px;color:var(--grn);text-shadow:0 0 80px rgba(54,211,153,.4);animation:slam .6s cubic-bezier(.2,1.4,.3,1) 17.35s both}
+.endchips{position:absolute;left:110px;top:440px;display:flex;gap:18px;flex-wrap:wrap;width:1100px}
+.endchips span{font-size:36px;font-weight:700;padding:14px 30px;border-radius:999px;border:2px solid rgba(255,255,255,.3);background:rgba(255,255,255,.06);animation:pop .45s cubic-bezier(.2,1.6,.4,1) var(--d) both}
+.url{position:absolute;left:110px;top:700px;font-size:76px;font-weight:800;letter-spacing:-1px;animation:up .5s ease-out 18.4s both}
+.url::after{content:"";display:block;height:8px;margin-top:14px;border-radius:8px;background:linear-gradient(90deg,var(--acc),var(--cy));transform-origin:left;animation:line .7s cubic-bezier(.2,.8,.2,1) 18.7s both}
+@keyframes line{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.name{position:absolute;left:110px;top:870px;font-size:40px;color:var(--sub);font-weight:600;animation:up .5s ease-out 18.6s both}
+.qr{position:absolute;right:150px;top:300px;width:420px;padding:34px;border-radius:30px;background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.25);animation:pop .6s cubic-bezier(.2,1.6,.4,1) 18.2s both}
+.qr img{width:100%;display:block}
+.qr div{text-align:center;font-size:28px;color:var(--sub);margin-top:20px;font-weight:600}
+.endzoom{position:absolute;inset:0;animation:ez 2.8s ease-out 17.2s both}
+@keyframes ez{from{transform:scale(1.04)}to{transform:scale(1)}}
+</style></head><body>
+<div class="stage">
+<div class="gridbg"></div>
+
+<!-- S1 문제 -->
+<section class="sc" style="--s:0s;--e:2.45s"><div class="shake" style="position:absolute;inset:0">
+  <div class="sheet" id="sheet"></div>
+  <div class="s1t s1a up" style="--d:.15s">Every month,</div>
+  <div class="s1t s1b up" style="--d:.55s">someone builds the on-call roster</div>
+  <div class="s1t s1c">BY HAND.</div>
+</div></section>
+
+<!-- S2 혼란 -->
+<section class="sc" style="--s:2.55s;--e:4.05s">
+  <div class="chaos" id="chaos"></div>
+  <div class="word w1">Conflicts.</div>
+  <div class="word w2">Complaints.</div>
+  <div class="word w3">Hours lost.</div>
+</section>
+<div class="flash"></div>
+
+<!-- S3 등장 -->
+<section class="sc" style="--s:4.2s;--e:5.85s">
+  <div class="logo">🩺</div>
+  <div class="title">Duty Roster Generator</div>
+  <div class="tag up" style="--d:5.0s">Fair on-call rosters. In seconds.</div>
+</section>
+
+<!-- S4 입력 -->
+<section class="sc" style="--s:6.0s;--e:8.85s">
+  <div class="kick up" style="--d:6.05s"><span class="n">1</span><span class="t">Enter your team</span></div>
+  <div class="chips">
+    <div class="chip" style="--d:6.6s;--c:#4d74ff"><i>★</i>Preferred dates &amp; weekdays</div>
+    <div class="chip" style="--d:6.9s;--c:#ff4d5e"><i>✕</i>Unavailable dates</div>
+    <div class="chip" style="--d:7.2s;--c:#36d399"><i>↺</i>Rest days after duty</div>
+    <div class="chip" style="--d:7.5s;--c:#e09a1a"><i>+</i>Junior + assistant pairing</div>
+    <div class="chip" style="--d:7.8s;--c:#8b5cf6"><i>⚖</i>Monthly limits &amp; weights</div>
+  </div>
+  <div class="rosterbox"><img src="roster.png"></div>
+  <img class="shot dp" src="dp.png">
+</section>
+
+<!-- S5 생성 -->
+<section class="sc" style="--s:9.0s;--e:11.65s">
+  <div class="speed" id="speed"></div>
+  <div class="kick up" style="--d:9.05s"><span class="n">2</span><span class="t">Generate</span></div>
+  <div class="gbtn">▶ Generate roster</div>
+  <div class="ring"></div>
+  <div class="count" id="count">0</div>
+  <div class="clabel">plans tested</div>
+  <div class="bar"><i></i></div>
+  <div class="time" id="time">in 0.41 seconds</div>
+</section>
+
+<!-- S6 결과 -->
+<section class="sc" style="--s:11.8s;--e:15.05s">
+  <div class="kick up" style="--d:11.85s"><span class="n">3</span><span class="t">Get the fairest plan</span></div>
+  <img class="shot res" src="results.png">
+  <div class="panel">
+    <div class="best">Duty Fairness Index</div>
+    <div class="score"><span class="v" id="dfi">0.0</span><span class="g">B</span></div>
+    <div id="mets"></div>
+    <div class="of">Best of 20,000 plans · top 3 to compare</div>
+  </div>
+</section>
+
+<!-- S7 언어·개인정보 -->
+<section class="sc" style="--s:15.2s;--e:17.05s">
+  <div class="kick up" style="--d:15.25s"><span class="n">4</span><span class="t">Works for your team</span></div>
+  <div class="langs" id="langs"></div>
+  <div class="lname" id="lnames"></div>
+  <div class="priv">
+    <svg class="shield" viewBox="0 0 100 118"><defs><linearGradient id="sg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#36d399"/><stop offset="1" stop-color="#38d9ff"/></linearGradient></defs>
+      <path d="M50 4 92 20v32c0 30-18 52-42 62C26 104 8 82 8 52V20Z" fill="url(#sg)"/><path d="M30 60l14 14 28-30" fill="none" stroke="#06101f" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <h3>Your data never leaves your browser.</h3>
+    <p>No server. No sign-up. No install.</p>
+  </div>
+</section>
+
+<!-- S8 마무리 -->
+<section class="sc" style="--s:17.2s;--e:99s"><div class="endzoom">
+  <div class="free">Free.</div>
+  <div class="endchips">
+    <span style="--d:17.8s">No install</span><span style="--d:17.92s">No sign-up</span><span style="--d:18.04s">6 languages</span><span style="--d:18.16s">Print-ready A4</span>
+  </div>
+  <div class="url">onlymarch.github.io/dutywebapp</div>
+  <div class="name">🩺 Duty Roster Generator</div>
+  <div class="qr"><img src="qr.svg"><div>Scan to try it now</div></div>
+</div></section>
+</div>
+
+<script>
+// ---------- 장면 요소 생성 (반복 요소) ----------
+// S1: 스프레드시트 격자, 일부 칸은 붉게 깜빡임(오류)
+const sheet = document.getElementById('sheet');
+const bad = new Set([5,14,27,31,44,52,63,70,85,98,103,111]);
+for (let i = 0; i < 120; i++){ const c = document.createElement('i'); if (bad.has(i)){ c.className = 'r'; c.style.setProperty('--d', (0.3 + (i % 7) * 0.12) + 's'); } sheet.appendChild(c); }
+// S2: 이름이 슬롯처럼 뒤섞이는 달력 + 충돌 표시
+const names = ['Emma','Liam','Noah','Ava','Mia','Ethan','Lucas','Grace','James','Sophia','Henry','Olivia'];
+const chaos = document.getElementById('chaos');
+for (let d = 1; d <= 21; d++){
+  const cell = document.createElement('div'); cell.className = 'cell';
+  const stack = [0,1,2,3,4].map(k => names[(d * 5 + k * 7) % names.length]);
+  cell.innerHTML = `<b>${d}</b><div class="slot"><div style="--d:${2.55 + (d % 5) * 0.05}s">${stack.map(n => `<div>${n}</div>`).join('')}</div></div>` +
+    ([3,8,12,17,19].includes(d) ? `<span class="x" style="--d:${2.75 + (d % 4) * 0.2}s">✕</span>` : '');
+  chaos.appendChild(cell);
+}
+// S5: 속도선
+const speed = document.getElementById('speed');
+for (let i = 0; i < 26; i++){ const b = document.createElement('b'); b.style.top = (40 + (i * 37) % 1000) + 'px'; b.style.setProperty('--d', (9.9 + (i % 9) * 0.05) + 's'); speed.appendChild(b); }
+// S6: 실제 결과의 DFI 지표 5개 (info.json의 값과 동일)
+const METS = [['M1 Workload accuracy',14.4,25,'#ff4d5e'],['M2 Holiday fairness',16.3,25,'#e09a1a'],['M3 Preference fulfillment',19.8,20,'#36d399'],['M4 Spacing regularity',12.3,15,'#e09a1a'],['M5 Weekday variety',11.3,15,'#e09a1a']];
+document.getElementById('mets').innerHTML = METS.map((m, i) =>
+  `<div class="met" style="--d:${13.0 + i * 0.12}s"><div class="l">${m[0]}<span>${m[1]}/${m[2]}</span></div><div class="b"><i style="--c:${m[3]};--w:${(m[1] / m[2] * 100).toFixed(1)}%;--d:${13.1 + i * 0.12}s"></i></div></div>`).join('');
+// S7: 6개 언어 화면을 빠르게 넘김
+const L = [['en','English'],['ko','한국어'],['ja','日本語'],['zh','中文'],['fr','Français'],['es','Español']];
+const t0 = 15.35, step = 0.27;
+document.getElementById('langs').innerHTML = L.map((l, i) => `<img class="lshot" src="lang_${l[0]}.png" style="--d:${t0 + i * step}s;--o:${i < L.length - 1 ? t0 + (i + 1) * step + 0.05 : 99}s">`).join('');
+// 언어 이름: 다음 이름이 나오기 0.1초 전에 사라져 겹치지 않게 함
+document.getElementById('lnames').innerHTML = L.map((l, i) => `<span style="--d:${t0 + i * step + 0.02}s;--o:${i < L.length - 1 ? t0 + (i + 1) * step - 0.1 : 99}s">${l[1]}</span>`).join('');
+
+// ---------- 숫자 카운터 (렌더러가 프레임마다 호출) ----------
+const ease = x => 1 - Math.pow(1 - x, 3);
+const clamp = x => Math.max(0, Math.min(1, x));
+window.tick = t => {   // t: 초
+  const c = clamp((t - 9.9) / 1.1);
+  document.getElementById('count').textContent = Math.round(ease(c) * 20000).toLocaleString('en-US');
+  const s = clamp((t - 12.6) / 1.0);
+  document.getElementById('dfi').textContent = (ease(s) * 74.1).toFixed(1);
+};
+window.tick(0);
+</script>
+</body></html>

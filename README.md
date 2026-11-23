@@ -1,111 +1,102 @@
-# 당직배정 웹앱 (Duty Fairness Index)
+# Duty Roster Generator (Duty Fairness Index)
 
-[English](README.en.md) · **한국어**
+**English** · [한국어](README.ko.md)
 
-근무자 명단과 희망·제외 조건을 입력하면 한 달 당직표를 자동으로 만들고, 당직 공정성 지수(DFI)로 평가하는 단일 HTML 웹앱입니다.
+A free, single-file web app that builds a month of on-call duty rosters for doctors in seconds and scores each plan with a **Duty Fairness Index (DFI)**.
 
-**바로 사용하기:** https://onlymarch.github.io/dutywebapp/
+**Try it now:** https://onlymarch.github.io/dutywebapp/
 
-현재 버전: **v1.14.3** (2026-11-23)
+[![20-second intro: from a messy hand-made roster to a fair plan in seconds](assets/promo-preview.gif)](https://onlymarch.github.io/dutywebapp/assets/promo-20s.mp4)
 
-> 당직표 작성을 돕는 도구입니다. 게시하기 전에 담당자가 최종 당직표를 확인하십시오.
+▶ [Watch the 20-second intro in full HD (MP4, 1080p)](https://onlymarch.github.io/dutywebapp/assets/promo-20s.mp4)
 
-## 사용 순서
+- No install, no sign-up, no server — **your roster never leaves your browser**
+- Preferred / available / unavailable dates and weekdays, rest days after duty, monthly limits, weights
+- Junior staff can be paired with an assistant automatically
+- Interface in English, 한국어, 日本語, 中文, Français and Español
 
-1. **설정**: 대상 연월을 고릅니다. 공휴일은 자동으로 입력됩니다. 슬라이더로 배정 제외일(0~5일)과 목표 DFI(50~100점, 5점 단위)를 정합니다. 시도 횟수는 자동입니다(아래 '시도 횟수' 참고).
-2. **근무자 명단**: 성명, 레벨, 가중치, 월 최대 횟수, 희망일·희망요일·가능일, 제외일·제외요일을 입력합니다. 날짜는 `3, 15, 20~22`처럼 쓰며, 기간은 `~`와 `-`를 모두 쓸 수 있습니다. `-5`는 1~5일, `25-`는 25일부터 그 달 말일까지입니다. 끝 날짜가 말일을 넘으면(2월에 `15-31`) 말일까지로 맞춥니다. 📅 버튼으로 달력에서 고를 수도 있습니다.
-3. **당직표 생성**: 생성 전에 사전 점검이 입력 충돌을 알려 줍니다. 생성이 끝나면 소요 시간, 최고점이 마지막으로 바뀐 시도 번호, 최고 DFI 변화 그래프가 표시됩니다.
-4. **결과**: DFI 상위 3개 안을 비교하고 출력할 안을 고릅니다. 이름을 누르면 강조되고, ✎ 버튼으로 수동 교체할 수 있습니다.
-5. **출력·저장**: A4 출력, 인쇄용 HTML, CSV, JSON 백업 중에서 고릅니다.
+![Monthly duty calendar with Duty Fairness Index](assets/screenshot-en.png)
 
-## 언어
+Current version: **v1.14.3** (2026-11-23)
 
-화면 맨 위(머리글)의 언어 선택에서 **한국어 · English · 日本語 · 中文(简体) · Français · Español** 6개 언어 중 하나를 고를 수 있습니다.
+> This is a scheduling aid. Please have the person responsible check the final roster before publishing it.
 
-- 새로 고침 없이 화면 전체가 바로 바뀝니다. 설정·명단, 날짜 선택 달력, 사전 점검, 진행·실행 요약, 결과(달력·통계·DFI·툴팁), 대화상자, 당직표 출력 양식, CSV와 내려받는 파일 이름이 모두 선택한 언어로 표시됩니다.
-- 처음 열 때는 브라우저의 언어 설정을 감지해 해당 언어로 시작합니다(지원하지 않는 언어면 영어). 그 뒤 고른 언어는 이 브라우저에 저장되어 다음에 열 때도 유지됩니다.
-- 근무자 이름·프로필 이름 등 직접 입력한 내용과 JSON 백업 내용은 번역하지 않습니다. 공휴일 자료는 한국 공휴일이며 이름만 번역됩니다.
-- 날짜는 `12月25日`, `25日`처럼 중국어·일본어 표기로도 입력할 수 있습니다.
+## How to use
 
-## 배정 규칙
+1. **Settings** — Pick the target month. Korean public holidays are filled in automatically; for other countries, type your holidays or click them on the mini calendar. Use the sliders to set rest days after a duty (0–5) and the target DFI (50–100, in steps of 5). The number of attempts is automatic (see *Attempts* below).
+2. **Staff roster** — Enter name, level, weight, monthly max, preferred dates, preferred weekdays, available dates, unavailable dates and unavailable weekdays. Write dates like `3, 15, 20~22`; ranges accept both `~` and `-`. `-5` means days 1–5 and `25-` means the 25th to the end of the month. If a range ends past the last day (e.g. `15-31` in February), it is cut at the month end. You can also pick dates on a calendar with the 📅 button.
+3. **Generate** — A pre-check flags conflicting input before you start. When it finishes, you see how many attempts were made, how long it took, when the best score last improved, and a chart of the best DFI over attempts.
+4. **Results** — Compare the top 3 plans by DFI and choose one. Click a name (or a row in the stats table) to highlight that person's days; use ✎ to swap someone manually (with rule warnings and undo).
+5. **Print & save** — One-page A4 print with an approval box, a printable HTML file, CSV, or JSON backup.
 
-| 항목 | 설명 |
+## Languages
+
+Pick a language from the dropdown at the top of the page: **English · 한국어 · 日本語 · 中文 (简体) · Français · Español**.
+
+- The whole interface switches instantly, including tooltips, dialogs, the print sheet and CSV.
+- On first visit the app follows your browser's language (English if it is not one of the six). After that, your choice is remembered in this browser.
+- Names and other text you type are never translated. The built-in holiday data is for Korea; only the holiday names are translated.
+
+## Assignment rules
+
+| Item | Description |
 |---|---|
-| 우선순위 | 희망일(0순위) → 희망요일(1순위) → 가능일(2순위) → 일반일(3순위) |
-| 배정 불가 | 제외일(특정 날짜), 제외요일(매주 같은 요일), 월 최대 횟수 초과 |
-| 배정 제외일 | 당직 다음 날부터 n일 동안 배정하지 않습니다. 평일 당직과 휴일 당직을 따로 정합니다. 예: 1일이면 3일 당직 후 5일부터 가능합니다. |
-| 가중치 | 근무량 배분 비율입니다(기본 1.0). 기대 근무수는 배정일수 × 본인 가중치 ÷ 가중치 합입니다. |
-| 희망일 쿼터 보호 | 남은 한도가 앞으로 남은 희망일 수 이하이면, 희망일이 아닌 날에는 배정을 보류합니다. |
-| 레벨 | 1 특례(배정 제외일 미적용) · 2 숙련 · 3 일반(조력 가능) · 4 초보(레벨 3 조력자 필수) |
+| Priority | Preferred dates (0) → preferred weekdays (1) → available dates (2) → any other day (3) |
+| Not assigned | Unavailable dates, unavailable weekdays, or when the monthly max is reached |
+| Rest days after duty | No duty for *n* days after a duty, set separately for weekday and holiday duties. With 1, someone on duty on the 3rd is available again from the 5th. |
+| Weight | Share of the workload (default 1.0). Expected duties = assigned days × own weight ÷ sum of weights. |
+| Preferred-date quota | If someone's remaining limit is no more than their remaining preferred dates, they are held back on other days. |
+| Level | 1 Exempt (rest days don't apply) · 2 Senior · 3 Regular (can assist) · 4 Junior (needs a level-3 assistant) |
 
-같은 우선순위 안에서는 해당 카테고리(휴일 / 목·금 / 월~수)와 요일의 누적 근무수가 적은 사람을 먼저 뽑습니다. 동점은 무작위로 정하므로 시도할 때마다 다른 안이 나옵니다.
+Within the same priority, the person with the fewest duties so far in that category (holiday / Thu–Fri / Mon–Wed) and on that weekday goes first. Ties are broken at random, so every attempt gives a different plan.
 
-## 시도 횟수
+## Attempts
 
-시도 횟수는 따로 정하지 않습니다. 목표 DFI에 따라 자동으로 정해집니다.
+You don't set the number of attempts; it depends on the target DFI.
 
-- 최소 **500회**는 시도합니다. 그 뒤 목표 DFI 이상인 **서로 다른 안이 5개** 모여 있으면 멈춥니다. 목표가 낮으면 500회 근처에서 끝납니다.
-- 5개가 모이지 않으면 **최대 20,000회**까지 시도합니다. 목표가 높을수록 오래 찾습니다.
-- 브라우저가 느려 시작 후 **5초**가 지나면 그때까지의 결과로 멈춥니다(최소 500회보다 우선).
-- 생성이 끝나면 몇 회 시도했는지와 멈춘 이유(목표 확보 / 최대 도달 / 시간 제한)가 표시됩니다.
+- At least **500** attempts are made. After that, the run stops once **5 different plans** reach the target DFI. A low target finishes near 500 attempts.
+- Otherwise it keeps going up to **20,000** attempts. The higher the target, the longer the search.
+- If the browser is slow, the run stops after **5 seconds** with the best plans found so far (this takes precedence over the 500 minimum).
 
-## 당직 공정성 지수 (DFI)
+## Duty Fairness Index (DFI)
 
-100점 만점입니다. 미배정일이 있으면 총점에 배정률을 곱합니다.
+Scored out of 100. If some days are left unassigned, the total is multiplied by the coverage rate.
 
-| 지표 | 배점 | 계산 |
+| Metric | Points | Calculation |
 |---|---|---|
-| M1 양적 정확도 | 25 | 기대 근무수와 실제 근무수의 RMSE. 25 − RMSE × 8 |
-| M2 질적 배분성 | 25 | 개인별 휴일 근무수의 표준편차. 25 − SD × 12 |
-| M3 선호도 충족률 | 20 | 희망일 8 + 희망요일 4 + 가능일 4 + 제외일 회피 4 |
-| M4 간격 규칙성 | 15 | 3회 이상 근무자의 근무 간격 SD 평균. 15 − SD × 3 |
-| M5 요일 다양성 | 15 | 개인별 요일 분포 SD 평균. 15 − SD × 5 |
+| M1 Workload accuracy | 25 | RMSE between expected and actual duties. 25 − RMSE × 8 |
+| M2 Holiday fairness | 25 | SD of holiday duties per person. 25 − SD × 12 |
+| M3 Preference fulfillment | 20 | Preferred dates 8 + preferred weekdays 4 + available dates 4 + avoiding unavailable dates 4 |
+| M4 Spacing regularity | 15 | Mean SD of gaps between duties (people with 3+ duties). 15 − SD × 3 |
+| M5 Weekday variety | 15 | Mean SD of each person's weekday distribution. 15 − SD × 5 |
 
-등급은 S 90점 이상, A 80점 이상, B 70점 이상, C 70점 미만입니다. 화면에는 점수·등급·지표 막대만 보이며, 지표 설명과 계산 방법, 개선 방법은 ⓘ나 막대에 마우스를 올리면(모바일은 탭) 툴팁으로 볼 수 있습니다.
+Grades: S ≥ 90, A ≥ 80, B ≥ 70, C < 70. Hover (or tap) the ⓘ marks and metric bars to see how each score is calculated and how to improve it.
 
-## 주요 기능
+## Your data
 
-- 시도 횟수 자동: 최소 500회, 목표 DFI 이상인 서로 다른 안이 5개 모이면 멈추고, 아니면 최대 20,000회(시간 제한 5초)까지 시도한 뒤 DFI 상위 3개 안 비교 (1안과 다른 날 표시)
-- 실행 요약: 시도 횟수와 멈춘 이유, 소요 시간·초당 시도 수, 마지막 개선 시점(이후 더 좋아지지 않은 시도 수), 최고 DFI 변화 그래프(가로축 로그 눈금)와 기록 표, 시도 횟수 조언
-- 생성 전 사전 점검: 한도 부족, 희망일 중복, 희망일과 제외일 충돌, 배정 불가능한 날 등
-- 입력이 바뀌면 이전 결과에 "결과 낡음" 경고 표시
-- 수동 교체 시 규칙 위반 경고, DFI 재계산, 실행 취소
-- 근무자 강조(정규 당직은 진하게, 조력은 연하게)와 근무일 요약 복사
-- 근무자별 통계: 요일 구분별 근무수, 기대 근무수, 차이 (명단에 입력한 순서대로, 행을 누르면 그 근무자 강조)
-- 한국 공휴일·대체공휴일 내장(2026–2027, 기준일 2026-11-22). 임시공휴일과 2027년 선거일은 직접 추가해야 합니다.
-- 프로필 여러 개 저장(새로 만들기, 다른 이름으로 저장, 이름 변경, 삭제)
-- 모바일 화면에서는 명단이 카드 형태로 바뀝니다.
-- 6개 언어 화면(한국어·영어·일본어·중국어 간체·프랑스어·스페인어), 머리글에서 즉시 전환
+There is no server. Settings and rosters are stored only in your browser (cookies and localStorage) and are never sent anywhere.
 
-## 데이터 저장
+- To move to another device or browser, use **JSON backup** and **JSON restore**.
+- Clearing browser data deletes what you saved. Keep important rosters as JSON files.
 
-서버가 없습니다. 입력한 설정과 명단은 사용하는 브라우저의 쿠키와 localStorage에만 저장되며, 외부로 전송되지 않습니다.
+## Run locally
 
-- 다른 기기나 다른 브라우저로 옮길 때는 **JSON 백업**과 **JSON 복원**을 이용하십시오.
-- 파일로 직접 열어 쓰던 데이터는 배포 사이트로 자동으로 옮겨지지 않습니다. JSON 백업 후 사이트에서 복원하십시오.
-- 브라우저 데이터를 지우면 저장 내용도 지워집니다. 중요한 명단은 JSON으로 보관하십시오.
+Download `index.html` and open it in a browser. Nothing to install.
 
-## 링크 미리보기
+## Files
 
-카카오톡·X·Reddit·Slack 등에 주소를 붙이면 제목·설명·이미지가 카드로 표시됩니다(Open Graph·X 카드). 미리보기 문구는 해외 공유를 고려해 영어로 두었습니다. 이미지를 바꾸면 각 서비스가 저장해 둔 이전 미리보기가 한동안 남을 수 있습니다.
-
-## 로컬 실행
-
-`index.html`을 내려받아 브라우저로 열면 됩니다. 별도 설치가 필요하지 않습니다.
-
-## 파일 구성
-
-| 파일 | 내용 |
+| File | Contents |
 |---|---|
-| `index.html` | 웹앱 전체 (화면, 배정 엔진, DFI 계산, 저장, 출력, 번역 사전) |
-| `tests/ui-qa.js` | 인터페이스 오류 탐색 테스트 (23개 범주 135개 항목, 다국어 포함) |
-| `README.en.md` | 영어 안내 |
-| `assets/` | 화면 캡처, 링크 미리보기 이미지(`og-image.png`, 1200×630) |
-| `.nojekyll` | GitHub Pages가 파일을 그대로 배포하도록 설정 |
+| `index.html` | The whole app (UI, scheduling engine, DFI, storage, printing, translations) |
+| `tests/ui-qa.js` | UI test suite (23 categories, 135 checks, including all languages) |
+| `README.ko.md` | Korean README |
+| `assets/` | Screenshots, link-preview image, the 20-second promo video and its GIF preview |
+| `promo/` | Source for the promo video (screen capture, motion graphics, renderer) |
+| `.nojekyll` | Tells GitHub Pages to serve files as they are |
 
-## 테스트
+## Tests
 
-Playwright(Chromium)로 실행합니다.
+Run with Playwright (Chromium):
 
 ```bash
 npm install playwright
@@ -119,8 +110,12 @@ npx playwright install chromium
 node tests/ui-qa.js
 ```
 
-마지막 줄에 `총 135건 · 통과 135 · 실패 0`이 나오면 정상입니다. 테스트는 Chromium에서만 확인했으며, Safari·iOS에서는 확인하지 않았습니다.
+The last line should read `총 135건 · 통과 135 · 실패 0` ("135 total · 135 passed · 0 failed"). Tests have been run on Chromium only, not on Safari or iOS.
 
-## 라이선스
+## Feedback
+
+Bug reports and ideas — especially about duty rules in your country or hospital — are welcome as [GitHub issues](https://github.com/onlymarch/dutywebapp/issues).
+
+## License
 
 MIT
