@@ -2,7 +2,7 @@
  * 인터페이스 오류 탐색 테스트 (Playwright, Chromium)
  * 실행: npx playwright install chromium   (최초 1회)
  *       node tests/ui-qa.js [index.html 경로]
- * 20개 범주(A~T) 80개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
+ * 20개 범주(A~T) 81개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
  * 숫자 경계값, 극단적 명단, 날짜 팝오버, 연타·중단, Worker 차단 환경, 수동 교체, 프로필 이름,
  * 저장 전 입력 보존, 대규모 명단, 모바일 배치, 키보드 조작, 출력, 공휴일 입력, 손상된 저장값, 이전 결과 조작,
  * 기간 입력(~와 -의 변형, 날짜 형식 기간, 열린 기간 -5·20-).
@@ -22,8 +22,10 @@ async function fresh(b,opt={}){
   if(opt.init) await p.addInitScript(opt.init);
   await p.goto(FILE); return p;
 }
+// 슬라이더 값 설정: 브라우저가 격자(min+k×step)에 맞춰 보정하므로 아무 값이나 넣어도 됩니다.
+const setRange=(p,sel,v)=>p.evaluate(([sel,v])=>{const el=document.querySelector(sel);el.value=String(v);el.dispatchEvent(new Event('input'));},[sel,v]);
 const closeDiag=async p=>{ if(await p.$('#diagDialog[open]')) await p.click('#diagClose'); };
-async function gen(p,attempts='300'){ await p.fill('#maxAttempts',attempts); await p.dispatchEvent('#maxAttempts','input');
+async function gen(p,attempts='300'){ await setRange(p,'#maxAttempts',attempts);
   await p.click('#btnGenerate'); await p.waitForFunction(()=>!document.querySelector('#btnGenerate').disabled,null,{timeout:60000}); await p.waitForTimeout(150); await closeDiag(p); }
 const setPeople=(p,people)=>p.evaluate(ps=>{state.people=ps.map(x=>Object.assign(blankPerson(),x));renderRoster();scheduleSave();},people);
 const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.join(' | ')); };
@@ -46,7 +48,7 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
 // B. 생성 중 프로필 전환
 {const p=await fresh(b); await p.click('#btnSample'); await p.waitForTimeout(500);
  await p.click('#btnProfileSaveAs'); await p.fill('#askInput','두번째'); await p.click('#askYes'); await p.waitForTimeout(200);
- await p.fill('#maxAttempts','10000'); await p.dispatchEvent('#maxAttempts','input'); await p.click('#btnGenerate'); await p.waitForTimeout(80);
+ await setRange(p,'#maxAttempts','10000'); await p.click('#btnGenerate'); await p.waitForTimeout(80);
  await p.click('#btnProfileNew'); await p.fill('#askInput','빈프로필'); await p.click('#askYes');
  await p.waitForTimeout(3500);
  const shown=await p.evaluate(()=>!document.querySelector('#results').classList.contains('hidden'));
@@ -97,7 +99,11 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
 {const p=await fresh(b); await p.click('#btnSample'); await p.waitForTimeout(300);
  for(const v of ['','0','-5','99999','1e9','abc']){ p.errs=[]; await p.evaluate(v=>{const el=document.querySelector('#maxAttempts');el.value=v;el.dispatchEvent(new Event('input'));},v);
    await p.click('#btnGenerate'); await p.waitForFunction(()=>!document.querySelector('#btnGenerate').disabled,null,{timeout:60000}); await closeDiag(p);
-   const t=await p.textContent('#progText'); log('E1 시뮬레이션 횟수="'+v+'"',!p.errs.length&&/완료/.test(t),t.slice(0,40)); }
+   const t=await p.textContent('#progText'), n=await p.evaluate(()=>buildCfg().maxAttempts);
+   log('E1 시뮬레이션 횟수="'+v+'"',!p.errs.length&&/완료/.test(t)&&[1000,3000,5000,7000,9000].includes(n),'적용 '+n+'회 · '+t.slice(0,30)); }
+ // 슬라이더 격자 보정: 이전 버전 값·JSON 값이 1,000~9,000(2,000 단위), 50~100(5 단위)에 맞춰지는지
+ const snap=await p.evaluate(()=>[snapSetting('maxAttempts',10000),snapSetting('maxAttempts',300),snapSetting('maxAttempts',2500),snapSetting('minDFI',82),snapSetting('minDFI',0),snapSetting('minDFI','')]);
+ log('E4 슬라이더 격자 보정',JSON.stringify(snap)==='[9000,1000,3000,80,50,75]',JSON.stringify(snap));
  await p.evaluate(()=>{const el=document.querySelector('#minDFI');el.value='';el.dispatchEvent(new Event('input'));}); await gen(p,'100');
  log('E2 목표 DFI 빈칸',!p.errs.length,await p.textContent('#dfiMeta'));
  await p.fill('#roster input[data-i="0"][data-f="weight"]','0'); await p.fill('#roster input[data-i="1"][data-f="weight"]','-3');
@@ -130,7 +136,7 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
 
 // H. 생성 버튼 연타 / 중단 후 재생성
 {const p=await fresh(b); await p.click('#btnSample'); await p.waitForTimeout(300);
- await p.fill('#maxAttempts','3000'); await p.dispatchEvent('#maxAttempts','input');
+ await setRange(p,'#maxAttempts','3000');
  await p.click('#btnGenerate'); await p.click('#btnGenerate',{force:true,timeout:500}).catch(()=>{});
  await p.click('#btnCancel'); await p.waitForTimeout(200);
  log('H1 중단',(await p.textContent('#progText')).includes('중단'),await p.textContent('#progText'));
@@ -140,7 +146,7 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
 // I. Worker 차단 환경(대체 실행) + 중단
 {const p=await fresh(b,{init:()=>{window.Worker=undefined;}}); await setPeople(p,Array.from({length:40},(_,i)=>({name:'사람'+i,level:1+i%4})));
  await gen(p,'500'); log('I1 Worker 없이 생성',/완료/.test(await p.textContent('#progText')),await p.textContent('#engineMode'));
- await p.fill('#maxAttempts','10000'); await p.dispatchEvent('#maxAttempts','input'); await p.click('#btnGenerate'); await p.waitForTimeout(100); await p.click('#btnCancel',{timeout:3000}); await p.waitForTimeout(300);
+ await setRange(p,'#maxAttempts','10000'); await p.click('#btnGenerate'); await p.waitForTimeout(100); await p.click('#btnCancel',{timeout:3000}); await p.waitForTimeout(300);
  log('I2 대체 실행 중단',(await p.textContent('#progText')).includes('중단')&&!(await p.$eval('#btnGenerate',b=>b.disabled)),await p.textContent('#progText'));
  errsOK(p,'I'); await p.context().close();}
 

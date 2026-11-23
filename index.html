@@ -90,8 +90,6 @@ button.big{padding:10px 22px;font-size:15px}
 .set-group>legend{font-size:12px;font-weight:700;color:var(--ink);padding:0 6px}
 .set-note{font-size:12px;color:var(--sub);margin:0}
 .set-sub{font-weight:400}
-.help{font-size:11px;color:var(--sub)}
-.pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}   /* 짧은 숫자 칸 2개를 한 줄에 */
 .range-label{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 /* 배정 규칙의 '평일'·'휴일' 강조 칩. 색은 달력과 같은 규칙(휴일 = 빨강 계열)을 따릅니다. */
 .day-tag{display:inline-block;padding:1px 7px;border-radius:6px;font-size:12px;font-weight:800;margin-right:2px}
@@ -378,10 +376,9 @@ body.printing-sheet #printSheet{display:block}
       </fieldset>
       <fieldset class="set-group sg-gen">
         <legend>생성 옵션</legend>
-        <div class="pair">
-          <div class="field"><label for="minDFI">목표 DFI</label><input type="number" id="minDFI" data-s="minDFI" min="0" max="100" inputmode="numeric"><span class="help">당직 공정성 지수 0–100</span></div>
-          <div class="field"><label for="maxAttempts">시뮬레이션 횟수</label><input type="number" id="maxAttempts" data-s="maxAttempts" min="1" max="10000" step="100" inputmode="numeric"><span class="help">최대 10,000회</span></div>
-        </div>
+        <!-- 목표 DFI 50~100(5 단위), 시뮬레이션 횟수 1,000~9,000(2,000 단위). 범위와 간격은 SLIDER_SPEC과 같아야 합니다. -->
+        <div class="field"><label for="minDFI" class="range-label"><span>목표 DFI</span><b class="range-val"><span id="minDFIVal">75</span>점</b></label><input type="range" id="minDFI" data-s="minDFI" min="50" max="100" step="5" aria-describedby="minDFIEx"><div class="range-ticks"><span>50</span><span>60</span><span>70</span><span>80</span><span>90</span><span>100</span></div><div class="range-ex" id="minDFIEx">최고 안의 DFI가 이 점수보다 낮으면 개선 안내를 표시합니다.</div></div>
+        <div class="field"><label for="maxAttempts" class="range-label"><span>시뮬레이션 횟수</span><b class="range-val"><span id="maxAttemptsVal">3,000</span>회</b></label><input type="range" id="maxAttempts" data-s="maxAttempts" min="1000" max="9000" step="2000" aria-describedby="maxAttemptsEx"><div class="range-ticks"><span>1천</span><span>3천</span><span>5천</span><span>7천</span><span>9천</span></div><div class="range-ex" id="maxAttemptsEx">많을수록 더 좋은 안을 찾을 가능성이 커지지만 시간이 더 걸립니다.</div></div>
       </fieldset>
     </div>
   </div>
@@ -922,8 +919,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.9.8', APP_BUILD = '2026-11-22';
+const APP_VERSION = '1.9.9', APP_BUILD = '2026-11-22';
 const CHANGELOG = [
+  '1.9.9 목표 DFI(50~100, 5 단위)와 시뮬레이션 횟수(1,000~9,000, 2,000 단위)를 슬라이더로 변경. 격자에 맞지 않는 저장값은 가장 가까운 칸으로 보정',
   '1.9.8 배정 규칙의 평일·휴일을 색 칩으로 강조',
   '1.9.7 열린 기간 입력: -5 → 1~5일, 20- → 20일~말일(달마다 자동). 입력칸 아래에 해석 결과를 따로 표시',
   '1.9.6 기간 입력: ~와 -의 모든 변형(전각 ～, 〜, −, – 등)을 기간으로 인식, 12/20-12/22·2026-12-20~2026-12-22처럼 날짜 형식으로 쓴 기간도 인식',
@@ -1135,7 +1133,7 @@ function normalizeSettings(s){
   const y = Math.round(+s.year), m = Math.round(+s.month);
   if (y >= 2000 && y <= 2100 && m >= 1 && m <= 12){ o.year = y; o.month = m; o.holidays = builtinStr(y, m); }
   if (s.holidays != null) o.holidays = String(s.holidays);
-  for (const k of ['restW', 'restH', 'minDFI', 'maxAttempts']) if (s[k] !== '' && s[k] != null && !isNaN(+s[k])) o[k] = +s[k];
+  for (const k in SLIDER_SPEC) if (s[k] !== '' && s[k] != null && !isNaN(+s[k])) o[k] = snapSetting(k, s[k]);
   return o;
 }
 
@@ -1356,9 +1354,25 @@ $('#ym').addEventListener('change', e => {
   toast(msg + (hasDates ? ' 명단의 날짜는 새 달 기준으로 다시 확인하십시오.' : ''));
 });
 
-const clampRest = v => { v = Math.round(+v); return isNaN(v) ? 0 : Math.min(5, Math.max(0, v)); };
+/* 설정 슬라이더의 범위·간격. HTML의 min/max/step과 같아야 합니다.
+   저장된 값이 이 격자에 맞지 않으면(이전 버전의 10,000회, 82점 등) 가장 가까운 칸으로 맞춥니다. */
+const SLIDER_SPEC = {
+  restW:       { min: 0,    max: 5,    step: 1,    def: 1 },
+  restH:       { min: 0,    max: 5,    step: 1,    def: 2 },
+  minDFI:      { min: 50,   max: 100,  step: 5,    def: 75 },
+  maxAttempts: { min: 1000, max: 9000, step: 2000, def: 3000 }
+};
+/** 값을 슬라이더 격자(min + k×step)에 맞춥니다. 숫자가 아니면 기본값. */
+function snapSetting(k, v){
+  const sp = SLIDER_SPEC[k];
+  if (v === '' || v == null || isNaN(+v)) return sp.def;     // 빈칸·문자는 기본값
+  v = +v;
+  const n = Math.round((Math.min(sp.max, Math.max(sp.min, v)) - sp.min) / sp.step);
+  return sp.min + n * sp.step;
+}
 /**
- * 배정 제외일 슬라이더의 숫자와 의미 안내를 갱신합니다.
+ * 설정 슬라이더 4개의 현재 값과 안내를 갱신합니다.
+ * 배정 제외일 슬라이더는 의미를 예시로 풀어 씁니다.
  * 배정 제외일 n = 당직 다음 날부터 n일 동안 그 사람에게 정규 당직을 배정하지 않음.
  * 예: n=1, 3일 당직 → 4일 제외 → 5일부터 가능 (엔진 조건: 다음 당직일 − 마지막 당직일 > n)
  */
@@ -1370,10 +1384,12 @@ function renderRangeLabels(){
   const w = +state.settings.restW || 0, h = +state.settings.restH || 0;
   $('#restWVal').textContent = w; $('#restHVal').textContent = h;
   $('#restWEx').textContent = rangeExplain(w); $('#restHEx').textContent = rangeExplain(h);
+  $('#minDFIVal').textContent = state.settings.minDFI;
+  $('#maxAttemptsVal').textContent = (+state.settings.maxAttempts).toLocaleString('ko-KR');
 }
 /** state.settings → 설정 패널 전체 반영 */
 function renderSettings(){
-  state.settings.restW = clampRest(state.settings.restW); state.settings.restH = clampRest(state.settings.restH);
+  for (const k in SLIDER_SPEC) state.settings[k] = snapSetting(k, state.settings[k]);
   $$('[data-s]').forEach(el => { el.value = state.settings[el.dataset.s]; });
   renderYM(); renderRangeLabels(); renderHolidayUI();
 }
@@ -1797,8 +1813,8 @@ function buildCfg(){
   return {
     year: +s.year, month: +s.month, holidays: parseDayList(s.holidays, N),
     restW: Math.max(0, +s.restW || 0), restH: Math.max(0, +s.restH || 0),
-    minDFI: Math.min(100, Math.max(0, +s.minDFI || 0)),
-    maxAttempts: Math.min(10000, Math.max(1, Math.floor(+s.maxAttempts || 1))),
+    minDFI: snapSetting('minDFI', s.minDFI),
+    maxAttempts: snapSetting('maxAttempts', s.maxAttempts),
     people: state.people.map((p, i) => ({
       name: (p.name || '').trim() || `근무자${i + 1}`, level: +p.level || 3,
       weight: Math.max(0.1, parseFloat(p.weight) || 1),
@@ -2016,7 +2032,7 @@ function renderDFI(R){
   else {
     const weak = D.metrics.slice().sort((a, b) => a.score / a.max - b.score / b.max)[0];
     box.innerHTML = `<b>목표 미달 (${D.total.toFixed(1)} / ${R.cfg.minDFI})</b> — 가장 낮은 지표는 <b>${weak.key} ${weak.name}</b> ${weak.score.toFixed(1)}/${weak.max} (${(weak.score / weak.max * 100).toFixed(0)}%)입니다.
-      <ul><li>${GUIDE[weak.key]}</li><li>시뮬레이션 횟수를 늘리면(최대 10,000) 더 나은 안을 찾을 가능성이 커집니다. 현재 ${R.cfg.maxAttempts.toLocaleString()}회.</li>${R.cfg.minDFI > 85 ? '<li>현재 명단 조건에서 목표가 과도할 수 있습니다. 목표 DFI를 낮추는 것도 검토하십시오.</li>' : ''}</ul>`;
+      <ul><li>${GUIDE[weak.key]}</li><li>시뮬레이션 횟수를 늘리면(최대 9,000) 더 나은 안을 찾을 가능성이 커집니다. 현재 ${R.cfg.maxAttempts.toLocaleString()}회.</li>${R.cfg.minDFI > 85 ? '<li>현재 명단 조건에서 목표가 과도할 수 있습니다. 목표 DFI를 낮추는 것도 검토하십시오.</li>' : ''}</ul>`;
     box.classList.remove('hidden');
   }
 
