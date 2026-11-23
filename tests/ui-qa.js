@@ -2,7 +2,7 @@
  * 인터페이스 오류 탐색 테스트 (Playwright, Chromium)
  * 실행: npx playwright install chromium   (최초 1회)
  *       node tests/ui-qa.js [index.html 경로]
- * 21개 범주(A~U) 96개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
+ * 21개 범주(A~U) 94개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
  * 숫자 경계값, 극단적 명단, 날짜 팝오버, 연타·중단, Worker 차단 환경, 수동 교체, 프로필 이름,
  * 저장 전 입력 보존, 대규모 명단, 모바일 배치, 키보드 조작, 출력, 공휴일 입력, 손상된 저장값, 이전 결과 조작,
  * 기간 입력(~와 -의 변형, 날짜 형식 기간, 열린 기간 -5·20-), 실행 요약(소요 시간·개선 기록).
@@ -25,7 +25,7 @@ async function fresh(b,opt={}){
 // 슬라이더 값 설정: 브라우저가 격자(min+k×step)에 맞춰 보정하므로 아무 값이나 넣어도 됩니다.
 const setRange=(p,sel,v)=>p.evaluate(([sel,v])=>{const el=document.querySelector(sel);el.value=String(v);el.dispatchEvent(new Event('input'));},[sel,v]);
 const closeDiag=async p=>{ if(await p.$('#diagDialog[open]')) await p.click('#diagClose'); };
-async function gen(p,attempts='300'){ await setRange(p,'#maxAttempts',attempts);
+async function gen(p){ /* 시도 횟수는 자동(목표 이상 5안 또는 최대 20,000회) */
   await p.click('#btnGenerate'); await p.waitForFunction(()=>!document.querySelector('#btnGenerate').disabled,null,{timeout:60000}); await p.waitForTimeout(150); await closeDiag(p); }
 const setPeople=(p,people)=>p.evaluate(ps=>{state.people=ps.map(x=>Object.assign(blankPerson(),x));renderRoster();scheduleSave();},people);
 const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.join(' | ')); };
@@ -48,7 +48,8 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
 // B. 생성 중 프로필 전환
 {const p=await fresh(b); await p.click('#btnSample'); await p.waitForTimeout(500);
  await p.click('#btnProfileSaveAs'); await p.fill('#askInput','두번째'); await p.click('#askYes'); await p.waitForTimeout(200);
- await setRange(p,'#maxAttempts','10000'); await p.click('#btnGenerate'); await p.waitForTimeout(80);
+ await setPeople(p,Array.from({length:40},(_,i)=>({name:'사람'+i,level:1+i%4}))); await setRange(p,'#minDFI','100'); await p.waitForTimeout(500);
+ await p.click('#btnGenerate'); await p.waitForTimeout(80);
  await p.click('#btnProfileNew'); await p.fill('#askInput','빈프로필'); await p.click('#askYes');
  await p.waitForTimeout(3500);
  const shown=await p.evaluate(()=>!document.querySelector('#results').classList.contains('hidden'));
@@ -82,7 +83,7 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
   const after=await p.evaluate(()=>JSON.stringify(serialize()));
   if(id==='D1 JSON 아님'||id==='D4 settings 없음') log(id,err&&before===after,err?(before===after?'거부·상태 유지':'거부됐지만 상태 일부 변경'):'오류 안내 없음');
   else { const ok=!p.errs.length; log(id,ok,ok?(err?'거부됨':'복원됨'):p.errs.join('|'));
-    if(!err){ await gen(p,'100'); log(id+' 복원 후 생성',!p.errs.length,p.errs.join('|')||'정상'); } }
+    if(!err){ await gen(p); log(id+' 복원 후 생성',!p.errs.length,p.errs.join('|')||'정상'); } }
  }
  // D5 같은 이름 프로필 덮어쓰기
  await p.click('#btnProfileSaveAs'); await p.fill('#askInput','보존'); await p.click('#askYes'); await p.waitForTimeout(200);
@@ -97,18 +98,21 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
 
 // E. 숫자 입력 경계값
 {const p=await fresh(b); await p.click('#btnSample'); await p.waitForTimeout(300);
- for(const v of ['','0','-5','99999','1e9','abc']){ p.errs=[]; await p.evaluate(v=>{const el=document.querySelector('#maxAttempts');el.value=v;el.dispatchEvent(new Event('input'));},v);
+ // E1. 시도 횟수 자동: 낮은 목표는 '목표 이상 5안'에서 일찍 멈추고, 도달 불가 목표는 최대 20,000회
+ for(const [v,expStop] of [['50','target'],['60','target'],['100','max']]){ p.errs=[]; await setRange(p,'#minDFI',v);
    await p.click('#btnGenerate'); await p.waitForFunction(()=>!document.querySelector('#btnGenerate').disabled,null,{timeout:60000}); await closeDiag(p);
-   const t=await p.textContent('#progText'), n=await p.evaluate(()=>buildCfg().maxAttempts);
-   log('E1 시뮬레이션 횟수="'+v+'"',!p.errs.length&&/완료/.test(t)&&[1000,3000,5000,7000,9000].includes(n),'적용 '+n+'회 · '+t.slice(0,30)); }
- // 슬라이더 격자 보정: 이전 버전 값·JSON 값이 1,000~9,000(2,000 단위), 50~100(5 단위)에 맞춰지는지
- const snap=await p.evaluate(()=>[snapSetting('maxAttempts',10000),snapSetting('maxAttempts',300),snapSetting('maxAttempts',2500),snapSetting('minDFI',82),snapSetting('minDFI',0),snapSetting('minDFI','')]);
- log('E4 슬라이더 격자 보정',JSON.stringify(snap)==='[9000,1000,3000,80,50,75]',JSON.stringify(snap));
- await p.evaluate(()=>{const el=document.querySelector('#minDFI');el.value='';el.dispatchEvent(new Event('input'));}); await gen(p,'100');
+   const r=await p.evaluate(()=>state.run), t=await p.textContent('#progText');
+   const ok=!p.errs.length&&r.stop===expStop&&(expStop==='max'?r.attempts===20000:r.hits===5&&r.attempts<20000);
+   log('E1 목표 '+v+' → '+expStop,ok,`${r.attempts}회 · ${r.stop} · 목표 이상 ${r.hits}안 · `+t.slice(0,40)); }
+ log('E5 시뮬레이션 횟수 설정 없음',!(await p.$('#maxAttempts')),'');
+ // 슬라이더 격자 보정: 목표 DFI 50~100(5 단위)
+ const snap=await p.evaluate(()=>[snapSetting('minDFI',82),snapSetting('minDFI',0),snapSetting('minDFI',''),snapSetting('minDFI',120)]);
+ log('E4 목표 DFI 격자 보정',JSON.stringify(snap)==='[80,50,75,100]',JSON.stringify(snap));
+ await p.evaluate(()=>{const el=document.querySelector('#minDFI');el.value='';el.dispatchEvent(new Event('input'));}); await gen(p);
  log('E2 목표 DFI 빈칸',!p.errs.length,await p.textContent('#dfiMeta'));
  await p.fill('#roster input[data-i="0"][data-f="weight"]','0'); await p.fill('#roster input[data-i="1"][data-f="weight"]','-3');
  await p.fill('#roster input[data-i="2"][data-f="max"]','-1'); await p.fill('#roster input[data-i="3"][data-f="max"]','2.7'); await p.waitForTimeout(500);
- await gen(p,'100'); log('E3 가중치 0·음수, 한도 음수·소수',!p.errs.length,p.errs.join('|')||'정상');
+ await gen(p); log('E3 가중치 0·음수, 한도 음수·소수',!p.errs.length,p.errs.join('|')||'정상');
  errsOK(p,'E'); await p.context().close();}
 
 // F. 극단적 명단
@@ -121,7 +125,7 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
   'F6 희망일=기피일, 범위 밖 날짜':[{name:'z',level:1,wish:'1, 40, 0, 5~3',avoid:'1'},{name:'w',level:2}],
  };
  for(const [id,ps] of Object.entries(cases)){ p.errs=[]; await setPeople(p,ps); await p.waitForTimeout(500);
-  const pc=await p.textContent('#precheck'); await gen(p,'200');
+  const pc=await p.textContent('#precheck'); await gen(p);
   const ok=!p.errs.length; log(id,ok,(ok?'':p.errs.join('|')+' ')+'점검: '+pc.replace(/\s+/g,' ').slice(0,70)); }
  errsOK(p,'F'); await p.context().close();}
 
@@ -136,17 +140,17 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
 
 // H. 생성 버튼 연타 / 중단 후 재생성
 {const p=await fresh(b); await p.click('#btnSample'); await p.waitForTimeout(300);
- await setRange(p,'#maxAttempts','3000');
+ await setPeople(p,Array.from({length:40},(_,i)=>({name:'사람'+i,level:1+i%4}))); await setRange(p,'#minDFI','100'); await p.waitForTimeout(500);
  await p.click('#btnGenerate'); await p.click('#btnGenerate',{force:true,timeout:500}).catch(()=>{});
  await p.click('#btnCancel'); await p.waitForTimeout(200);
  log('H1 중단',(await p.textContent('#progText')).includes('중단'),await p.textContent('#progText'));
- await gen(p,'200'); log('H2 중단 후 재생성',/완료/.test(await p.textContent('#progText')),'');
+ await gen(p); log('H2 중단 후 재생성',/완료/.test(await p.textContent('#progText')),'');
  errsOK(p,'H'); await p.context().close();}
 
 // I. Worker 차단 환경(대체 실행) + 중단
 {const p=await fresh(b,{init:()=>{window.Worker=undefined;}}); await setPeople(p,Array.from({length:40},(_,i)=>({name:'사람'+i,level:1+i%4})));
- await gen(p,'500'); log('I1 Worker 없이 생성',/완료/.test(await p.textContent('#progText')),await p.textContent('#engineMode'));
- await setRange(p,'#maxAttempts','10000'); await p.click('#btnGenerate'); await p.waitForTimeout(100); await p.click('#btnCancel',{timeout:3000}); await p.waitForTimeout(300);
+ await gen(p); log('I1 Worker 없이 생성',/완료/.test(await p.textContent('#progText')),await p.textContent('#engineMode'));
+ await setRange(p,'#minDFI','100'); await p.click('#btnGenerate'); await p.waitForTimeout(100); await p.click('#btnCancel',{timeout:3000}); await p.waitForTimeout(300);
  log('I2 대체 실행 중단',(await p.textContent('#progText')).includes('중단')&&!(await p.$eval('#btnGenerate',b=>b.disabled)),await p.textContent('#progText'));
  errsOK(p,'I'); await p.context().close();}
 
@@ -186,16 +190,16 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
 
 // M. 대규모 명단 성능
 {const p=await fresh(b); const ps=Array.from({length:40},(_,i)=>({name:'사람'+i,level:1+i%4,wish:String(1+i%28),avoid:String(2+i%27)}));
- await setPeople(p,ps); const t=Date.now(); await gen(p,'2000'); const ms=Date.now()-t;
+ await setPeople(p,ps); const t=Date.now(); await gen(p); const ms=Date.now()-t;
  const t2=Date.now(); await p.click('#cal [data-pid]'); const hl=Date.now()-t2;
- log('M1 40명 2,000회 생성',!p.errs.length&&ms<15000,`${ms}ms, 강조 반응 ${hl}ms`);
+ log('M1 40명 생성(최대 20,000회)',!p.errs.length&&ms<30000,`${ms}ms, 강조 반응 ${hl}ms`);
  errsOK(p,'M'); await p.context().close();}
 
 // N. 모바일: 팝오버·카드·결과
 {const p=await fresh(b,{vp:{width:360,height:740}}); await p.click('#btnSample'); await p.waitForTimeout(300);
  await p.click('[data-dp="11"] >> visible=true'); const r=await p.$eval('#dp',e=>{const b=e.getBoundingClientRect();return [b.left,b.right,b.top,b.bottom,innerWidth,innerHeight]});
  log('N1 팝오버 화면 안',r[0]>=0&&r[1]<=r[4]&&r[2]>=0&&r[3]<=r[5],r.map(Math.round).join(','));
- await p.keyboard.press('Escape'); await gen(p,'200');
+ await p.keyboard.press('Escape'); await gen(p);
  const ov=await p.evaluate(()=>document.documentElement.scrollWidth-innerWidth); log('N2 가로 넘침 없음',ov<=0,'초과 '+ov+'px');
  errsOK(p,'N'); await p.context().close();}
 
@@ -230,7 +234,7 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
 {const p=await fresh(b,{init:()=>{try{localStorage.setItem('dfiDuty:list','["손상"]');localStorage.setItem('dfiDuty:last','손상');
    localStorage.setItem('dfiDuty:p:손상',JSON.stringify({v:1,s:{year:2026,month:13,restW:'x',maxAttempts:null},p:[['a',null,null,null,7,null,999,'q',null]]}));}catch(e){}}});
  await p.waitForTimeout(300); log('R1 손상된 프로필 불러오기',!p.errs.length,p.errs.join('|')||'정상');
- await gen(p,'100'); log('R2 손상 프로필로 생성',!p.errs.length,(await p.textContent('#progText')).slice(0,40));
+ await gen(p); log('R2 손상 프로필로 생성',!p.errs.length,(await p.textContent('#progText')).slice(0,40));
  await p.context().close();}
 
 // S. 결과 강조 후 재생성 / 명단 축소 후 이전 결과 강조
@@ -253,14 +257,14 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
  errsOK(p,'T'); await p.context().close();}
 
 // U. 실행 요약: 소요 시간, 마지막 개선 시점, 그래프·표
-{const p=await fresh(b); await p.click('#btnSample'); await p.waitForTimeout(300); await gen(p,'5000');
+{const p=await fresh(b); await p.click('#btnSample'); await p.waitForTimeout(300); await gen(p);
  const info=await p.evaluate(()=>({run:state.run, best:state.cands[0].attempt, ticks:[...document.querySelectorAll('#runSvg text.ax')].map(t=>t.textContent), rows:document.querySelectorAll('.run-table tbody tr').length}));
  const H=info.run.hist, last=H[H.length-1];
  log('U1 실행 요약 표시',await p.isVisible('#runSum')&&/초/.test(await p.textContent('#progText')),(await p.textContent('#progText')).slice(0,40));
  log('U2 마지막 개선 = 1안 발견 시도',last.a===info.best,`마지막 개선 ${last.a} · 1안 ${info.best}`);
  log('U3 개선 기록 오름차순·첫 기록 1번째',H[0].a===1&&H.every((h,i)=>!i||h.a>H[i-1].a),H.map(h=>h.a).join(','));
  log('U4 표 행 수 = 기록 수',info.rows===H.length,info.rows+'행');
- log('U5 로그 눈금',info.ticks.includes('1')&&info.ticks.includes('5,000'),info.ticks.join(' '));
+ log('U5 로그 눈금',info.ticks.includes('1')&&info.ticks.includes(info.run.attempts.toLocaleString()),info.ticks.join(' '));
  // 통계표 행의 숫자 칸을 눌러도 강조, 다시 누르면 해제
  await p.click('#stats tbody tr:nth-child(3) td:nth-child(9)'); const hl3=await p.evaluate(()=>[state.hl,document.querySelector('#stats tbody tr:nth-child(3)').classList.contains('hl-row'),!document.querySelector('#hlInfo').classList.contains('hidden')]);
  await p.click('#stats tbody tr:nth-child(3) td:nth-child(4)'); const off=await p.evaluate(()=>state.hl);
