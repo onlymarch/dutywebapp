@@ -947,8 +947,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.10.3', APP_BUILD = '2026-11-22';
+const APP_VERSION = '1.10.4', APP_BUILD = '2026-11-22';
 const CHANGELOG = [
+  '1.10.4 출력 양식 달력의 글자 확대: 날짜 9→13px, 이름 12.5→17px(긴 이름 14·12px), 조력자 9→11.5px, 요일 머리글 10→12px. 칸 높이 19.5→22mm(6주 달 16.5→19mm)',
   '1.10.3 근무자별 통계(화면·인쇄·CSV)를 명단에 입력한 순서대로 표시 (이전: 레벨 → 이름 순)',
   '1.10.2 기간의 끝 날짜가 그 달 말일을 넘으면 말일까지로 보정 (예: 2월에 15-31 → 15~28). 입력칸 아래에 보정 내용 표시',
   '1.10.1 샘플 데이터 근무자 이름을 일반적인 영어 이름으로 변경',
@@ -2445,15 +2446,17 @@ body{font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans 
 .ps-sign th{background:#f0f0f0}
 .ps-sign td{height:12mm}
 table.ps-cal{width:100%;border-collapse:collapse;table-layout:fixed}
-.ps-cal th{border:1px solid #000;padding:2px;font-size:10px;background:#f0f0f0}
+.ps-cal th{border:1px solid #000;padding:3px;font-size:12px;background:#f0f0f0}
 .ps-cal th.sun{color:#c62828} .ps-cal th.sat{color:#1565c0}
-.ps-cal td{border:1px solid #000;height:19mm;vertical-align:top;padding:1.5px 3px}
+.ps-cal td{border:1px solid #000;height:19mm;vertical-align:top;padding:2px 4px}
 .ps-cal td.sun,.ps-cal td.pub{background:#ffebee} .ps-cal td.sat{background:#e3f2fd}
 .ps-cal td.blank{background:#fafafa}
-.ps-d{font-size:9px;font-weight:700}
-.ps-d .h{color:#c62828;margin-left:2px;font-weight:600}
-.ps-n{font-size:12.5px;font-weight:600;margin-top:1px;word-break:keep-all}
-.ps-a{font-size:9px;color:#444}
+/* 달력 글자 크기: 날짜 13px, 이름 17px, 조력자 11.5px (멀리서도 읽히도록. 넘치면 fitSheet가 축소) */
+.ps-d{font-size:13px;font-weight:800;line-height:1.1}
+.ps-d .h{color:#c62828;margin-left:3px;font-weight:600;font-size:10px}
+.ps-n{font-size:17px;font-weight:700;margin-top:2px;line-height:1.15;word-break:keep-all;overflow-wrap:anywhere}
+.ps-n.long{font-size:14px} .ps-n.xlong{font-size:12px}   /* 긴 이름은 칸(약 27mm)을 넘지 않도록 한 단계씩 축소 */
+.ps-a{font-size:11.5px;color:#444;line-height:1.2}
 .ps-n.hl{font-weight:900;background:#ffe082;padding:0 2px}
 .ps-n.dim{color:#888;font-weight:400}
 .ps-legend{font-size:9px;margin-top:1.5mm;color:#333}
@@ -2491,14 +2494,14 @@ function buildPrintBody(){
     const day = R.cal.days[d], k = R.duty[d], a = R.assist[d];
     let c = `<td class="${dayClass(day)}"><div class="ps-d">${d}${day.isPub ? `<span class="h">${esc(holName(R.cfg.year, R.cfg.month, d))}</span>` : ''}</div>`;
     if (k >= 0){
-      const nc = o.hl ? (k === state.hl ? 'hl' : 'dim') : '';
+      const nc = (o.hl ? (k === state.hl ? 'hl' : 'dim') : '') + ' ' + nameSizeCls(P[k].name);
       c += `<div class="ps-n ${nc}">${esc(P[k].name)}</div>`;
       if (P[k].level >= 4) c += `<div class="ps-a">(조력: ${a >= 0 ? esc(P[a].name) : '없음'})</div>`;
     } else c += '<div class="ps-n" style="color:#c62828">미배정</div>';
     cells.push(c + '</td>');
   }
   while (cells.length % 7) cells.push('<td class="blank"></td>');
-  const cellH = cells.length / 7 >= 6 ? 16.5 : 19.5;
+  const cellH = cells.length / 7 >= 6 ? 19 : 22;   // 6주짜리 달은 칸을 낮춰 1장 유지
   let rows = '';
   for (let i = 0; i < cells.length; i += 7) rows += '<tr>' + cells.slice(i, i + 7).join('') + '</tr>';
   html += `<table class="ps-cal"><thead><tr>${DOW.map((d, i) => `<th class="${i === 0 ? 'sun' : i === 6 ? 'sat' : ''}">${d}</th>`).join('')}</tr></thead>` +
@@ -2521,6 +2524,12 @@ function buildPrintBody(){
     html += '</div>';
   }
   return html + '</div>';
+}
+/** 출력 달력 칸 폭에 맞춘 이름 크기 등급. 한글·한자 등 넓은 글자는 1.7자로 셉니다.
+    17px 기준 약 9자(라틴)까지 한 줄에 들어갑니다. */
+function nameSizeCls(name){
+  let w = 0; for (const ch of name) w += ch.codePointAt(0) > 0x2E80 ? 1.7 : 1;
+  return w > 12 ? 'xlong' : w > 9 ? 'long' : '';
 }
 const SIGN_BLOCK = '<div class="ps-sign"><table><tr><th>작성</th><th>검토</th><th>승인</th></tr><tr><td></td><td></td><td></td></tr></table></div>';
 /** 독립 HTML 문서 (iframe 인쇄·인쇄용 파일 공용). withButton이면 화면 우측 상단에 인쇄 버튼 표시 */
