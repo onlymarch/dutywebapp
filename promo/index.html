@@ -8,6 +8,7 @@
   장면: S1 문제(0–2.6) · S2 혼란(2.6–4.2) · S3 등장(4.2–6.0) · S4 입력(6.0–9.0)
         S5 생성(9.0–11.8) · S6 결과(11.8–15.0) · S7 6개 언어(15.0–17.2) · S8 마무리·개인정보(17.2–20.0)
 -->
+<script>/* ?vert 로 열면 세로형(1080×1920, 쇼츠·릴스) 배치 */ if (location.search.includes('vert')) document.documentElement.classList.add('vert');</script>
 <style>
 :root{--bg:#070b18;--ink:#f4f6ff;--sub:#a9b4d6;--acc:#4d74ff;--cy:#38d9ff;--red:#ff4d5e;--grn:#36d399;--gold:#ffcc4d}
 *{box-sizing:border-box;margin:0}
@@ -149,6 +150,55 @@ html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);font-f
 .privline span{color:#b7f5dc}
 .endzoom{position:absolute;inset:0;animation:ez 2.8s ease-out 17.2s both}
 @keyframes ez{from{transform:scale(1.04)}to{transform:scale(1)}}
+
+/* =================== 세로형 1080×1920 (쇼츠·릴스) ===================
+   타임라인·애니메이션은 가로형과 같고 위치·크기만 바꿉니다.
+   쇼츠 화면은 아래쪽(약 380px: 제목·자막·버튼)과 오른쪽(약 140px: 좋아요·공유 아이콘)이 가려지므로
+   핵심 내용은 y 140–1540, x 60–940 안에 둡니다. */
+html.vert,html.vert body{width:1080px;height:1920px}
+.vert .sheet{width:1000px;height:1500px}
+.vert .s1t{padding:0 60px}
+.vert .s1a{top:560px;font-size:56px}
+.vert .s1b{top:640px;font-size:62px;line-height:1.15}
+.vert .s1c{top:860px;font-size:168px}
+.vert .chaos{grid-template-columns:repeat(4,200px);top:48%}
+.vert .word{font-size:118px}
+.vert .w1{left:60px;top:200px}
+.vert .w2{right:70px;top:1260px}
+.vert .w3{left:90px;bottom:auto;top:1420px}
+.vert .logo{top:520px}
+.vert .title{top:770px;font-size:112px;line-height:1.05;padding:0 60px}
+.vert .tag{top:1060px;font-size:46px;padding:0 60px}
+.vert .kick{left:70px;top:170px}
+.vert .kick .t{font-size:54px}
+.vert .rosterbox{left:60px;top:300px;width:960px;height:640px}
+.vert .rosterbox img{width:175%}            /* 좁은 화면: 명단 왼쪽(이름·레벨·가중치·희망일)을 확대 */
+.vert .lstage img{width:165%;right:auto}  /* 언어별 화면: 제목·설정 부분을 확대 */
+.vert .chips{left:70px;top:1000px;gap:16px}
+.vert .chip{font-size:32px}
+.vert .dp{left:600px;top:700px;width:390px}
+.vert .gbtn{top:520px;font-size:54px}
+.vert .ring{top:585px}
+.vert .count{top:760px;font-size:190px}
+.vert .clabel{top:1000px;font-size:48px}
+.vert .bar{left:120px;right:120px;top:1100px}
+.vert .time{top:1160px;font-size:54px}
+.vert .res{left:60px;top:300px;width:960px;transform-origin:65% 20%}
+.vert .panel{left:70px;top:790px;width:880px}
+.vert .score .v{font-size:150px}
+.vert .of{font-size:32px}
+.vert .lstage{left:60px;top:300px;width:960px;height:420px}
+.vert .bigl{left:0;right:0;top:820px;width:auto;height:240px;display:flex;justify-content:center}
+.vert .bigl span{left:auto;position:absolute;font-size:120px}
+.vert .lchips{left:60px;top:1110px;width:900px;flex-wrap:wrap;gap:16px}
+.vert .lchips span{font-size:42px}
+.vert .free{left:70px;top:240px;font-size:200px}
+.vert .endchips{left:70px;top:500px;width:900px;gap:14px}
+.vert .endchips span{font-size:34px}
+.vert .privline{left:70px;top:690px;width:880px;font-size:40px;align-items:flex-start}
+.vert .url{left:70px;top:820px;font-size:54px}
+.vert .name{left:70px;top:930px;font-size:38px}
+.vert .qr{left:330px;right:auto;top:1020px;width:420px}
 </style></head><body>
 <div class="stage">
 <div class="gridbg"></div>

@@ -8,7 +8,7 @@
 
 [![20초 소개 영상: 손으로 짜던 당직표에서 몇 초 만에 공정한 안까지](assets/promo-preview.gif)](https://onlymarch.github.io/dutywebapp/assets/promo-20s.mp4)
 
-▶ [20초 소개 영상 고화질·음악 포함으로 보기 (MP4, 1080p, 영어)](https://onlymarch.github.io/dutywebapp/assets/promo-20s.mp4)
+▶ [20초 소개 영상 고화질·음악 포함으로 보기 (MP4, 1080p, 영어)](https://onlymarch.github.io/dutywebapp/assets/promo-20s.mp4) · [세로형 쇼츠·릴스용 (1080×1920)](https://onlymarch.github.io/dutywebapp/assets/promo-shorts-20s.mp4)
 
 현재 버전: **v1.14.3** (2026-11-23)
 
@@ -105,7 +105,7 @@
 | `tests/ui-qa.js` | 인터페이스 오류 탐색 테스트 (23개 범주 135개 항목, 다국어 포함) |
 | `README.md` | 영어 안내 (저장소 첫 화면) |
 | `README.ko.md` | 한국어 안내 (이 문서) |
-| `assets/` | 화면 캡처, 링크 미리보기 이미지(`og-image.png`, 1200×630), 20초 소개 영상(`promo-20s.mp4`)과 미리보기 GIF |
+| `assets/` | 화면 캡처, 링크 미리보기 이미지(`og-image.png`, 1200×630), 20초 소개 영상(가로 `promo-20s.mp4`, 세로 `promo-shorts-20s.mp4`)과 미리보기 GIF |
 | `promo/` | 소개 영상 제작 소스 (화면 캡처·모션그래픽·렌더링 스크립트) |
 | `.nojekyll` | GitHub Pages가 파일을 그대로 배포하도록 설정 |
 

@@ -1,11 +1,11 @@
 # 20-second promo video (motion graphics)
 
-Source for `assets/promo-20s.mp4` (1920×1080, 30 fps, 20 s) and `assets/promo-preview.gif`.
+Source for `assets/promo-20s.mp4` (1920×1080, 30 fps, 20 s), the vertical Shorts/Reels version `assets/promo-shorts-20s.mp4` (1080×1920) and `assets/promo-preview.gif`. Both videos share one timeline and one soundtrack.
 
 - `capture.js` — opens the app (`../index.html`) in English and saves real screenshots used in the video (`*.png`, `info.json`). The results scene uses the real values from this run (attempts, time, DFI and metric scores); update the numbers in `index.html` (`METS`, counter targets, "in 0.41 seconds") if they change.
 - `index.html` — the motion-graphics page. Every movement is a CSS animation whose delay is an absolute time on the 20 s timeline.
-- `music.py` — synthesizes the original background music (`music.wav`, 128 BPM, A minor) with numpy only — no samples or third-party audio, so there are no licensing issues. Hits and risers are timed to the scene changes in `index.html`.
-- `render.js` — seeks all animations frame by frame (`document.getAnimations()`), screenshots each of the 600 frames, pipes them to ffmpeg, then muxes `music.wav` (−0.8 dB, about −14 LUFS) into `assets/promo-20s.mp4`.
+- `music.py` — synthesizes the original soundtrack (`music.wav`) with numpy only — no samples or third-party audio, so there are no licensing issues. A steady background bed (120 BPM, A minor, Am–F–C–G, exactly 10 bars) runs the whole 20 s; short sound effects (pop, click, whoosh, chime) are added only at the moments the video highlights.
+- `render.js` — seeks all animations frame by frame (`document.getAnimations()`), screenshots each of the 600 frames, pipes them to ffmpeg, then muxes `music.wav` (loudness-normalised to −14 LUFS, −1 dBTP) into `assets/promo-20s.mp4`.
 
 ```bash
 node promo/capture.js
@@ -18,6 +18,12 @@ python3 promo/music.py
 ```bash
 node promo/render.js full
 ```
+
+```bash
+node promo/render.js full vert
+```
+
+The vertical version opens the same `index.html` with `?vert`; only the CSS layout changes. Key content stays inside y 140–1540 and x 60–940 so it isn't covered by the Shorts/Reels interface.
 
 ```bash
 ffmpeg -y -i assets/promo-20s.mp4 -vf "fps=10,scale=640:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle" assets/promo-preview.gif
