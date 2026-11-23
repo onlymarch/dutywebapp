@@ -2,7 +2,7 @@
  * 인터페이스 오류 탐색 테스트 (Playwright, Chromium)
  * 실행: npx playwright install chromium   (최초 1회)
  *       node tests/ui-qa.js [index.html 경로]
- * 21개 범주(A~U) 94개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
+ * 21개 범주(A~U) 95개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
  * 숫자 경계값, 극단적 명단, 날짜 팝오버, 연타·중단, Worker 차단 환경, 수동 교체, 프로필 이름,
  * 저장 전 입력 보존, 대규모 명단, 모바일 배치, 키보드 조작, 출력, 공휴일 입력, 손상된 저장값, 이전 결과 조작,
  * 기간 입력(~와 -의 변형, 날짜 형식 기간, 열린 기간 -5·20-), 실행 요약(소요 시간·개선 기록).
@@ -261,6 +261,10 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
  log('U3 개선 기록 오름차순·첫 기록 1번째',H[0].a===1&&H.every((h,i)=>!i||h.a>H[i-1].a),H.map(h=>h.a).join(','));
  log('U4 표 행 수 = 기록 수',info.rows===H.length,info.rows+'행');
  log('U5 로그 눈금',info.ticks.includes('1')&&info.ticks.includes('5,000'),info.ticks.join(' '));
+ // 통계표 행의 숫자 칸을 눌러도 강조, 다시 누르면 해제
+ await p.click('#stats tbody tr:nth-child(3) td:nth-child(9)'); const hl3=await p.evaluate(()=>[state.hl,document.querySelector('#stats tbody tr:nth-child(3)').classList.contains('hl-row'),!document.querySelector('#hlInfo').classList.contains('hidden')]);
+ await p.click('#stats tbody tr:nth-child(3) td:nth-child(4)'); const off=await p.evaluate(()=>state.hl);
+ log('U7 통계표 행 클릭 강조·해제',hl3[0]===2&&hl3[1]&&hl3[2]&&off===-1,JSON.stringify(hl3)+' → '+off);
  await p.click('#btnProfileNew'); await p.fill('#askInput','U빈'); await p.click('#askYes'); await p.waitForTimeout(200);
  log('U6 프로필 전환 시 요약 숨김',!(await p.isVisible('#runSum')),'');
  errsOK(p,'U'); await p.context().close();}

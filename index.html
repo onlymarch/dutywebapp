@@ -286,6 +286,9 @@ th.c-sat{color:var(--accent)} th.c-sun{color:var(--bad)}
 td.num{font-variant-numeric:tabular-nums}
 .stats-name{text-decoration:underline dotted}
 tr.hl-row td{background:var(--hl-weak)}
+/* 통계표는 행 어디를 눌러도 그 근무자를 강조합니다 (이름 버튼만이 아니라) */
+#stats tbody tr{cursor:pointer}
+#stats tbody tr:not(.hl-row):hover td{background:#f3f6fd}
 .d-pos{color:var(--warn);font-weight:700} .d-neg{color:var(--accent);font-weight:700}   /* 기대보다 많음 / 적음 */
 /* 8-4. DFI */
 .dfi-intro{font-size:12px;color:var(--sub);margin:0 0 10px;line-height:1.6}
@@ -485,7 +488,7 @@ body.printing-sheet #printSheet{display:block}
   </section>
   </div>
   <section class="card">
-    <h2>📊 근무자별 통계 <span class="muted">기대 = 배정일수 × 본인 가중치 ÷ 가중치 합 · 차이가 ±1 이상이면 색으로 표시합니다</span></h2>
+    <h2>📊 근무자별 통계 <span class="muted">행을 누르면 그 근무자의 근무일을 달력에서 강조합니다 · 기대 = 배정일수 × 본인 가중치 ÷ 가중치 합 · 차이가 ±1 이상이면 색으로 표시합니다</span></h2>
     <div class="table-wrap"><table id="stats"></table></div>
   </section>
 </div>
@@ -952,8 +955,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.11.0', APP_BUILD = '2026-11-22';
+const APP_VERSION = '1.11.1', APP_BUILD = '2026-11-22';
 const CHANGELOG = [
+  '1.11.1 근무자별 통계표의 행 어디를 눌러도 그 근무자를 강조 (다시 누르면 해제), 행 마우스오버 표시',
   '1.11.0 명단 열 순서 변경(성명·레벨·가중치·월 최대·달력·희망일·가능일·희망요일·제외일·제외요일·관리), 용어 기피일 → 제외일',
   '1.10.5 명단의 희망·제외 요일 버튼에서 일요일 테두리를 연한 분홍색, 토요일 테두리를 하늘색으로 표시',
   '1.10.4 출력 양식 달력의 글자 확대: 날짜 9→13px, 이름 12.5→17px(긴 이름 14·12px), 조력자 9→11.5px, 요일 머리글 10→12px. 칸 높이 19.5→22mm(6주 달 16.5→19mm)',
@@ -2275,11 +2279,12 @@ function selectCand(i){
   toast(`${i + 1}안을 선택했습니다. 출력·CSV·수동 교체는 이 안에 적용됩니다.`);
 }
 
-/* 결과 영역 클릭 위임: ✎ 수동 교체 > 이름 강조 > 안 선택 > 빈 곳(강조 해제) 순으로 판정 */
+/* 결과 영역 클릭 위임: ✎ 수동 교체 > 이름 강조 > 안 선택 > 통계표 행(강조) > 빈 곳(강조 해제) 순으로 판정 */
 $('#results').addEventListener('click', e => {
   const edit = e.target.closest('[data-edit]'); if (edit){ openEdit(+edit.dataset.edit); return; }
   const nm = e.target.closest('[data-pid]'); if (nm){ setHighlight(+nm.dataset.pid); return; }
   const cd = e.target.closest('[data-cand]'); if (cd){ if (+cd.dataset.cand !== state.sel) selectCand(+cd.dataset.cand); return; }
+  const row = e.target.closest('#stats tr[data-row]'); if (row){ setHighlight(+row.dataset.row); return; }   // 통계표 행의 아무 칸
   if (state.hl >= 0 && (e.target.closest('#cal') || e.target.closest('#stats'))) setHighlight(state.hl);
 });
 /* 안 카드 키보드 조작: Enter·Space로 선택. 다시 그린 뒤에도 같은 카드에 포커스 유지 */
