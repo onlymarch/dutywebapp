@@ -135,6 +135,9 @@ th[data-tip]:hover,th[data-tip]:focus{color:var(--accent);outline:none}
 .dow button{padding:2px 5px;font-size:11px;border-radius:5px;min-width:22px}
 .dow button.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .dow.ex button.on{background:var(--bad);border-color:var(--bad)}
+/* 일·토 버튼 테두리: 연한 분홍·하늘색 (선택되지 않았을 때만. 선택되면 채움색이 우선) */
+.dow button.sun:not(.on){border-color:#f5b5c4}
+.dow button.sat:not(.on){border-color:#9ccbf3}
 .ops{white-space:nowrap}
 .ops button{padding:2px 7px}
 .btn-dp{padding:4px 8px;white-space:nowrap}
@@ -947,8 +950,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.10.4', APP_BUILD = '2026-11-22';
+const APP_VERSION = '1.10.5', APP_BUILD = '2026-11-22';
 const CHANGELOG = [
+  '1.10.5 명단의 희망·제외 요일 버튼에서 일요일 테두리를 연한 분홍색, 토요일 테두리를 하늘색으로 표시',
   '1.10.4 출력 양식 달력의 글자 확대: 날짜 9→13px, 이름 12.5→17px(긴 이름 14·12px), 조력자 9→11.5px, 요일 머리글 10→12px. 칸 높이 19.5→22mm(6주 달 16.5→19mm)',
   '1.10.3 근무자별 통계(화면·인쇄·CSV)를 명단에 입력한 순서대로 표시 (이전: 레벨 → 이름 순)',
   '1.10.2 기간의 끝 날짜가 그 달 말일을 넘으면 말일까지로 보정 (예: 2월에 15-31 → 15~28). 입력칸 아래에 보정 내용 표시',
@@ -1571,7 +1575,7 @@ const personLabel = (p, i) => p.name || (i + 1) + '번';
 /** 요일 토글 버튼 묶음. ex=true이면 제외요일(빨간색) */
 function dowGroup(idx, field, arr, ex){
   return `<span class="dow ${ex ? 'ex' : ''}" role="group">` + DOW.map((d, i) =>
-    `<button type="button" class="${arr[i] ? 'on' : ''}" aria-pressed="${!!arr[i]}" aria-label="${d}요일 ${ex ? '제외' : '희망'}" data-i="${idx}" data-dow="${field}" data-k="${i}">${d}</button>`).join('') + '</span>';
+    `<button type="button" class="${i === 0 ? 'sun' : i === 6 ? 'sat' : ''} ${arr[i] ? 'on' : ''}" aria-pressed="${!!arr[i]}" aria-label="${d}요일 ${ex ? '제외' : '희망'}" data-i="${idx}" data-dow="${field}" data-k="${i}">${d}</button>`).join('') + '</span>';
 }
 /** 명단 아래 요약: 인원, 한도 합계 / 월 일수 */
 function rosterSummary(){
