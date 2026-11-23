@@ -2,7 +2,7 @@
  * 인터페이스 오류 탐색 테스트 (Playwright, Chromium)
  * 실행: npx playwright install chromium   (최초 1회)
  *       node tests/ui-qa.js [index.html 경로]
- * 21개 범주(A~U) 94개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
+ * 22개 범주(A~V) 96개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
  * 숫자 경계값, 극단적 명단, 날짜 팝오버, 연타·중단, Worker 차단 환경, 수동 교체, 프로필 이름,
  * 저장 전 입력 보존, 대규모 명단, 모바일 배치, 키보드 조작, 출력, 공휴일 입력, 손상된 저장값, 이전 결과 조작,
  * 기간 입력(~와 -의 변형, 날짜 형식 기간, 열린 기간 -5·20-), 실행 요약(소요 시간·개선 기록).
@@ -98,11 +98,11 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
 
 // E. 숫자 입력 경계값
 {const p=await fresh(b); await p.click('#btnSample'); await p.waitForTimeout(300);
- // E1. 시도 횟수 자동: 낮은 목표는 '목표 이상 5안'에서 일찍 멈추고, 도달 불가 목표는 최대 20,000회
+ // E1. 시도 횟수 자동: 낮은 목표는 최소 500회에서 멈추고(목표 이상 5안 확보), 도달 불가 목표는 최대 20,000회
  for(const [v,expStop] of [['50','target'],['60','target'],['100','max']]){ p.errs=[]; await setRange(p,'#minDFI',v);
    await p.click('#btnGenerate'); await p.waitForFunction(()=>!document.querySelector('#btnGenerate').disabled,null,{timeout:60000}); await closeDiag(p);
    const r=await p.evaluate(()=>state.run), t=await p.textContent('#progText');
-   const ok=!p.errs.length&&r.stop===expStop&&(expStop==='max'?r.attempts===20000:r.hits===5&&r.attempts<20000);
+   const ok=!p.errs.length&&r.stop===expStop&&(expStop==='max'?r.attempts===20000:r.hits>=5&&r.attempts===500);
    log('E1 목표 '+v+' → '+expStop,ok,`${r.attempts}회 · ${r.stop} · 목표 이상 ${r.hits}안 · `+t.slice(0,40)); }
  log('E5 시뮬레이션 횟수 설정 없음',!(await p.$('#maxAttempts')),'');
  // 슬라이더 격자 보정: 목표 DFI 50~100(5 단위)
@@ -276,6 +276,15 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
  await p.click('#btnProfileNew'); await p.fill('#askInput','U빈'); await p.click('#askYes'); await p.waitForTimeout(200);
  log('U6 프로필 전환 시 요약 숨김',!(await p.isVisible('#runSum')),'');
  errsOK(p,'U'); await p.context().close();}
+
+// V. 느린 브라우저: 5초 시간 제한 (Worker 없는 대체 실행에서 시계를 빠르게 흐르게 해 흉내)
+{const p=await fresh(b,{init:()=>{window.Worker=undefined;const real=Date.now.bind(Date);let c=0;Date.now=()=>real()+(c++)*400;}});
+ await p.click('#btnSample'); await p.waitForTimeout(300); await setRange(p,'#minDFI','100'); await p.waitForTimeout(450);
+ await p.click('#btnGenerate'); await p.waitForFunction(()=>!document.querySelector('#btnGenerate').disabled,null,{timeout:60000}); await closeDiag(p);
+ const r=await p.evaluate(()=>state.run), t=await p.textContent('#progText'), adv=await p.textContent('.run-advice');
+ log('V1 5초 제한에서 멈춤',r.stop==='time'&&r.attempts<20000&&/시간 제한/.test(t),`${r.attempts}회 · ${t.slice(0,45)}`);
+ log('V2 시간 제한 안내',/느려/.test(adv),adv.slice(0,50));
+ errsOK(p,'V'); await p.context().close();}
 
 await b.close();
 const f=results.filter(r=>!r.ok); console.log(`\n총 ${results.length}건 · 통과 ${results.length-f.length} · 실패 ${f.length}`);
