@@ -93,6 +93,10 @@ button.big{padding:10px 22px;font-size:15px}
 .help{font-size:11px;color:var(--sub)}
 .pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}   /* 짧은 숫자 칸 2개를 한 줄에 */
 .range-label{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+/* 배정 규칙의 '평일'·'휴일' 강조 칩. 색은 달력과 같은 규칙(휴일 = 빨강 계열)을 따릅니다. */
+.day-tag{display:inline-block;padding:1px 7px;border-radius:6px;font-size:12px;font-weight:800;margin-right:2px}
+.day-tag.wd{background:var(--accent-weak);color:var(--accent)}
+.day-tag.hd{background:var(--sun);color:var(--bad)}
 .profile-row{display:grid;grid-template-columns:minmax(160px,260px) 1fr;gap:8px;align-items:center}
 .profile-actions{display:flex;flex-wrap:wrap;gap:6px}
 @media (min-width:761px){
@@ -369,8 +373,8 @@ body.printing-sheet #printSheet{display:block}
     <div class="set-col">
       <fieldset class="set-group sg-rule">
         <legend>배정 규칙</legend>
-        <div class="field"><label for="restW" class="range-label"><span>평일 당직 후 배정 제외일</span><b class="range-val"><span id="restWVal">1</span>일</b></label><input type="range" id="restW" data-s="restW" min="0" max="5" step="1" aria-describedby="restWEx"><div class="range-ticks"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div><div class="range-ex" id="restWEx"></div></div>
-        <div class="field"><label for="restH" class="range-label"><span>휴일 당직 후 배정 제외일</span><b class="range-val"><span id="restHVal">2</span>일</b></label><input type="range" id="restH" data-s="restH" min="0" max="5" step="1" aria-describedby="restHEx"><div class="range-ticks"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div><div class="range-ex" id="restHEx"></div></div>
+        <div class="field"><label for="restW" class="range-label"><span><b class="day-tag wd">평일</b> 당직 후 배정 제외일</span><b class="range-val"><span id="restWVal">1</span>일</b></label><input type="range" id="restW" data-s="restW" min="0" max="5" step="1" aria-describedby="restWEx"><div class="range-ticks"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div><div class="range-ex" id="restWEx"></div></div>
+        <div class="field"><label for="restH" class="range-label"><span><b class="day-tag hd">휴일</b> 당직 후 배정 제외일</span><b class="range-val"><span id="restHVal">2</span>일</b></label><input type="range" id="restH" data-s="restH" min="0" max="5" step="1" aria-describedby="restHEx"><div class="range-ticks"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div><div class="range-ex" id="restHEx"></div></div>
       </fieldset>
       <fieldset class="set-group sg-gen">
         <legend>생성 옵션</legend>
@@ -918,8 +922,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.9.7', APP_BUILD = '2026-11-22';
+const APP_VERSION = '1.9.8', APP_BUILD = '2026-11-22';
 const CHANGELOG = [
+  '1.9.8 배정 규칙의 평일·휴일을 색 칩으로 강조',
   '1.9.7 열린 기간 입력: -5 → 1~5일, 20- → 20일~말일(달마다 자동). 입력칸 아래에 해석 결과를 따로 표시',
   '1.9.6 기간 입력: ~와 -의 모든 변형(전각 ～, 〜, −, – 등)을 기간으로 인식, 12/20-12/22·2026-12-20~2026-12-22처럼 날짜 형식으로 쓴 기간도 인식',
   '1.9.5 설정 영역을 4개 묶음(프로필·대상 기간·배정 규칙·생성 옵션)으로 재배치, 모바일: 프로필 버튼 2×2, 숫자 칸 2열, 공휴일 달력 전체 폭, 입력칸 16px(iOS 확대 방지)',
