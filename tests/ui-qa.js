@@ -2,9 +2,10 @@
  * 인터페이스 오류 탐색 테스트 (Playwright, Chromium)
  * 실행: npx playwright install chromium   (최초 1회)
  *       node tests/ui-qa.js [index.html 경로]
- * 19개 범주(A~S) 55개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
+ * 20개 범주(A~T) 72개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
  * 숫자 경계값, 극단적 명단, 날짜 팝오버, 연타·중단, Worker 차단 환경, 수동 교체, 프로필 이름,
- * 저장 전 입력 보존, 대규모 명단, 모바일 배치, 키보드 조작, 출력, 공휴일 입력, 손상된 저장값, 이전 결과 조작.
+ * 저장 전 입력 보존, 대규모 명단, 모바일 배치, 키보드 조작, 출력, 공휴일 입력, 손상된 저장값, 이전 결과 조작,
+ * 기간 입력(~와 -의 변형, 날짜 형식 기간).
  * 각 항목은 JS 예외·콘솔 오류·브라우저 기본 대화상자 발생도 함께 실패로 기록합니다.
  */
 
@@ -234,6 +235,12 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
  await p.click('#cal [data-pid]'); await p.click('#btnCSV'); if(await p.isVisible('#askDialog')) await p.click('#askYes');
  log('S1 명단 축소 후 이전 결과 조작',!p.errs.length,p.errs.join('|')||'정상');
  errsOK(p,'S'); await p.context().close();}
+
+// T. 기간 입력: ~와 -의 변형, 날짜 형식으로 쓴 기간
+{const p=await fresh(b); const exp={'20~22':'20~22','20-22':'20~22','20 - 22':'20~22','20일-22일':'20~22','20～22':'20~22','20〜22':'20~22','20−22':'20~22','20–22':'20~22','20—22':'20~22',
+  '12/20-12/22':'20~22','12.20~12.22':'20~22','12월 20일-22일':'20~22','2026-12-20~2026-12-22':'20~22','2026-12-25':'25','12/25':'25','22-20':'','20-':''};
+ for(const [inp,want] of Object.entries(exp)){ const got=await p.evaluate(v=>fmtDays(parseDays(v,31).days),inp); log('T "'+inp+'"',got===want,'→ '+(got||'(오류 표시)')); }
+ errsOK(p,'T'); await p.context().close();}
 
 await b.close();
 const f=results.filter(r=>!r.ok); console.log(`\n총 ${results.length}건 · 통과 ${results.length-f.length} · 실패 ${f.length}`);
