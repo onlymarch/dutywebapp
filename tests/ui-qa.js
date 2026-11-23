@@ -2,12 +2,13 @@
  * 인터페이스 오류 탐색 테스트 (Playwright, Chromium)
  * 실행: npx playwright install chromium   (최초 1회)
  *       node tests/ui-qa.js [index.html 경로]
- * 23개 범주(A~W) 135개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
+ * 24개 범주(A~X) 142개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
  * 숫자 경계값, 극단적 명단, 날짜 팝오버, 연타·중단, Worker 차단 환경, 수동 교체, 프로필 이름,
  * 저장 전 입력 보존, 대규모 명단, 모바일 배치, 키보드 조작, 출력, 공휴일 입력, 손상된 저장값, 이전 결과 조작,
  * 기간 입력(~와 -의 변형, 날짜 형식 기간, 열린 기간 -5·20-), 실행 요약(소요 시간·개선 기록),
  * 다국어(W: en·ja·zh·fr·es 각각 화면·툴팁·팝오버·대화상자·출력·CSV에 한글이 남지 않는지, 한국어 복원,
- *   결과 표시 중 재전환, 새로 고침 후 유지, 360px 가로 넘침, 12月25日 형식 해석). 첫 실행은 브라우저 언어를 감지해 저장하고, 이후에는 저장된 언어를 씁니다.
+ *   결과 표시 중 재전환, 새로 고침 후 유지, 360px 가로 넘침, 12月25日 형식 해석),
+ * v1.15(X: 내장 공휴일은 한국어에서만, 목표 미달 원인·개선 목록, 통계 기대·차이 툴팁). 첫 실행은 브라우저 언어를 감지해 저장하고, 이후에는 저장된 언어를 씁니다.
  * 각 항목은 JS 예외·콘솔 오류·브라우저 기본 대화상자 발생도 함께 실패로 기록합니다.
  */
 
@@ -355,6 +356,38 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
    errsOK(q,'W7 '+L); await q.context().close();}
  }
 }
+
+// X. v1.15: 내장 공휴일은 한국어에서만 · 목표 미달 원인 추정 · 통계 차이 툴팁
+{const p=await fresh(b); await p.click('#btnSample'); await p.waitForTimeout(300);
+ await p.selectOption('#ym','2027-1'); await p.waitForTimeout(200); await p.selectOption('#ym','2026-12'); await p.waitForTimeout(300);
+ const koH=await p.inputValue('#holidays');
+ log('X1 한국어: 내장 공휴일 자동 입력',/25/.test(koH),koH||'(비어 있음)');
+ await p.selectOption('#langSelect','en'); await p.waitForTimeout(150);
+ await p.selectOption('#ym','2026-10'); await p.waitForTimeout(300);
+ const enH=await p.inputValue('#holidays'); const hint=await p.textContent('#holHint').catch(()=>'');
+ log('X2 영어: 공휴일 자동 입력 안 함',enH.trim()===''&&/Korean/.test(hint),(enH||'(비어 있음)')+' · '+(hint||'').slice(0,60));
+ await p.fill('#holidays','12'); await p.waitForTimeout(450);
+ {const h3=await p.textContent('#holHint'); log('X3 영어: 직접 입력한 공휴일 유지·안내 숨김',(await p.inputValue('#holidays'))==='12'&&!h3.trim(),'12 · '+(h3||'(안내 없음)'));}
+ await p.selectOption('#langSelect','ko'); await p.waitForTimeout(150);
+ // 목표 100 → 대개 미달: 원인 목록과 추정 최고점
+ await p.selectOption('#ym','2027-1'); await p.waitForTimeout(200); await p.selectOption('#ym','2026-12'); await p.waitForTimeout(300);
+ await setRange(p,'#minDFI','100'); await p.waitForTimeout(300); await gen(p);
+ const dg=await p.evaluate(()=>{const d=document.querySelector('#dfiDiag details');if(!d)return null;d.open=true;return {n:d.querySelectorAll('li').length,fix:d.querySelectorAll('.fix').length,ub:(d.querySelector('.ub')||{}).textContent||''};});
+ log('X4 목표 미달 → 원인·개선 목록',dg&&dg.n>=1&&dg.fix>=1&&/\d/.test(dg.ub),dg?`${dg.n}개 · ${dg.ub}`:'목록 없음');
+ // 통계 차이 칸 툴팁
+ const why=await p.$('#stats td.why');
+ if(why){await why.hover(); await p.waitForTimeout(300); const tt=await p.textContent('#tip');
+   log('X5 통계 차이 칸 툴팁',/실제/.test(tt)&&/기대/.test(tt),tt.replace(/\s+/g,' ').slice(0,80));}
+ else log('X5 통계 차이 칸 툴팁',true,'±1 이상 차이 없음(표시 대상 없음)');
+ await p.hover('#stats th[data-tt="statDiff"]'); await p.waitForTimeout(300);
+ log('X6 차이 열 머리글 툴팁',/실제 − 기대/.test(await p.textContent('#tip')),'');
+ // 영어에서 원인 목록·툴팁에 한글 없음
+ await p.selectOption('#langSelect','en'); await p.waitForTimeout(200);
+ const enDiag=await p.evaluate(()=>{const d=document.querySelector('#dfiDiag');return d?d.textContent:'';});
+ let enTip=''; const w2=await p.$('#stats td.why'); if(w2){await w2.hover();await p.waitForTimeout(300);enTip=await p.textContent('#tip');}
+ const hg=/[가-힣]/.test(enDiag+enTip);
+ log('X7 영어: 원인 목록·통계 툴팁 번역',!hg,hg?(enDiag+enTip).match(/.{0,20}[가-힣]+.{0,20}/)[0]:enDiag.replace(/\s+/g,' ').slice(0,70));
+ errsOK(p,'X'); await p.context().close();}
 
 await b.close();
 const f=results.filter(r=>!r.ok); console.log(`\n총 ${results.length}건 · 통과 ${results.length-f.length} · 실패 ${f.length}`);

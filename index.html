@@ -335,8 +335,17 @@ tr.hl-row td{background:var(--hl-weak)}
 .gauge .bar i{display:block;height:100%;border-radius:999px}
 .gauge .lbl{font-size:12px}
 .gauge .val{font-size:12px;text-align:right;font-variant-numeric:tabular-nums}
-/* 목표 미달 한 줄 요약. 개선 방법은 툴팁 */
-.diag-line{margin:0 0 8px;padding:6px 10px;border-radius:8px;background:#fff4e5;border:1px solid #ffe0b2;font-size:12px;color:#7a4a00;cursor:help}
+/* 목표 미달: 한 줄 요약(누르면 펼침) + 원인·개선 방법 목록 */
+.diag-line{margin:0 0 8px;padding:6px 10px;border-radius:8px;background:#fff4e5;border:1px solid #ffe0b2;font-size:12px;color:#7a4a00}
+.diag-line summary{cursor:pointer;list-style:none}
+.diag-line summary::-webkit-details-marker{display:none}
+.diag-line summary .more{color:var(--accent);font-weight:600;white-space:nowrap}
+.diag-line ol{margin:8px 0 2px;padding-left:20px;color:var(--ink)}
+.diag-line li{margin:6px 0;line-height:1.5}
+.diag-line li .fix{display:block;color:#1b6b46}
+.diag-line .ub{margin-top:6px;font-size:11px;color:var(--sub)}
+/* 통계표: 차이가 큰 칸은 툴팁으로 원인 표시 */
+td.why{cursor:help;text-decoration:underline dotted;text-underline-offset:3px}
 .warn-list{color:var(--warn);font-size:12px}
 /* 8-5. 출력·저장 */
 .out-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:16px}
@@ -435,7 +444,7 @@ body.printing-sheet #printSheet{display:block}
       <legend>대상 기간</legend>
       <div class="field"><label for="ym">대상 연월</label><select id="ym"></select></div>
       <div class="field">
-        <label for="holidays">공휴일 <span class="set-sub">— 연월을 고르면 자동 입력되며, 달력을 눌러 추가·해제할 수 있습니다</span></label>
+        <label for="holidays">공휴일 <span class="set-sub">— 달력을 눌러 추가·해제할 수 있습니다</span></label>
         <input type="text" id="holidays" data-s="holidays" placeholder="예: 25 또는 1, 28~30">
         <div class="ph" id="ph-holidays"></div>
         <div class="mini-cal" id="miniCal"></div>
@@ -524,7 +533,7 @@ body.printing-sheet #printSheet{display:block}
       <div class="grade" id="dfiGrade" tabindex="0" data-tt="dfiGrade">-</div>
       <div class="dfi-meta" id="dfiMeta"></div>
     </div>
-    <div class="diag-line hidden" id="dfiDiag" tabindex="0" data-tt="dfiDiag"></div>
+    <div class="diag-line hidden" id="dfiDiag"></div>
     <div id="gauges"></div>
     <div class="warn-list" id="dfiWarn"></div>
   </section>
@@ -1008,7 +1017,7 @@ if (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScop
  *   - <b> 등 강조 태그가 든 원문은 번역문에도 같은 태그를 둡니다(툴팁·정적 HTML 일부).
  *   - 다섯 언어 모두 같은 키를 같은 순서로 두며, 앱 구역(§) 순서로 묶었습니다.
  *   - 키가 없으면 화면에 한국어 원문이 그대로 표시됩니다.
- *   키 429개 × 5개 언어 (en·ja·zh·fr·es). 한국어(ko)는 원문을 그대로 쓰므로 사전이 없습니다.
+ *   키 481개 × 5개 언어 (en·ja·zh·fr·es). 한국어(ko)는 원문을 그대로 쓰므로 사전이 없습니다.
  * ============================================================================= */
 const I18N = {
 /* ──────────────── en: English ──────────────── */
@@ -1420,7 +1429,7 @@ en: {
   "설정과 명단은 입력할 때마다 이 브라우저에 자동 저장되고, 다음 실행 때 마지막 프로필을 불러옵니다.": "Settings and the roster are saved automatically in this browser as you type, and the last profile is loaded next time.",
   "대상 기간": "Period",
   "대상 연월": "Target month",
-  "— 연월을 고르면 자동 입력되며, 달력을 눌러 추가·해제할 수 있습니다": "— filled in automatically when you choose the month; click the calendar to add or remove",
+  "— 달력을 눌러 추가·해제할 수 있습니다": "— click the calendar to add or remove",
   "예: 25 또는 1, 28~30": "e.g. 25 or 1, 28~30",
   "배정 규칙": "Assignment rules",
   "<b class=\"day-tag wd\">평일</b> 당직 후 배정 제외일": "<b class=\"day-tag wd\">Weekday</b> duty → rest days",
@@ -1464,6 +1473,59 @@ en: {
   "적용 · DFI 재계산": "Apply · recalculate DFI",
   "실행 취소": "Undo",
   "날짜 지정": "Set dates",
+  // ── v1.15: 내장 공휴일(한국어 전용)·목표 미달 원인 추정·통계 툴팁 ──
+  "내장 공휴일은 한국어 화면에서만 자동으로 입력됩니다(한국 공휴일). 이 달의 공휴일을 직접 입력하거나 달력을 누르십시오.": "Built-in holidays (Korea) are filled in only when the interface is in Korean. Type this month's public holidays or click them on the calendar.",
+  "{ym}: 공휴일을 비웠습니다. 이 달의 공휴일을 직접 입력하십시오.": "{ym}: public holidays cleared. Enter this month's holidays.",
+  "원인과 개선 방법 ({n})": "Likely causes and fixes ({n})",
+  "이 명단 조건에서 추정한 최고 가능 점수: 약 {ub}점": "Estimated best possible score with this roster: about {ub}",
+  "수동 교체 {n}건 이후 점수가 바뀌었습니다.": "Score changed after {n} manual {n:swap|swaps}.",
+  "교체를 되돌리거나(실행 취소) 다른 안을 선택하십시오.": "Undo the swaps or choose another plan.",
+  "브라우저가 느려 {n}회에서 시간 제한으로 멈췄습니다.": "The browser was slow, so the run stopped at the time limit after {n} attempts.",
+  "다른 탭을 닫고 다시 생성하면 더 많이 시도합니다.": "Close other tabs and generate again to try more plans.",
+  "{n}일이 미배정입니다. 그날 규칙을 모두 만족하는 사람이 없었습니다: {days}일.": "Unassigned: {n} {n:day|days} ({days}) — nobody met all the rules on those days.",
+  "그날의 제외일·제외요일을 줄이거나 배정 제외일을 줄이십시오. 레벨 1(특례) 인원을 늘려도 됩니다.": "Reduce unavailable dates/weekdays on those days or shorten rest days after duty; adding Level 1 (exempt) staff also helps.",
+  "이 명단 조건에서 기대할 수 있는 최고점은 약 {ub}점입니다. 근무 횟수는 정수라서 가중치대로 정확히 나눌 수 없고(M1), 휴일 수가 인원으로 나누어떨어지지 않으며(M2), 1인당 근무가 적으면 요일이 고르게 퍼질 수 없습니다(M5).": "With this roster, the highest score you can expect is about {ub}. Duty counts are whole numbers so they can't match the weights exactly (M1), holidays don't divide evenly among staff (M2), and with few duties per person weekdays can't spread evenly (M5).",
+  "목표 DFI를 {ub}점 이하로 낮추십시오.": "Lower the target DFI to {ub} or below.",
+  "월 최대 한도가 기대 근무수보다 낮은 사람: {list}.": "Monthly max is below the expected share for: {list}.",
+  "한도를 올리거나, 그 사람의 가중치를 한도에 맞게 낮추십시오.": "Raise the limit, or lower that person's weight to match it.",
+  "배정 가능한 날이 기대보다 많이 부족한 사람: {list}.": "Too few available days compared with the expected share: {list}.",
+  "{name}(가능 {f}일 · 기대 {e})": "{name} ({f} days free · expected {e})",
+  "제외일·제외요일을 줄이거나 가중치를 낮추십시오.": "Reduce unavailable dates/weekdays or lower the weight.",
+  "레벨 4는 조력자(레벨 3)가 있는 날만 배정되어 기대보다 적게 배정되었습니다: {list}.": "Level 4 staff can only work on days an assistant (Level 3) is free, so they got fewer duties: {list}.",
+  "레벨 3 인원을 늘리거나 레벨 3의 제외일을 줄이십시오. 또는 레벨 4의 가중치를 낮추십시오.": "Add Level 3 staff or reduce their unavailable dates — or lower Level 4 weights.",
+  "배정 제외일(평일 {w}일·휴일 {h}일)이 길어 근무가 많은 사람을 다 채우기 어렵습니다: {list}.": "Rest days after duty (weekday {w}, holiday {h}) are too long to fit everyone's share: {list}.",
+  "배정 제외일을 1일 줄이십시오.": "Shorten rest days after duty by one day.",
+  "주말을 제외요일로 둔 사람이 {k}명이라 휴일 근무가 나머지 {r}명에게 몰립니다.": "{k} {k:person excludes|people exclude} weekends, so holiday duties pile up on the other {r}.",
+  "주말 제외를 줄이고, 근무량 조정은 가중치로 하십시오.": "Use fewer weekend exclusions and balance workload with weights instead.",
+  "휴일 근무가 고르게 나뉘지 않았습니다(휴일 근무 {min}~{max}회).": "Holiday duties are uneven ({min}–{max} per person).",
+  "휴일 당직 후 배정 제외일을 줄이면 휴일 후보가 늘어납니다. 다시 생성해 보십시오.": "Shortening rest days after a holiday duty gives more holiday candidates; try generating again.",
+  "희망일이 겹친 날이 {n}일 있어 일부만 반영되었습니다.": "Preferred dates clash on {n} {n:day|days}, so only some could be honoured.",
+  "같은 날 희망자를 조정하십시오(사전 점검에 표시).": "Resolve clashes on the same day (listed in the pre-check).",
+  "희망일이 한도보다 많거나 제외 조건과 겹치는 사람: {list}.": "Preferred dates exceed the limit or clash with unavailability for: {list}.",
+  "희망일을 한도 이내로 줄이고 제외일·제외요일과 겹치지 않게 하십시오.": "Keep preferred dates within the limit and away from unavailable dates/weekdays.",
+  "가능일·희망일이 한쪽 기간에 몰려 근무가 붙어서 배정된 사람: {list}.": "Duties bunched because available/preferred dates sit in one part of the month: {list}.",
+  "근무 간격이 고르지 않습니다. 가능일·희망일이 한쪽 기간에 몰려 있거나 배정 제외일이 짧으면 근무가 붙어서 배정됩니다.": "Duty spacing is uneven — available/preferred dates in one part of the month, or short rest days, make duties bunch up.",
+  "가능일 범위를 넓히거나 배정 제외일을 1일 늘리십시오.": "Widen available-date ranges or add one rest day after duty.",
+  "1인당 근무가 평균 {a}회로 적거나 희망·제외요일 지정이 많아 특정 요일에 몰렸습니다(요일 지정 {k}명).": "Duties cluster on certain weekdays — few duties per person (avg {a}) or many weekday preferences/exclusions ({k} {k:person|people}).",
+  "희망요일·제외요일 지정을 줄이십시오. 1인당 근무가 적은 달은 이 점수가 낮게 나오는 것이 정상입니다.": "Use fewer weekday preferences/exclusions. A lower score here is normal when each person works only a few duties.",
+  "월 최대 {max}회가 기대 {e}보다 낮습니다.": "Monthly max {max} is below the expected {e}.",
+  "배정 가능한 날이 {f}일뿐입니다(제외일 {a}일, 제외요일 {k}개).": "Only {f} {f:day is|days are} available (unavailable dates: {a}, unavailable weekdays: {k}).",
+  "레벨 4라 조력자(레벨 3)가 있는 날만 배정됩니다.": "Level 4: only assigned on days an assistant (Level 3) is free.",
+  "배정 제외일(평일 {w}·휴일 {h}일) 때문에 연속 배정이 제한됩니다.": "Rest days after duty (weekday {w}, holiday {h}) limit back-to-back assignments.",
+  "다른 사람의 희망일·희망요일이 먼저 배정되어 차례가 밀렸습니다.": "Other people's preferred dates/weekdays were filled first, pushing this person back.",
+  "희망일 {n}일이 우선 반영되었습니다.": "{n} preferred {n:date was|dates were} given priority.",
+  "희망요일({d})이 우선 반영되었습니다.": "Preferred weekdays ({d}) were given priority.",
+  "레벨 1(특례)은 배정 제외일이 적용되지 않아 빈 날을 채우는 데 자주 배정됩니다.": "Level 1 (exempt) has no rest days after duty, so they often fill the gaps.",
+  "다른 근무자의 제외일·한도 때문에 남은 날을 더 맡았습니다.": "Took on leftover days because of other staff's unavailability and limits.",
+  "기대 근무수": "Expected duties",
+  "배정된 날 수 × 본인 가중치 ÷ 전체 가중치 합입니다.": "Assigned days × own weight ÷ total of all weights.",
+  "가중치에 비례한 '공정한 몫'이며, DFI M1이 이 값과 실제 근무수의 차이로 계산됩니다.": "It is the 'fair share' in proportion to weight; DFI M1 is calculated from the gap between this and actual duties.",
+  "차이 = 실제 − 기대": "Difference = actual − expected",
+  "±1 이상이면 색으로 표시합니다(주황: 많음, 파랑: 적음).": "Differences of ±1 or more are coloured (orange: more, blue: fewer).",
+  "<b>적게</b> 배정되는 경우: 월 최대 한도가 기대보다 낮음 · 제외일·제외요일이 많음 · 레벨 4(조력자 있는 날만) · 배정 제외일 때문에 연속 배정이 막힘 · 다른 사람의 희망일에 밀림": "<b>Fewer</b> than expected when: monthly max below the share · many unavailable dates/weekdays · Level 4 (only on days with an assistant) · rest days block close assignments · pushed back by others' preferred dates",
+  "<b>많이</b> 배정되는 경우: 희망일·희망요일이 많음 · 레벨 1(배정 제외일 미적용)이라 빈 날을 채움 · 다른 사람들의 제약으로 남은 날을 떠맡음": "<b>More</b> than expected when: many preferred dates/weekdays · Level 1 (no rest days) fills the gaps · takes on leftover days because of others' restrictions",
+  "차이가 큰 칸에 마우스를 올리면 그 사람에게 해당하는 원인을 보여 줍니다.": "Hover a highlighted difference to see the likely cause for that person.",
+  "{name}: 실제 {a} · 기대 {e} ({d})": "{name}: actual {a} · expected {e} ({d})",
 },
 /* ──────────────── ja: 日本語 ──────────────── */
 ja: {
@@ -1874,7 +1936,7 @@ ja: {
   "설정과 명단은 입력할 때마다 이 브라우저에 자동 저장되고, 다음 실행 때 마지막 프로필을 불러옵니다.": "設定と名簿は入力のたびにこのブラウザーに自動保存され、次回起動時に最後のプロフィールを読み込みます。",
   "대상 기간": "対象期間",
   "대상 연월": "対象年月",
-  "— 연월을 고르면 자동 입력되며, 달력을 눌러 추가·해제할 수 있습니다": "— 年月を選ぶと自動入力され、カレンダーをクリックして追加・解除できます",
+  "— 달력을 눌러 추가·해제할 수 있습니다": "— カレンダーをクリックして追加・解除できます",
   "예: 25 또는 1, 28~30": "例: 25 または 1, 28~30",
   "배정 규칙": "割当ルール",
   "<b class=\"day-tag wd\">평일</b> 당직 후 배정 제외일": "<b class=\"day-tag wd\">平日</b> 当直後の休息日",
@@ -1918,6 +1980,59 @@ ja: {
   "적용 · DFI 재계산": "適用 · DFI 再計算",
   "실행 취소": "元に戻す",
   "날짜 지정": "日付の指定",
+  // ── v1.15: 내장 공휴일(한국어 전용)·목표 미달 원인 추정·통계 툴팁 ──
+  "내장 공휴일은 한국어 화면에서만 자동으로 입력됩니다(한국 공휴일). 이 달의 공휴일을 직접 입력하거나 달력을 누르십시오.": "内蔵の祝日(韓国)は韓国語表示のときだけ自動入力されます。今月の祝日を入力するか、カレンダーをクリックしてください。",
+  "{ym}: 공휴일을 비웠습니다. 이 달의 공휴일을 직접 입력하십시오.": "{ym}:祝日を空にしました。今月の祝日を入力してください。",
+  "원인과 개선 방법 ({n})": "考えられる原因と改善方法({n})",
+  "이 명단 조건에서 추정한 최고 가능 점수: 약 {ub}점": "この名簿の条件で推定される最高点:約{ub}点",
+  "수동 교체 {n}건 이후 점수가 바뀌었습니다.": "手動入れ替え{n}件の後で点数が変わりました。",
+  "교체를 되돌리거나(실행 취소) 다른 안을 선택하십시오.": "入れ替えを元に戻すか、別の案を選んでください。",
+  "브라우저가 느려 {n}회에서 시간 제한으로 멈췄습니다.": "ブラウザが遅く、{n}回で時間制限により停止しました。",
+  "다른 탭을 닫고 다시 생성하면 더 많이 시도합니다.": "他のタブを閉じて再作成すると、より多く試行できます。",
+  "{n}일이 미배정입니다. 그날 규칙을 모두 만족하는 사람이 없었습니다: {days}일.": "{n}日が未割当です。その日はすべてのルールを満たす人がいませんでした:{days}日。",
+  "그날의 제외일·제외요일을 줄이거나 배정 제외일을 줄이십시오. 레벨 1(특례) 인원을 늘려도 됩니다.": "その日の不可日・不可曜日を減らすか、当直後の休息日を短くしてください。レベル1(特例)の人を増やすのも有効です。",
+  "이 명단 조건에서 기대할 수 있는 최고점은 약 {ub}점입니다. 근무 횟수는 정수라서 가중치대로 정확히 나눌 수 없고(M1), 휴일 수가 인원으로 나누어떨어지지 않으며(M2), 1인당 근무가 적으면 요일이 고르게 퍼질 수 없습니다(M5).": "この名簿の条件で期待できる最高点は約{ub}点です。勤務回数は整数のため重みどおりに正確には分けられず(M1)、休日数は人数で割り切れず(M2)、1人あたりの勤務が少ないと曜日を均等に分散できません(M5)。",
+  "목표 DFI를 {ub}점 이하로 낮추십시오.": "目標DFIを{ub}点以下に下げてください。",
+  "월 최대 한도가 기대 근무수보다 낮은 사람: {list}.": "月上限が期待勤務数より低い人:{list}。",
+  "한도를 올리거나, 그 사람의 가중치를 한도에 맞게 낮추십시오.": "上限を上げるか、その人の重みを上限に合わせて下げてください。",
+  "배정 가능한 날이 기대보다 많이 부족한 사람: {list}.": "期待に比べて割当可能な日が少ない人:{list}。",
+  "{name}(가능 {f}일 · 기대 {e})": "{name}(可能{f}日・期待{e})",
+  "제외일·제외요일을 줄이거나 가중치를 낮추십시오.": "不可日・不可曜日を減らすか、重みを下げてください。",
+  "레벨 4는 조력자(레벨 3)가 있는 날만 배정되어 기대보다 적게 배정되었습니다: {list}.": "レベル4は補助者(レベル3)がいる日しか割り当てられず、期待より少なくなりました:{list}。",
+  "레벨 3 인원을 늘리거나 레벨 3의 제외일을 줄이십시오. 또는 레벨 4의 가중치를 낮추십시오.": "レベル3の人数を増やすか不可日を減らす、またはレベル4の重みを下げてください。",
+  "배정 제외일(평일 {w}일·휴일 {h}일)이 길어 근무가 많은 사람을 다 채우기 어렵습니다: {list}.": "当直後の休息日(平日{w}日・休日{h}日)が長く、勤務の多い人の分を入れきれません:{list}。",
+  "배정 제외일을 1일 줄이십시오.": "当直後の休息日を1日短くしてください。",
+  "주말을 제외요일로 둔 사람이 {k}명이라 휴일 근무가 나머지 {r}명에게 몰립니다.": "{k}人が週末を不可曜日にしているため、休日勤務が残りの{r}人に集中します。",
+  "주말 제외를 줄이고, 근무량 조정은 가중치로 하십시오.": "週末の除外を減らし、勤務量の調整は重みで行ってください。",
+  "휴일 근무가 고르게 나뉘지 않았습니다(휴일 근무 {min}~{max}회).": "休日勤務が均等ではありません(1人{min}〜{max}回)。",
+  "휴일 당직 후 배정 제외일을 줄이면 휴일 후보가 늘어납니다. 다시 생성해 보십시오.": "休日当直後の休息日を短くすると休日の候補が増えます。もう一度作成してみてください。",
+  "희망일이 겹친 날이 {n}일 있어 일부만 반영되었습니다.": "希望日が重なった日が{n}日あり、一部しか反映できませんでした。",
+  "같은 날 희망자를 조정하십시오(사전 점검에 표시).": "同じ日の希望者を調整してください(事前チェックに表示)。",
+  "희망일이 한도보다 많거나 제외 조건과 겹치는 사람: {list}.": "希望日が上限を超える、または不可条件と重なる人:{list}。",
+  "희망일을 한도 이내로 줄이고 제외일·제외요일과 겹치지 않게 하십시오.": "希望日を上限以内にし、不可日・不可曜日と重ならないようにしてください。",
+  "가능일·희망일이 한쪽 기간에 몰려 근무가 붙어서 배정된 사람: {list}.": "可能日・希望日が月の一部に集中し、勤務が詰まった人:{list}。",
+  "근무 간격이 고르지 않습니다. 가능일·희망일이 한쪽 기간에 몰려 있거나 배정 제외일이 짧으면 근무가 붙어서 배정됩니다.": "勤務間隔が不均一です。可能日・希望日が月の一部に集中していたり、休息日が短いと勤務が詰まって割り当てられます。",
+  "가능일 범위를 넓히거나 배정 제외일을 1일 늘리십시오.": "可能日の範囲を広げるか、当直後の休息日を1日増やしてください。",
+  "1인당 근무가 평균 {a}회로 적거나 희망·제외요일 지정이 많아 특정 요일에 몰렸습니다(요일 지정 {k}명).": "1人あたりの勤務が平均{a}回と少ない、または曜日の希望・除外が多い({k}人)ため、特定の曜日に偏りました。",
+  "희망요일·제외요일 지정을 줄이십시오. 1인당 근무가 적은 달은 이 점수가 낮게 나오는 것이 정상입니다.": "希望曜日・不可曜日の指定を減らしてください。1人あたりの勤務が少ない月はこの点数が低めなのが普通です。",
+  "월 최대 {max}회가 기대 {e}보다 낮습니다.": "月上限{max}回が期待{e}より低いです。",
+  "배정 가능한 날이 {f}일뿐입니다(제외일 {a}일, 제외요일 {k}개).": "割当可能な日は{f}日だけです(不可日{a}日、不可曜日{k}個)。",
+  "레벨 4라 조력자(레벨 3)가 있는 날만 배정됩니다.": "レベル4のため、補助者(レベル3)がいる日だけ割り当てられます。",
+  "배정 제외일(평일 {w}·휴일 {h}일) 때문에 연속 배정이 제한됩니다.": "当直後の休息日(平日{w}・休日{h}日)のため、連続した割当が制限されます。",
+  "다른 사람의 희망일·희망요일이 먼저 배정되어 차례가 밀렸습니다.": "他の人の希望日・希望曜日が先に割り当てられ、順番が後回しになりました。",
+  "희망일 {n}일이 우선 반영되었습니다.": "希望日{n}日が優先して反映されました。",
+  "희망요일({d})이 우선 반영되었습니다.": "希望曜日({d})が優先して反映されました。",
+  "레벨 1(특례)은 배정 제외일이 적용되지 않아 빈 날을 채우는 데 자주 배정됩니다.": "レベル1(特例)は当直後の休息日が適用されないため、空いた日を埋めるのによく割り当てられます。",
+  "다른 근무자의 제외일·한도 때문에 남은 날을 더 맡았습니다.": "他の担当者の不可日・上限のため、残った日を多く担当しました。",
+  "기대 근무수": "期待勤務数",
+  "배정된 날 수 × 본인 가중치 ÷ 전체 가중치 합입니다.": "割当日数 × 本人の重み ÷ 全員の重みの合計です。",
+  "가중치에 비례한 '공정한 몫'이며, DFI M1이 이 값과 실제 근무수의 차이로 계산됩니다.": "重みに比例した「公平な取り分」で、DFIのM1はこの値と実際の勤務数の差から計算されます。",
+  "차이 = 실제 − 기대": "差 = 実際 − 期待",
+  "±1 이상이면 색으로 표시합니다(주황: 많음, 파랑: 적음).": "±1以上は色で表示します(オレンジ:多い、青:少ない)。",
+  "<b>적게</b> 배정되는 경우: 월 최대 한도가 기대보다 낮음 · 제외일·제외요일이 많음 · 레벨 4(조력자 있는 날만) · 배정 제외일 때문에 연속 배정이 막힘 · 다른 사람의 희망일에 밀림": "<b>少なく</b>なる場合:月上限が期待より低い・不可日/不可曜日が多い・レベル4(補助者がいる日のみ)・休息日で連続割当ができない・他の人の希望日に押される",
+  "<b>많이</b> 배정되는 경우: 희망일·희망요일이 많음 · 레벨 1(배정 제외일 미적용)이라 빈 날을 채움 · 다른 사람들의 제약으로 남은 날을 떠맡음": "<b>多く</b>なる場合:希望日・希望曜日が多い・レベル1(休息日なし)で空いた日を埋める・他の人の制約で残った日を引き受ける",
+  "차이가 큰 칸에 마우스를 올리면 그 사람에게 해당하는 원인을 보여 줍니다.": "差の大きいセルにマウスを合わせると、その人に当てはまる原因を表示します。",
+  "{name}: 실제 {a} · 기대 {e} ({d})": "{name}:実際{a}・期待{e}({d})",
 },
 /* ──────────────── zh: 中文(简体) ──────────────── */
 zh: {
@@ -2328,7 +2443,7 @@ zh: {
   "설정과 명단은 입력할 때마다 이 브라우저에 자동 저장되고, 다음 실행 때 마지막 프로필을 불러옵니다.": "设置和名单在每次输入时自动保存到此浏览器,下次打开时会载入最后使用的配置。",
   "대상 기간": "目标期间",
   "대상 연월": "目标年月",
-  "— 연월을 고르면 자동 입력되며, 달력을 눌러 추가·해제할 수 있습니다": "— 选择年月后自动填入,可点击日历添加或取消",
+  "— 달력을 눌러 추가·해제할 수 있습니다": "— 点击日历可添加或取消",
   "예: 25 또는 1, 28~30": "例: 25 或 1, 28~30",
   "배정 규칙": "排班规则",
   "<b class=\"day-tag wd\">평일</b> 당직 후 배정 제외일": "<b class=\"day-tag wd\">工作日</b> 值班后休息日",
@@ -2372,6 +2487,59 @@ zh: {
   "적용 · DFI 재계산": "应用 · 重新计算 DFI",
   "실행 취소": "撤销",
   "날짜 지정": "指定日期",
+  // ── v1.15: 내장 공휴일(한국어 전용)·목표 미달 원인 추정·통계 툴팁 ──
+  "내장 공휴일은 한국어 화면에서만 자동으로 입력됩니다(한국 공휴일). 이 달의 공휴일을 직접 입력하거나 달력을 누르십시오.": "内置节假日(韩国)仅在韩语界面下自动填入。请输入本月的公众假日,或在日历上点击。",
+  "{ym}: 공휴일을 비웠습니다. 이 달의 공휴일을 직접 입력하십시오.": "{ym}:已清空公众假日。请输入本月的假日。",
+  "원인과 개선 방법 ({n})": "可能原因与改进方法({n})",
+  "이 명단 조건에서 추정한 최고 가능 점수: 약 {ub}점": "按当前名单估计的最高可能分数:约{ub}分",
+  "수동 교체 {n}건 이후 점수가 바뀌었습니다.": "手动替换{n}次后分数发生变化。",
+  "교체를 되돌리거나(실행 취소) 다른 안을 선택하십시오.": "请撤销替换或选择其他方案。",
+  "브라우저가 느려 {n}회에서 시간 제한으로 멈췄습니다.": "浏览器较慢,在{n}次时因时间限制停止。",
+  "다른 탭을 닫고 다시 생성하면 더 많이 시도합니다.": "关闭其他标签页后重新生成可尝试更多方案。",
+  "{n}일이 미배정입니다. 그날 규칙을 모두 만족하는 사람이 없었습니다: {days}일.": "有{n}天未排班:这些天没有人满足全部规则({days}日)。",
+  "그날의 제외일·제외요일을 줄이거나 배정 제외일을 줄이십시오. 레벨 1(특례) 인원을 늘려도 됩니다.": "请减少这些天的不可排日期/星期,或缩短值班后休息日;增加1级(特例)人员也有帮助。",
+  "이 명단 조건에서 기대할 수 있는 최고점은 약 {ub}점입니다. 근무 횟수는 정수라서 가중치대로 정확히 나눌 수 없고(M1), 휴일 수가 인원으로 나누어떨어지지 않으며(M2), 1인당 근무가 적으면 요일이 고르게 퍼질 수 없습니다(M5).": "按当前名单条件,预计可达到的最高分约为{ub}分。值班次数为整数,无法完全按权重分配(M1);假日天数无法被人数整除(M2);人均值班少时星期无法均匀分布(M5)。",
+  "목표 DFI를 {ub}점 이하로 낮추십시오.": "请将目标DFI降至{ub}分以下。",
+  "월 최대 한도가 기대 근무수보다 낮은 사람: {list}.": "月上限低于期望值班数的人员:{list}。",
+  "한도를 올리거나, 그 사람의 가중치를 한도에 맞게 낮추십시오.": "请提高上限,或将其权重降低到与上限相符。",
+  "배정 가능한 날이 기대보다 많이 부족한 사람: {list}.": "可排班日明显少于期望的人员:{list}。",
+  "{name}(가능 {f}일 · 기대 {e})": "{name}(可排{f}天·期望{e})",
+  "제외일·제외요일을 줄이거나 가중치를 낮추십시오.": "请减少不可排日期/星期,或降低权重。",
+  "레벨 4는 조력자(레벨 3)가 있는 날만 배정되어 기대보다 적게 배정되었습니다: {list}.": "4级人员只能在有协助者(3级)的日子排班,因此少于期望:{list}。",
+  "레벨 3 인원을 늘리거나 레벨 3의 제외일을 줄이십시오. 또는 레벨 4의 가중치를 낮추십시오.": "请增加3级人员或减少其不可排日期,或降低4级人员的权重。",
+  "배정 제외일(평일 {w}일·휴일 {h}일)이 길어 근무가 많은 사람을 다 채우기 어렵습니다: {list}.": "值班后休息日(工作日{w}天·假日{h}天)过长,无法排满值班较多人员的份额:{list}。",
+  "배정 제외일을 1일 줄이십시오.": "请将值班后休息日缩短1天。",
+  "주말을 제외요일로 둔 사람이 {k}명이라 휴일 근무가 나머지 {r}명에게 몰립니다.": "有{k}人将周末设为不可排,假日值班集中到其余{r}人。",
+  "주말 제외를 줄이고, 근무량 조정은 가중치로 하십시오.": "请减少周末排除,改用权重调整工作量。",
+  "휴일 근무가 고르게 나뉘지 않았습니다(휴일 근무 {min}~{max}회).": "假日值班分配不均(每人{min}~{max}次)。",
+  "휴일 당직 후 배정 제외일을 줄이면 휴일 후보가 늘어납니다. 다시 생성해 보십시오.": "缩短假日值班后休息日可增加假日候选人;请重新生成。",
+  "희망일이 겹친 날이 {n}일 있어 일부만 반영되었습니다.": "有{n}天的希望日期冲突,只能部分满足。",
+  "같은 날 희망자를 조정하십시오(사전 점검에 표시).": "请调整同一天的希望者(见预检)。",
+  "희망일이 한도보다 많거나 제외 조건과 겹치는 사람: {list}.": "希望日期超过上限或与不可排条件冲突的人员:{list}。",
+  "희망일을 한도 이내로 줄이고 제외일·제외요일과 겹치지 않게 하십시오.": "请将希望日期控制在上限内,并避开不可排日期/星期。",
+  "가능일·희망일이 한쪽 기간에 몰려 근무가 붙어서 배정된 사람: {list}.": "可排/希望日期集中在月内某段导致值班扎堆的人员:{list}。",
+  "근무 간격이 고르지 않습니다. 가능일·희망일이 한쪽 기간에 몰려 있거나 배정 제외일이 짧으면 근무가 붙어서 배정됩니다.": "值班间隔不均:可排/希望日期集中在月内某段,或休息日过短,会使值班扎堆。",
+  "가능일 범위를 넓히거나 배정 제외일을 1일 늘리십시오.": "请扩大可排日期范围,或将值班后休息日增加1天。",
+  "1인당 근무가 평균 {a}회로 적거나 희망·제외요일 지정이 많아 특정 요일에 몰렸습니다(요일 지정 {k}명).": "人均值班仅{a}次,或星期偏好/排除较多({k}人),值班集中于某些星期。",
+  "희망요일·제외요일 지정을 줄이십시오. 1인당 근무가 적은 달은 이 점수가 낮게 나오는 것이 정상입니다.": "请减少希望/不可排星期的设置。人均值班较少的月份此项分数偏低属正常。",
+  "월 최대 {max}회가 기대 {e}보다 낮습니다.": "月上限{max}次低于期望{e}。",
+  "배정 가능한 날이 {f}일뿐입니다(제외일 {a}일, 제외요일 {k}개).": "可排班日只有{f}天(不可排日期{a}天,不可排星期{k}个)。",
+  "레벨 4라 조력자(레벨 3)가 있는 날만 배정됩니다.": "4级人员只能在有协助者(3级)的日子排班。",
+  "배정 제외일(평일 {w}·휴일 {h}일) 때문에 연속 배정이 제한됩니다.": "值班后休息日(工作日{w}·假日{h}天)限制了连续排班。",
+  "다른 사람의 희망일·희망요일이 먼저 배정되어 차례가 밀렸습니다.": "其他人的希望日期/星期优先排班,此人被往后推。",
+  "희망일 {n}일이 우선 반영되었습니다.": "{n}个希望日期被优先满足。",
+  "희망요일({d})이 우선 반영되었습니다.": "希望星期({d})被优先满足。",
+  "레벨 1(특례)은 배정 제외일이 적용되지 않아 빈 날을 채우는 데 자주 배정됩니다.": "1级(特例)不受值班后休息日限制,常被用来填补空缺。",
+  "다른 근무자의 제외일·한도 때문에 남은 날을 더 맡았습니다.": "因其他人员的不可排日期和上限,承担了更多剩余天数。",
+  "기대 근무수": "期望值班数",
+  "배정된 날 수 × 본인 가중치 ÷ 전체 가중치 합입니다.": "已排班天数 × 本人权重 ÷ 全员权重之和。",
+  "가중치에 비례한 '공정한 몫'이며, DFI M1이 이 값과 실제 근무수의 차이로 계산됩니다.": "这是按权重计算的“公平份额”,DFI的M1由该值与实际值班数的差计算。",
+  "차이 = 실제 − 기대": "差 = 实际 − 期望",
+  "±1 이상이면 색으로 표시합니다(주황: 많음, 파랑: 적음).": "±1及以上用颜色标示(橙色:偏多,蓝色:偏少)。",
+  "<b>적게</b> 배정되는 경우: 월 최대 한도가 기대보다 낮음 · 제외일·제외요일이 많음 · 레벨 4(조력자 있는 날만) · 배정 제외일 때문에 연속 배정이 막힘 · 다른 사람의 희망일에 밀림": "<b>偏少</b>的情况:月上限低于期望 · 不可排日期/星期多 · 4级(仅限有协助者的日子)· 休息日限制连续排班 · 被他人的希望日期挤后",
+  "<b>많이</b> 배정되는 경우: 희망일·희망요일이 많음 · 레벨 1(배정 제외일 미적용)이라 빈 날을 채움 · 다른 사람들의 제약으로 남은 날을 떠맡음": "<b>偏多</b>的情况:希望日期/星期多 · 1级(无休息日)填补空缺 · 因他人限制承担剩余天数",
+  "차이가 큰 칸에 마우스를 올리면 그 사람에게 해당하는 원인을 보여 줍니다.": "将鼠标移到差值较大的单元格上,可查看此人的可能原因。",
+  "{name}: 실제 {a} · 기대 {e} ({d})": "{name}:实际{a} · 期望{e}({d})",
 },
 /* ──────────────── fr: Français ──────────────── */
 fr: {
@@ -2782,7 +2950,7 @@ fr: {
   "설정과 명단은 입력할 때마다 이 브라우저에 자동 저장되고, 다음 실행 때 마지막 프로필을 불러옵니다.": "Les paramètres et la liste sont enregistrés automatiquement dans ce navigateur à chaque saisie ; le dernier profil est rechargé à la prochaine ouverture.",
   "대상 기간": "Période",
   "대상 연월": "Mois concerné",
-  "— 연월을 고르면 자동 입력되며, 달력을 눌러 추가·해제할 수 있습니다": "— renseignés automatiquement selon le mois ; cliquez sur le calendrier pour ajouter ou retirer",
+  "— 달력을 눌러 추가·해제할 수 있습니다": "— cliquez sur le calendrier pour ajouter ou retirer",
   "예: 25 또는 1, 28~30": "ex. : 25 ou 1, 28~30",
   "배정 규칙": "Règles d'attribution",
   "<b class=\"day-tag wd\">평일</b> 당직 후 배정 제외일": "<b class=\"day-tag wd\">Semaine</b> repos après une garde",
@@ -2826,6 +2994,59 @@ fr: {
   "적용 · DFI 재계산": "Appliquer · recalculer le DFI",
   "실행 취소": "Annuler",
   "날짜 지정": "Définir les dates",
+  // ── v1.15: 내장 공휴일(한국어 전용)·목표 미달 원인 추정·통계 툴팁 ──
+  "내장 공휴일은 한국어 화면에서만 자동으로 입력됩니다(한국 공휴일). 이 달의 공휴일을 직접 입력하거나 달력을 누르십시오.": "Les jours fériés intégrés (Corée) ne sont remplis automatiquement qu’en coréen. Saisissez les jours fériés du mois ou cliquez dessus dans le calendrier.",
+  "{ym}: 공휴일을 비웠습니다. 이 달의 공휴일을 직접 입력하십시오.": "{ym} : jours fériés effacés. Saisissez ceux de ce mois.",
+  "원인과 개선 방법 ({n})": "Causes probables et solutions ({n})",
+  "이 명단 조건에서 추정한 최고 가능 점수: 약 {ub}점": "Meilleur score estimé possible avec cette liste : environ {ub}",
+  "수동 교체 {n}건 이후 점수가 바뀌었습니다.": "Le score a changé après {n} {n:échange manuel|échanges manuels}.",
+  "교체를 되돌리거나(실행 취소) 다른 안을 선택하십시오.": "Annulez les échanges ou choisissez un autre plan.",
+  "브라우저가 느려 {n}회에서 시간 제한으로 멈췄습니다.": "Navigateur lent : arrêt à la limite de temps après {n} essais.",
+  "다른 탭을 닫고 다시 생성하면 더 많이 시도합니다.": "Fermez d’autres onglets et relancez pour tester plus de plans.",
+  "{n}일이 미배정입니다. 그날 규칙을 모두 만족하는 사람이 없었습니다: {days}일.": "{n} {n:jour|jours} sans garde ({days}) : personne ne respectait toutes les règles ces jours-là.",
+  "그날의 제외일·제외요일을 줄이거나 배정 제외일을 줄이십시오. 레벨 1(특례) 인원을 늘려도 됩니다.": "Réduisez les indisponibilités ces jours-là ou les jours de repos après une garde ; ajouter du personnel de niveau 1 (dérogation) aide aussi.",
+  "이 명단 조건에서 기대할 수 있는 최고점은 약 {ub}점입니다. 근무 횟수는 정수라서 가중치대로 정확히 나눌 수 없고(M1), 휴일 수가 인원으로 나누어떨어지지 않으며(M2), 1인당 근무가 적으면 요일이 고르게 퍼질 수 없습니다(M5).": "Avec cette liste, le meilleur score envisageable est d’environ {ub}. Le nombre de gardes est entier et ne peut suivre exactement les poids (M1), les jours fériés ne se répartissent pas exactement (M2) et, avec peu de gardes par personne, les jours de la semaine ne peuvent pas être répartis uniformément (M5).",
+  "목표 DFI를 {ub}점 이하로 낮추십시오.": "Abaissez le DFI cible à {ub} ou moins.",
+  "월 최대 한도가 기대 근무수보다 낮은 사람: {list}.": "Le maximum mensuel est inférieur à la part attendue pour : {list}.",
+  "한도를 올리거나, 그 사람의 가중치를 한도에 맞게 낮추십시오.": "Augmentez la limite ou baissez le poids de la personne en conséquence.",
+  "배정 가능한 날이 기대보다 많이 부족한 사람: {list}.": "Trop peu de jours disponibles par rapport à la part attendue : {list}.",
+  "{name}(가능 {f}일 · 기대 {e})": "{name} ({f} j libres · attendu {e})",
+  "제외일·제외요일을 줄이거나 가중치를 낮추십시오.": "Réduisez les indisponibilités ou baissez le poids.",
+  "레벨 4는 조력자(레벨 3)가 있는 날만 배정되어 기대보다 적게 배정되었습니다: {list}.": "Le niveau 4 ne peut travailler que les jours où un assistant (niveau 3) est libre, d’où moins de gardes : {list}.",
+  "레벨 3 인원을 늘리거나 레벨 3의 제외일을 줄이십시오. 또는 레벨 4의 가중치를 낮추십시오.": "Ajoutez du personnel de niveau 3 ou réduisez ses indisponibilités — ou baissez le poids du niveau 4.",
+  "배정 제외일(평일 {w}일·휴일 {h}일)이 길어 근무가 많은 사람을 다 채우기 어렵습니다: {list}.": "Les jours de repos après une garde (semaine {w}, férié {h}) sont trop longs pour caser la part de chacun : {list}.",
+  "배정 제외일을 1일 줄이십시오.": "Réduisez d’un jour les jours de repos après une garde.",
+  "주말을 제외요일로 둔 사람이 {k}명이라 휴일 근무가 나머지 {r}명에게 몰립니다.": "{k} {k:personne exclut|personnes excluent} le week-end : les gardes fériées retombent sur les {r} autres.",
+  "주말 제외를 줄이고, 근무량 조정은 가중치로 하십시오.": "Limitez les exclusions du week-end et équilibrez plutôt avec les poids.",
+  "휴일 근무가 고르게 나뉘지 않았습니다(휴일 근무 {min}~{max}회).": "Gardes fériées inégales ({min}–{max} par personne).",
+  "휴일 당직 후 배정 제외일을 줄이면 휴일 후보가 늘어납니다. 다시 생성해 보십시오.": "Raccourcir le repos après une garde fériée élargit les candidats ; relancez la génération.",
+  "희망일이 겹친 날이 {n}일 있어 일부만 반영되었습니다.": "Les dates souhaitées se chevauchent sur {n} {n:jour|jours} : seules certaines ont été retenues.",
+  "같은 날 희망자를 조정하십시오(사전 점검에 표시).": "Réglez les conflits du même jour (indiqués dans la pré-vérification).",
+  "희망일이 한도보다 많거나 제외 조건과 겹치는 사람: {list}.": "Dates souhaitées au-delà de la limite ou en conflit avec une indisponibilité : {list}.",
+  "희망일을 한도 이내로 줄이고 제외일·제외요일과 겹치지 않게 하십시오.": "Restez dans la limite et évitez les dates/jours indisponibles.",
+  "가능일·희망일이 한쪽 기간에 몰려 근무가 붙어서 배정된 사람: {list}.": "Gardes regroupées car les dates disponibles/souhaitées sont concentrées : {list}.",
+  "근무 간격이 고르지 않습니다. 가능일·희망일이 한쪽 기간에 몰려 있거나 배정 제외일이 짧으면 근무가 붙어서 배정됩니다.": "Espacement irrégulier : des dates disponibles/souhaitées concentrées sur une partie du mois ou un repos trop court regroupent les gardes.",
+  "가능일 범위를 넓히거나 배정 제외일을 1일 늘리십시오.": "Élargissez les plages disponibles ou ajoutez un jour de repos après une garde.",
+  "1인당 근무가 평균 {a}회로 적거나 희망·제외요일 지정이 많아 특정 요일에 몰렸습니다(요일 지정 {k}명).": "Gardes concentrées sur certains jours : peu de gardes par personne (moy. {a}) ou nombreuses préférences/exclusions de jours ({k} {k:personne|personnes}).",
+  "희망요일·제외요일 지정을 줄이십시오. 1인당 근무가 적은 달은 이 점수가 낮게 나오는 것이 정상입니다.": "Limitez les préférences/exclusions de jours. Un score plus bas est normal quand chacun n’a que quelques gardes.",
+  "월 최대 {max}회가 기대 {e}보다 낮습니다.": "Le maximum mensuel ({max}) est inférieur à l’attendu ({e}).",
+  "배정 가능한 날이 {f}일뿐입니다(제외일 {a}일, 제외요일 {k}개).": "Seulement {f} {f:jour disponible|jours disponibles} (dates indisponibles : {a}, jours exclus : {k}).",
+  "레벨 4라 조력자(레벨 3)가 있는 날만 배정됩니다.": "Niveau 4 : affecté uniquement les jours où un assistant (niveau 3) est libre.",
+  "배정 제외일(평일 {w}·휴일 {h}일) 때문에 연속 배정이 제한됩니다.": "Les jours de repos après une garde (semaine {w}, férié {h}) limitent les gardes rapprochées.",
+  "다른 사람의 희망일·희망요일이 먼저 배정되어 차례가 밀렸습니다.": "Les dates/jours souhaités des autres ont été servis en premier, ce qui a repoussé cette personne.",
+  "희망일 {n}일이 우선 반영되었습니다.": "{n} {n:date souhaitée a été prioritaire|dates souhaitées ont été prioritaires}.",
+  "희망요일({d})이 우선 반영되었습니다.": "Les jours souhaités ({d}) ont été prioritaires.",
+  "레벨 1(특례)은 배정 제외일이 적용되지 않아 빈 날을 채우는 데 자주 배정됩니다.": "Le niveau 1 (dérogation) n’a pas de repos après une garde : il comble souvent les trous.",
+  "다른 근무자의 제외일·한도 때문에 남은 날을 더 맡았습니다.": "A repris des jours restants à cause des indisponibilités et limites des autres.",
+  "기대 근무수": "Gardes attendues",
+  "배정된 날 수 × 본인 가중치 ÷ 전체 가중치 합입니다.": "Jours attribués × poids de la personne ÷ somme des poids.",
+  "가중치에 비례한 '공정한 몫'이며, DFI M1이 이 값과 실제 근무수의 차이로 계산됩니다.": "C’est la « part équitable » selon le poids ; le M1 du DFI se calcule à partir de l’écart avec les gardes réelles.",
+  "차이 = 실제 − 기대": "Écart = réel − attendu",
+  "±1 이상이면 색으로 표시합니다(주황: 많음, 파랑: 적음).": "Les écarts de ±1 ou plus sont colorés (orange : plus, bleu : moins).",
+  "<b>적게</b> 배정되는 경우: 월 최대 한도가 기대보다 낮음 · 제외일·제외요일이 많음 · 레벨 4(조력자 있는 날만) · 배정 제외일 때문에 연속 배정이 막힘 · 다른 사람의 희망일에 밀림": "<b>Moins</b> que prévu quand : maximum mensuel inférieur à la part · nombreuses indisponibilités · niveau 4 (seulement avec un assistant) · repos empêchant des gardes rapprochées · repoussé par les dates souhaitées des autres",
+  "<b>많이</b> 배정되는 경우: 희망일·희망요일이 많음 · 레벨 1(배정 제외일 미적용)이라 빈 날을 채움 · 다른 사람들의 제약으로 남은 날을 떠맡음": "<b>Plus</b> que prévu quand : nombreuses dates/jours souhaités · niveau 1 (sans repos) comblant les trous · reprise des jours restants à cause des contraintes des autres",
+  "차이가 큰 칸에 마우스를 올리면 그 사람에게 해당하는 원인을 보여 줍니다.": "Survolez un écart coloré pour voir la cause probable pour cette personne.",
+  "{name}: 실제 {a} · 기대 {e} ({d})": "{name} : réel {a} · attendu {e} ({d})",
 },
 /* ──────────────── es: Español ──────────────── */
 es: {
@@ -3236,7 +3457,7 @@ es: {
   "설정과 명단은 입력할 때마다 이 브라우저에 자동 저장되고, 다음 실행 때 마지막 프로필을 불러옵니다.": "La configuración y la lista se guardan automáticamente en este navegador al escribir, y la próxima vez se carga el último perfil.",
   "대상 기간": "Periodo",
   "대상 연월": "Mes",
-  "— 연월을 고르면 자동 입력되며, 달력을 눌러 추가·해제할 수 있습니다": "— se rellenan al elegir el mes; haga clic en el calendario para añadir o quitar",
+  "— 달력을 눌러 추가·해제할 수 있습니다": "— haga clic en el calendario para añadir o quitar",
   "예: 25 또는 1, 28~30": "p. ej.: 25 o 1, 28~30",
   "배정 규칙": "Reglas de asignación",
   "<b class=\"day-tag wd\">평일</b> 당직 후 배정 제외일": "<b class=\"day-tag wd\">Laborable</b> descanso tras guardia",
@@ -3280,6 +3501,59 @@ es: {
   "적용 · DFI 재계산": "Aplicar · recalcular DFI",
   "실행 취소": "Deshacer",
   "날짜 지정": "Marcar fechas",
+  // ── v1.15: 내장 공휴일(한국어 전용)·목표 미달 원인 추정·통계 툴팁 ──
+  "내장 공휴일은 한국어 화면에서만 자동으로 입력됩니다(한국 공휴일). 이 달의 공휴일을 직접 입력하거나 달력을 누르십시오.": "Los festivos integrados (Corea) solo se rellenan automáticamente con la interfaz en coreano. Escriba los festivos de este mes o haga clic en el calendario.",
+  "{ym}: 공휴일을 비웠습니다. 이 달의 공휴일을 직접 입력하십시오.": "{ym}: festivos borrados. Introduzca los festivos de este mes.",
+  "원인과 개선 방법 ({n})": "Causas probables y soluciones ({n})",
+  "이 명단 조건에서 추정한 최고 가능 점수: 약 {ub}점": "Mejor puntuación posible estimada con esta lista: unos {ub}",
+  "수동 교체 {n}건 이후 점수가 바뀌었습니다.": "La puntuación cambió tras {n} {n:cambio manual|cambios manuales}.",
+  "교체를 되돌리거나(실행 취소) 다른 안을 선택하십시오.": "Deshaga los cambios o elija otro plan.",
+  "브라우저가 느려 {n}회에서 시간 제한으로 멈췄습니다.": "El navegador fue lento y se detuvo por límite de tiempo tras {n} intentos.",
+  "다른 탭을 닫고 다시 생성하면 더 많이 시도합니다.": "Cierre otras pestañas y vuelva a generar para probar más planes.",
+  "{n}일이 미배정입니다. 그날 규칙을 모두 만족하는 사람이 없었습니다: {days}일.": "{n} {n:día|días} sin asignar ({days}): nadie cumplía todas las reglas esos días.",
+  "그날의 제외일·제외요일을 줄이거나 배정 제외일을 줄이십시오. 레벨 1(특례) 인원을 늘려도 됩니다.": "Reduzca las fechas/días no disponibles esos días o acorte los días de descanso tras la guardia; añadir personal de nivel 1 (exento) también ayuda.",
+  "이 명단 조건에서 기대할 수 있는 최고점은 약 {ub}점입니다. 근무 횟수는 정수라서 가중치대로 정확히 나눌 수 없고(M1), 휴일 수가 인원으로 나누어떨어지지 않으며(M2), 1인당 근무가 적으면 요일이 고르게 퍼질 수 없습니다(M5).": "Con esta lista, la puntuación máxima esperable es de unos {ub}. El número de guardias es entero y no puede ajustarse exactamente a los pesos (M1), los festivos no se reparten exactamente entre el personal (M2) y, con pocas guardias por persona, los días de la semana no pueden repartirse por igual (M5).",
+  "목표 DFI를 {ub}점 이하로 낮추십시오.": "Baje el DFI objetivo a {ub} o menos.",
+  "월 최대 한도가 기대 근무수보다 낮은 사람: {list}.": "El máximo mensual es inferior a la parte esperada para: {list}.",
+  "한도를 올리거나, 그 사람의 가중치를 한도에 맞게 낮추십시오.": "Suba el límite o baje el peso de esa persona para que coincida.",
+  "배정 가능한 날이 기대보다 많이 부족한 사람: {list}.": "Muy pocos días disponibles en relación con la parte esperada: {list}.",
+  "{name}(가능 {f}일 · 기대 {e})": "{name} ({f} días libres · esperado {e})",
+  "제외일·제외요일을 줄이거나 가중치를 낮추십시오.": "Reduzca las fechas/días no disponibles o baje el peso.",
+  "레벨 4는 조력자(레벨 3)가 있는 날만 배정되어 기대보다 적게 배정되었습니다: {list}.": "El nivel 4 solo puede trabajar los días en que hay un asistente (nivel 3) libre, por eso recibió menos guardias: {list}.",
+  "레벨 3 인원을 늘리거나 레벨 3의 제외일을 줄이십시오. 또는 레벨 4의 가중치를 낮추십시오.": "Añada personal de nivel 3 o reduzca sus fechas no disponibles, o baje el peso del nivel 4.",
+  "배정 제외일(평일 {w}일·휴일 {h}일)이 길어 근무가 많은 사람을 다 채우기 어렵습니다: {list}.": "Los días de descanso tras la guardia (laborable {w}, festivo {h}) son demasiado largos para encajar la parte de cada uno: {list}.",
+  "배정 제외일을 1일 줄이십시오.": "Acorte un día los días de descanso tras la guardia.",
+  "주말을 제외요일로 둔 사람이 {k}명이라 휴일 근무가 나머지 {r}명에게 몰립니다.": "{k} {k:persona excluye|personas excluyen} los fines de semana, así que las guardias festivas recaen en los otros {r}.",
+  "주말 제외를 줄이고, 근무량 조정은 가중치로 하십시오.": "Reduzca las exclusiones de fin de semana y equilibre la carga con los pesos.",
+  "휴일 근무가 고르게 나뉘지 않았습니다(휴일 근무 {min}~{max}회).": "Guardias festivas desiguales ({min}–{max} por persona).",
+  "휴일 당직 후 배정 제외일을 줄이면 휴일 후보가 늘어납니다. 다시 생성해 보십시오.": "Acortar el descanso tras una guardia festiva amplía los candidatos; vuelva a generar.",
+  "희망일이 겹친 날이 {n}일 있어 일부만 반영되었습니다.": "Las fechas preferidas coinciden en {n} {n:día|días}, así que solo algunas se respetaron.",
+  "같은 날 희망자를 조정하십시오(사전 점검에 표시).": "Resuelva los conflictos del mismo día (indicados en la comprobación previa).",
+  "희망일이 한도보다 많거나 제외 조건과 겹치는 사람: {list}.": "Fechas preferidas por encima del límite o en conflicto con la no disponibilidad: {list}.",
+  "희망일을 한도 이내로 줄이고 제외일·제외요일과 겹치지 않게 하십시오.": "Manténgase dentro del límite y evite las fechas/días no disponibles.",
+  "가능일·희망일이 한쪽 기간에 몰려 근무가 붙어서 배정된 사람: {list}.": "Guardias agrupadas porque las fechas disponibles/preferidas se concentran: {list}.",
+  "근무 간격이 고르지 않습니다. 가능일·희망일이 한쪽 기간에 몰려 있거나 배정 제외일이 짧으면 근무가 붙어서 배정됩니다.": "Espaciado irregular: fechas disponibles/preferidas concentradas en una parte del mes o un descanso corto agrupan las guardias.",
+  "가능일 범위를 넓히거나 배정 제외일을 1일 늘리십시오.": "Amplíe los rangos disponibles o añada un día de descanso tras la guardia.",
+  "1인당 근무가 평균 {a}회로 적거나 희망·제외요일 지정이 많아 특정 요일에 몰렸습니다(요일 지정 {k}명).": "Guardias concentradas en ciertos días: pocas guardias por persona (media {a}) o muchas preferencias/exclusiones de días ({k} {k:persona|personas}).",
+  "희망요일·제외요일 지정을 줄이십시오. 1인당 근무가 적은 달은 이 점수가 낮게 나오는 것이 정상입니다.": "Reduzca las preferencias/exclusiones de días. Es normal una puntuación menor cuando cada persona tiene pocas guardias.",
+  "월 최대 {max}회가 기대 {e}보다 낮습니다.": "El máximo mensual ({max}) es inferior al esperado ({e}).",
+  "배정 가능한 날이 {f}일뿐입니다(제외일 {a}일, 제외요일 {k}개).": "Solo {f} {f:día disponible|días disponibles} (fechas no disponibles: {a}, días excluidos: {k}).",
+  "레벨 4라 조력자(레벨 3)가 있는 날만 배정됩니다.": "Nivel 4: solo se asigna los días en que hay un asistente (nivel 3) libre.",
+  "배정 제외일(평일 {w}·휴일 {h}일) 때문에 연속 배정이 제한됩니다.": "Los días de descanso tras la guardia (laborable {w}, festivo {h}) limitan las guardias seguidas.",
+  "다른 사람의 희망일·희망요일이 먼저 배정되어 차례가 밀렸습니다.": "Las fechas/días preferidos de otros se asignaron primero y esta persona quedó atrás.",
+  "희망일 {n}일이 우선 반영되었습니다.": "{n} {n:fecha preferida tuvo|fechas preferidas tuvieron} prioridad.",
+  "희망요일({d})이 우선 반영되었습니다.": "Los días preferidos ({d}) tuvieron prioridad.",
+  "레벨 1(특례)은 배정 제외일이 적용되지 않아 빈 날을 채우는 데 자주 배정됩니다.": "El nivel 1 (exento) no tiene descanso tras la guardia, por eso suele cubrir los huecos.",
+  "다른 근무자의 제외일·한도 때문에 남은 날을 더 맡았습니다.": "Asumió días sobrantes por la no disponibilidad y los límites de otros.",
+  "기대 근무수": "Guardias esperadas",
+  "배정된 날 수 × 본인 가중치 ÷ 전체 가중치 합입니다.": "Días asignados × peso propio ÷ suma de todos los pesos.",
+  "가중치에 비례한 '공정한 몫'이며, DFI M1이 이 값과 실제 근무수의 차이로 계산됩니다.": "Es la «parte justa» según el peso; el M1 del DFI se calcula a partir de la diferencia con las guardias reales.",
+  "차이 = 실제 − 기대": "Diferencia = real − esperado",
+  "±1 이상이면 색으로 표시합니다(주황: 많음, 파랑: 적음).": "Las diferencias de ±1 o más se colorean (naranja: más, azul: menos).",
+  "<b>적게</b> 배정되는 경우: 월 최대 한도가 기대보다 낮음 · 제외일·제외요일이 많음 · 레벨 4(조력자 있는 날만) · 배정 제외일 때문에 연속 배정이 막힘 · 다른 사람의 희망일에 밀림": "<b>Menos</b> de lo esperado cuando: máximo mensual inferior a la parte · muchas fechas/días no disponibles · nivel 4 (solo con asistente) · el descanso impide guardias cercanas · desplazado por las fechas preferidas de otros",
+  "<b>많이</b> 배정되는 경우: 희망일·희망요일이 많음 · 레벨 1(배정 제외일 미적용)이라 빈 날을 채움 · 다른 사람들의 제약으로 남은 날을 떠맡음": "<b>Más</b> de lo esperado cuando: muchas fechas/días preferidos · nivel 1 (sin descanso) cubre huecos · asume días sobrantes por las restricciones de otros",
+  "차이가 큰 칸에 마우스를 올리면 그 사람에게 해당하는 원인을 보여 줍니다.": "Pase el ratón sobre una diferencia coloreada para ver la causa probable de esa persona.",
+  "{name}: 실제 {a} · 기대 {e} ({d})": "{name}: real {a} · esperado {e} ({d})",
 }
 };
 </script>
@@ -3324,8 +3598,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.14.3', APP_BUILD = '2026-11-23';
+const APP_VERSION = '1.15.0', APP_BUILD = '2026-11-23';
 const CHANGELOG = [
+  '1.15.0 내장 공휴일은 한국어 화면에서만 자동 입력, 목표 미달 시 명단을 분석한 원인·개선 방법과 도달 가능 상한 추정, 통계표 기대·차이 툴팁과 차이 큰 칸의 개인별 원인 툴팁',
   '1.14.3 링크 미리보기 카드(Open Graph·X 카드 메타 태그, assets/og-image.png 1200×630), 영어 README 추가',
   '1.14.2 첫 실행 시 브라우저 언어를 감지해 적용·저장(지원하지 않는 언어면 영어), 이후 실행은 저장된 언어 사용',
   '1.14.1 명단 열 순서: 희망일 → 희망요일 → 가능일 (우선순위 0 → 1 → 2 순). 명단 머리글 줄바꿈 허용, 영어 요일 버튼 2글자(Su Mo …)로 다른 언어의 표 넘침 축소',
@@ -3539,8 +3814,11 @@ const KR_HOLIDAYS = {
          8:[[15,'광복절'],[16,'대체공휴일']], 9:[[14,'추석 연휴'],[15,'추석'],[16,'추석 연휴']],
          10:[[3,'개천절'],[4,'대체공휴일'],[9,'한글날'],[11,'대체공휴일']], 12:[[25,'성탄절'],[27,'대체공휴일']]}
 };
-/** 내장 공휴일 목록. 그 연도 자료가 없으면 null, 있으면 배열(공휴일 없는 달은 빈 배열)을 반환합니다. */
-function builtinHolidays(y, m){ const Y = KR_HOLIDAYS[y]; return Y ? (Y[m] || []) : null; }
+/** 내장 공휴일은 한국 공휴일이므로 화면 언어가 한국어일 때만 씁니다.
+    다른 언어에서는 자동 입력·이름 표시를 하지 않고, 사용자가 공휴일을 직접 입력합니다(이미 입력된 값은 지우지 않음). */
+const holidaysBuiltin = () => LANG === 'ko';
+/** 내장 공휴일 목록. 한국어가 아니거나 그 연도 자료가 없으면 null, 있으면 배열(공휴일 없는 달은 빈 배열) */
+function builtinHolidays(y, m){ if (!holidaysBuiltin()) return null; const Y = KR_HOLIDAYS[y]; return Y ? (Y[m] || []) : null; }
 /** 공휴일 이름(현재 언어). 사용자가 직접 추가한 날처럼 내장 자료에 없으면 '공휴일'을 반환합니다.
     KR_HOLIDAYS의 한국어 이름은 번역 키입니다. */
 function holNameKo(y, m, d){ const h = (builtinHolidays(y, m) || []).find(x => x[0] === d); return h ? h[1] : '공휴일'; }
@@ -3947,7 +4225,8 @@ $('#ym').addEventListener('change', e => {
   $('#holidays').value = state.settings.holidays;
   renderHolidayUI(); renderRoster(); scheduleSave();
   const hasDates = state.people.some(p => p.wish || p.avail || p.avoid);
-  const msg = bi == null ? t('{y}년 내장 공휴일 정보가 없습니다. 직접 입력하십시오.', { y })
+  const msg = !holidaysBuiltin() ? t('{ym}: 공휴일을 비웠습니다. 이 달의 공휴일을 직접 입력하십시오.', { ym: fmtYM(y, m) })
+            : bi == null ? t('{y}년 내장 공휴일 정보가 없습니다. 직접 입력하십시오.', { y })
             : bi.length   ? t('{ym} 공휴일을 자동 입력했습니다: {list}.', { ym: fmtYM(y, m), list: bi.map(x => fmtMD(m, x[0]) + ' ' + t(x[1])).join(', ') })
             :               t('{ym}에는 내장 공휴일이 없습니다.', { ym: fmtYM(y, m) });
   toast(msg + (hasDates ? ' ' + t('명단의 날짜는 새 달 기준으로 다시 확인하십시오.') : ''));
@@ -4026,7 +4305,10 @@ function renderHolidayUI(){
 
   const bi = builtinHolidays(y, m);
   const same = fmtDays(parseDayList(builtinStr(y, m), N)) === fmtDays([...hol]);   // 내장값과 같은지
-  $('#holHint').innerHTML = bi == null
+  // 한국어 이외: 내장 공휴일을 쓰지 않음. 안내는 칸이 비어 있을 때만(입력한 뒤에는 군더더기)
+  $('#holHint').innerHTML = !holidaysBuiltin()
+    ? (hol.size ? '' : esc(t('내장 공휴일은 한국어 화면에서만 자동으로 입력됩니다(한국 공휴일). 이 달의 공휴일을 직접 입력하거나 달력을 누르십시오.')))
+    : bi == null
     ? esc(t('{y}년 내장 공휴일 정보가 없습니다. 직접 입력하십시오.', { y }))
     : esc(t('내장 공휴일({ym}): {list}', { ym: fmtYM(y, m), list: bi.length ? bi.map(x => fmtMD(m, x[0]) + ' ' + t(x[1])).join(' · ') : t('없음') })) +
       (same ? '' : ` <button type="button" class="link" id="btnHolReset">${esc(t('내장값으로 되돌리기'))}</button>`) +
@@ -4823,15 +5105,24 @@ function statCols(){
 }
 function renderStats(R){
   const c = statCols(), th = (k, cls) => `<th${cls ? ` class="${cls}"` : ''}>${esc(c[k])}</th>`;
+  const thTip = (k, tt) => `<th data-tt="${tt}" tabindex="0">${esc(c[k])} <i class="tip-i">ⓘ</i></th>`;   // 기대·차이: 설명 툴팁
   const head = '<thead><tr>' + th('name') + th('level') + th('mw') + th('thu') + th('fri') + th('sat', 'c-sat') + th('sun', 'c-sun') + th('pub', 'c-sun') +
-               th('total') + th('exp') + th('diff') + th('assist') + '</tr></thead>';
+               th('total') + thTip('exp', 'statExp') + thTip('diff', 'statDiff') + th('assist') + '</tr></thead>';
   const num = v => `<td class="num">${v}</td>`;
+  // 차이가 ±1 이상인 칸: 그 사람에게 해당하는 원인을 툴팁으로 (언어를 바꿔도 다시 만들도록 함수로 등록)
+  const facts = rosterFacts(R);
+  const diffCell = s => {
+    if (Math.abs(s.diff) < 1) return `<td class="num">${fmtDiff(s.diff)}</td>`;
+    DYN_TIPS['pd' + s.i] = () => ({ t: esc(t('{name}: 실제 {a} · 기대 {e} ({d})', { name: s.name, a: s.total, e: s.exp.toFixed(1), d: fmtDiff(s.diff) })),
+                                    items: personCauses(R, facts[s.i]).map(esc) });
+    return `<td class="num why ${diffCls(s.diff)}" data-tt="pd${s.i}" tabindex="0">${fmtDiff(s.diff)}</td>`;
+  };
   $('#stats').innerHTML = head + '<tbody>' + getStats(R).map(s =>
     `<tr data-row="${s.i}" class="${state.hl === s.i ? 'hl-row' : ''}">` +
     `<td><button type="button" class="nm-btn stats-name" data-pid="${s.i}">${esc(s.name)}</button></td>` + num(s.level) +
     num(s.mw) + num(s.thu) + num(s.fri) + num(s.sat) + num(s.sun) + num(s.pub) +
     `<td class="num"><b>${s.total}</b></td>` + num(s.exp.toFixed(1)) +
-    `<td class="num ${diffCls(s.diff)}">${fmtDiff(s.diff)}</td>` + num(s.assist) + '</tr>').join('') + '</tbody>';
+    diffCell(s) + num(s.assist) + '</tr>').join('') + '</tbody>';
 }
 
 /* ---- 13-4. DFI 카드 ---- */
@@ -4868,17 +5159,17 @@ function renderDFI(R){
   $('#dfiMeta').innerHTML = `${esc(t('목표 {n}', { n: R.cfg.minDFI }))} · ${met ? `<b style="color:var(--ok)">${esc(t('달성'))}</b>` : `<b style="color:var(--bad)">${esc(t('미달'))}</b>`}` +
     `<br>${esc(t('배정률 {p}%', { p: (D.coverage * 100).toFixed(0) }))}${R.edited.size ? ' · ' + esc(t('수동 수정 {n}건', { n: R.edited.size })) : ''}`;
 
-  // 목표 미달: 한 줄 요약 + 툴팁에 개선 방법 (점수 비율이 가장 낮은 지표 기준)
+  // 목표 미달: 한 줄 요약(누르면 펼침) + 이 명단을 분석해 추정한 원인·개선 방법 목록 (§13-4b diagnose)
   const box = $('#dfiDiag');
   if (met) box.classList.add('hidden');
   else {
     const weak = D.metrics.slice().sort((a, b) => a.score / a.max - b.score / b.max)[0], wt = metricText(weak);
-    box.innerHTML = `⚠️ <b>${esc(t('목표 미달'))}</b> ${D.total.toFixed(1)} / ${R.cfg.minDFI} · ${esc(t('가장 낮은 지표'))} <b>${weak.key} ${esc(wt.name)}</b> ${(weak.score / weak.max * 100).toFixed(0)}% <i class="tip-i tt">ⓘ ${esc(t('개선 방법'))}</i>`;
-    DYN_TIPS.dfiDiag = { t: esc(t('개선 방법 — {key} {name} {score}/{max}', { key: weak.key, name: wt.name, score: weak.score.toFixed(1), max: weak.max })), items: [
-      esc(t(GUIDE[weak.key])),
-      esc(R.edited.size ? t('수동 교체로 점수가 목표 아래로 내려갔을 수 있습니다. 교체를 되돌리거나 다른 안을 선택하십시오.')
-                        : t('최대 {n}회를 시도해도 목표에 못 미쳤습니다. 입력 조건을 조정하거나 목표 DFI를 낮추십시오.', { n: fmtN(MAX_ATTEMPTS) })),
-      ...(R.cfg.minDFI > 85 ? [esc(t('현재 명단 조건에서 목표가 과도할 수 있습니다. 목표 DFI를 낮추는 것도 검토하십시오.'))] : [])] };
+    const dg = diagnose(R);
+    const wasOpen = !!box.querySelector('details[open]');
+    box.innerHTML = `<details${wasOpen ? ' open' : ''}><summary>⚠️ <b>${esc(t('목표 미달'))}</b> ${D.total.toFixed(1)} / ${R.cfg.minDFI} · ${esc(t('가장 낮은 지표'))} <b>${weak.key} ${esc(wt.name)}</b> ${(weak.score / weak.max * 100).toFixed(0)}% · ` +
+      `<span class="more">${esc(t('원인과 개선 방법 ({n})', { n: dg.items.length }))} ▾</span></summary><ol>` +
+      dg.items.map(x => `<li>${esc(x.text)}${x.fix ? `<span class="fix">→ ${esc(x.fix)}</span>` : ''}</li>`).join('') + '</ol>' +
+      `<div class="ub">${esc(t('이 명단 조건에서 추정한 최고 가능 점수: 약 {ub}점', { ub: dg.ub.toFixed(1) }))}</div></details>`;
     box.classList.remove('hidden');
   }
 
@@ -4893,6 +5184,141 @@ function renderDFI(R){
   }).join('');
   $('#dfiWarn').innerHTML = R.unfilled.length ? esc(t('미배정일: {days}일 — 총점에 배정률이 곱해집니다.', { days: fmtDays(R.unfilled) })) : '';
 }
+
+/* ---- 13-4b. 목표 미달 원인 추정 ----
+   점수가 목표보다 낮을 때, 결과와 입력을 분석해 '왜'와 '어떻게'를 사람 이름과 숫자로 제시합니다.
+   1) 공통 원인: 수동 교체, 시간 제한, 미배정일, 목표가 이 명단으로 도달 가능한 상한(scoreCeiling)보다 높음
+   2) 지표별 원인: 점수 비율이 낮은 지표부터
+      M1 근무량 — 월 최대 < 기대, 배정 가능한 날 부족, 레벨 4(조력자 필요), 배정 제외일이 긴 경우
+      M2 휴일 — 주말 제외요일, 휴일 근무 편차
+      M3 선호 — 같은 날 희망 겹침, 희망일이 한도 초과·제외 조건과 겹침
+      M4 간격 — 가능일·희망일이 한쪽 기간에 몰림
+      M5 요일 — 1인당 근무가 적음, 요일 지정이 많음
+   원인을 하나도 찾지 못하면 가장 낮은 지표의 일반 안내(GUIDE)를 보여 줍니다. */
+
+/** 사람별 기본 사실: 통계(s), 배정 가능한 날(free: 제외일·제외요일 제외, 레벨 4는 조력자 가능한 날만) */
+function rosterFacts(R){
+  const P = R.cfg.people, N = R.cal.N, days = R.cal.days, st = getStats(R);
+  const blocked = (p, d) => p.avoid.includes(d) || !!p.exDow[days[d].dow];
+  const helperOn = d => P.some(h => h.level === 3 && !blocked(h, d));
+  return P.map((p, i) => {
+    let free = 0;
+    for (let d = 1; d <= N; d++) if (!blocked(p, d) && (p.level < 4 || helperOn(d))) free++;
+    return { i, p, s: st[i], free, avoidN: p.avoid.length, exK: p.exDow.filter(Boolean).length };
+  });
+}
+
+/**
+ * 이 명단으로 기대할 수 있는 최고 DFI(상한) 추정. 근무 횟수가 정수라서 생기는 구조적 한계만 반영합니다.
+ *   M1: 기대 근무수를 정수로 가장 가깝게 나눈 경우의 RMSE (월 최대 한도 반영)
+ *   M2: 휴일 근무를 모든 사람에게 정수로 고르게 나눈 경우의 표준편차
+ *   M5: 각자 근무를 7개 요일에 최대한 고르게 퍼뜨린 경우의 표준편차 평균
+ *   M3·M4는 만점으로 가정 → 실제 최고점은 이보다 낮을 수 있습니다(상한).
+ */
+function scoreCeiling(R){
+  const P = R.cfg.people, n = P.length, N = R.cal.N, filled = N - R.unfilled.length;
+  if (!n || !filled) return 0;
+  const W = P.reduce((a, p) => a + p.weight, 0) || 1, exp = P.map(p => filled * p.weight / W);
+  const cnt = exp.map(Math.floor);
+  let rem = filled - cnt.reduce((a, b) => a + b, 0);
+  exp.map((e, i) => [e - Math.floor(e), i]).sort((a, b) => b[0] - a[0]).slice(0, rem).forEach(([, i]) => cnt[i]++);
+  // 월 최대 한도를 넘는 몫은 여유 있는 사람에게 (기대보다 많이 모자란 순서로) 옮김
+  let extra = 0; P.forEach((p, i) => { if (cnt[i] > p.max){ extra += cnt[i] - p.max; cnt[i] = p.max; } });
+  while (extra > 0){
+    let best = -1; P.forEach((p, i) => { if (cnt[i] < p.max && (best < 0 || exp[i] - cnt[i] > exp[best] - cnt[best])) best = i; });
+    if (best < 0) break; cnt[best]++; extra--;
+  }
+  const rmse = Math.sqrt(cnt.reduce((a, c, i) => a + (c - exp[i]) ** 2, 0) / n);
+  const H = R.cal.days.filter((d, k) => k > 0 && d.isHol && R.duty[k] >= 0).length, r = H % n;
+  const holSD = Math.sqrt(r * (n - r)) / n;
+  const work = cnt.filter(c => c > 0), dowSD = work.length ? work.reduce((a, c) => { const q = c % 7; return a + Math.sqrt(q * (7 - q)) / 7; }, 0) / work.length : 0;
+  const raw = Math.max(0, 25 - rmse * 8) + Math.max(0, 25 - holSD * 12) + 20 + 15 + Math.max(0, 15 - dowSD * 5);
+  return Math.round(raw * filled / N * 10) / 10;
+}
+
+/** 목표 미달 원인 목록: [{text, fix}] (현재 언어) + 추정 상한 ub */
+function diagnose(R){
+  const D = R.dfi, cfg = R.cfg, N = R.cal.N, P = cfg.people, n = P.length, items = [];
+  const add = (text, fix) => items.push({ text, fix });
+  const facts = rosterFacts(R), ub = scoreCeiling(R), e1 = v => v.toFixed(1);
+  const listOf = (arr, fmt) => arr.slice(0, 5).map(fmt).join(', ') + (arr.length > 5 ? ' …' : '');
+  // ---- 공통 원인 ----
+  if (R.edited.size) add(t('수동 교체 {n}건 이후 점수가 바뀌었습니다.', { n: R.edited.size }), t('교체를 되돌리거나(실행 취소) 다른 안을 선택하십시오.'));
+  if (state.run && state.run.stop === 'time' && R.cfg === cfgSnapshot) add(t('브라우저가 느려 {n}회에서 시간 제한으로 멈췄습니다.', { n: fmtN(state.run.attempts) }), t('다른 탭을 닫고 다시 생성하면 더 많이 시도합니다.'));
+  if (R.unfilled.length) add(t('{n}일이 미배정입니다. 그날 규칙을 모두 만족하는 사람이 없었습니다: {days}일.', { n: R.unfilled.length, days: fmtDays(R.unfilled) }),
+                             t('그날의 제외일·제외요일을 줄이거나 배정 제외일을 줄이십시오. 레벨 1(특례) 인원을 늘려도 됩니다.'));
+  if (cfg.minDFI > ub) add(t('이 명단 조건에서 기대할 수 있는 최고점은 약 {ub}점입니다. 근무 횟수는 정수라서 가중치대로 정확히 나눌 수 없고(M1), 휴일 수가 인원으로 나누어떨어지지 않으며(M2), 1인당 근무가 적으면 요일이 고르게 퍼질 수 없습니다(M5).', { ub: e1(ub) }),
+                           t('목표 DFI를 {ub}점 이하로 낮추십시오.', { ub: Math.floor(ub / 5) * 5 }));
+  // ---- 지표별 원인 (비율이 낮은 지표부터) ----
+  const done = new Set();
+  const order = D.metrics.slice().sort((a, b) => a.score / a.max - b.score / b.max).filter(x => x.score / x.max < 0.92);
+  for (const x of order){
+    if (x.key === 'M1'){
+      const lowMax = facts.filter(f => f.p.max < 999 && f.p.max < f.s.exp - 0.5);
+      if (lowMax.length) add(t('월 최대 한도가 기대 근무수보다 낮은 사람: {list}.', { list: listOf(lowMax, f => `${f.p.name} (${f.p.max} < ${e1(f.s.exp)})`) }),
+                             t('한도를 올리거나, 그 사람의 가중치를 한도에 맞게 낮추십시오.'));
+      const lowFree = facts.filter(f => f.s.diff <= -0.5 && f.free < f.s.exp * 1.8 && !lowMax.includes(f) && f.p.level < 4);
+      if (lowFree.length) add(t('배정 가능한 날이 기대보다 많이 부족한 사람: {list}.', { list: listOf(lowFree, f => t('{name}(가능 {f}일 · 기대 {e})', { name: f.p.name, f: f.free, e: e1(f.s.exp) })) }),
+                              t('제외일·제외요일을 줄이거나 가중치를 낮추십시오.'));
+      const lv4 = facts.filter(f => f.p.level >= 4 && f.s.diff <= -0.5);
+      if (lv4.length) add(t('레벨 4는 조력자(레벨 3)가 있는 날만 배정되어 기대보다 적게 배정되었습니다: {list}.', { list: listOf(lv4, f => `${f.p.name} (${f.s.total} < ${e1(f.s.exp)})`) }),
+                          t('레벨 3 인원을 늘리거나 레벨 3의 제외일을 줄이십시오. 또는 레벨 4의 가중치를 낮추십시오.'));
+      const rest = facts.filter(f => f.p.level !== 1 && f.s.exp * (cfg.restW + 1) > N * 0.85);
+      if (rest.length) add(t('배정 제외일(평일 {w}일·휴일 {h}일)이 길어 근무가 많은 사람을 다 채우기 어렵습니다: {list}.', { w: cfg.restW, h: cfg.restH, list: listOf(rest, f => f.p.name) }),
+                           t('배정 제외일을 1일 줄이십시오.'));
+    } else if (x.key === 'M2'){
+      const wk = facts.filter(f => f.p.exDow[0] || f.p.exDow[6]).length;
+      if (wk) add(t('주말을 제외요일로 둔 사람이 {k}명이라 휴일 근무가 나머지 {r}명에게 몰립니다.', { k: wk, r: n - wk }), t('주말 제외를 줄이고, 근무량 조정은 가중치로 하십시오.'));
+      else {
+        const hol = getStats(R).map(s => s.sat + s.sun + s.pub);
+        add(t('휴일 근무가 고르게 나뉘지 않았습니다(휴일 근무 {min}~{max}회).', { min: Math.min(...hol), max: Math.max(...hol) }), t('휴일 당직 후 배정 제외일을 줄이면 휴일 후보가 늘어납니다. 다시 생성해 보십시오.'));
+      }
+    } else if (x.key === 'M3'){
+      const by = {}; P.forEach(p => p.wish.forEach(d => { by[d] = (by[d] || 0) + 1; }));
+      const clash = Object.values(by).filter(c => c > 1).length;
+      if (clash) add(t('희망일이 겹친 날이 {n}일 있어 일부만 반영되었습니다.', { n: clash }), t('같은 날 희망자를 조정하십시오(사전 점검에 표시).'));
+      const over = P.filter(p => (p.max < 999 && p.wish.length > p.max) || p.wish.some(d => p.avoid.includes(d) || p.exDow[R.cal.days[d].dow]));
+      if (over.length) add(t('희망일이 한도보다 많거나 제외 조건과 겹치는 사람: {list}.', { list: listOf(over, p => p.name) }), t('희망일을 한도 이내로 줄이고 제외일·제외요일과 겹치지 않게 하십시오.'));
+    } else if (x.key === 'M4'){
+      const span = a => a.length ? Math.max(...a) - Math.min(...a) + 1 : N;
+      const narrow = P.filter(p => (p.avail.length && span(p.avail.concat(p.wish)) < N / 2) || (p.wish.length >= 3 && span(p.wish) < N / 3));
+      if (narrow.length) add(t('가능일·희망일이 한쪽 기간에 몰려 근무가 붙어서 배정된 사람: {list}.', { list: listOf(narrow, p => p.name) }), t('가능일 범위를 넓히거나 배정 제외일을 1일 늘리십시오.'));
+      else add(t('근무 간격이 고르지 않습니다. 가능일·희망일이 한쪽 기간에 몰려 있거나 배정 제외일이 짧으면 근무가 붙어서 배정됩니다.'), t('가능일 범위를 넓히거나 배정 제외일을 1일 늘리십시오.'));
+    } else if (x.key === 'M5'){
+      const k = P.filter(p => p.wishDow.some(Boolean) || p.exDow.some(Boolean)).length;
+      const avg = (N - R.unfilled.length) / Math.max(1, n);
+      add(t('1인당 근무가 평균 {a}회로 적거나 희망·제외요일 지정이 많아 특정 요일에 몰렸습니다(요일 지정 {k}명).', { a: e1(avg), k }),
+          t('희망요일·제외요일 지정을 줄이십시오. 1인당 근무가 적은 달은 이 점수가 낮게 나오는 것이 정상입니다.'));
+    }
+    done.add(x.key);
+  }
+  if (!items.length){ const weak = D.metrics.slice().sort((a, b) => a.score / a.max - b.score / b.max)[0]; add(t(GUIDE[weak.key]), ''); }
+  return { items, ub };
+}
+
+/** 통계표 '차이' 칸 툴팁: 그 사람의 차이가 큰 이유 (현재 언어) */
+function personCauses(R, f){
+  const { p, s, free } = f, cfg = R.cfg, out = [], e = s.exp.toFixed(1);
+  if (s.diff <= -1){
+    if (p.max < 999 && p.max < s.exp - 0.5) out.push(t('월 최대 {max}회가 기대 {e}보다 낮습니다.', { max: p.max, e }));
+    if (free < s.exp * 1.8) out.push(t('배정 가능한 날이 {f}일뿐입니다(제외일 {a}일, 제외요일 {k}개).', { f: free, a: f.avoidN, k: f.exK }));
+    if (p.level >= 4) out.push(t('레벨 4라 조력자(레벨 3)가 있는 날만 배정됩니다.'));
+    if (p.level !== 1 && s.exp * (cfg.restW + 1) > R.cal.N * 0.85) out.push(t('배정 제외일(평일 {w}·휴일 {h}일) 때문에 연속 배정이 제한됩니다.', { w: cfg.restW, h: cfg.restH }));
+    if (!out.length) out.push(t('다른 사람의 희망일·희망요일이 먼저 배정되어 차례가 밀렸습니다.'));
+  } else if (s.diff >= 1){
+    if (p.wish.length) out.push(t('희망일 {n}일이 우선 반영되었습니다.', { n: p.wish.length }));
+    if (p.wishDow.some(Boolean)) out.push(t('희망요일({d})이 우선 반영되었습니다.', { d: dowNames().filter((_, k) => p.wishDow[k]).join('·') }));
+    if (p.level === 1) out.push(t('레벨 1(특례)은 배정 제외일이 적용되지 않아 빈 날을 채우는 데 자주 배정됩니다.'));
+    const others = R.cfg.people.some((q, j) => j !== f.i && (q.max < 999 || q.avoid.length || q.exDow.some(Boolean) || q.level >= 4));
+    if (others || !out.length) out.push(t('다른 근무자의 제외일·한도 때문에 남은 날을 더 맡았습니다.'));
+  }
+  return out;
+}
+DYN_TIPS.statExp = () => ({ t: t('기대 근무수'), items: [t('배정된 날 수 × 본인 가중치 ÷ 전체 가중치 합입니다.'), t("가중치에 비례한 '공정한 몫'이며, DFI M1이 이 값과 실제 근무수의 차이로 계산됩니다.")] });
+DYN_TIPS.statDiff = () => ({ t: t('차이 = 실제 − 기대'), items: [t('±1 이상이면 색으로 표시합니다(주황: 많음, 파랑: 적음).'),
+  t('<b>적게</b> 배정되는 경우: 월 최대 한도가 기대보다 낮음 · 제외일·제외요일이 많음 · 레벨 4(조력자 있는 날만) · 배정 제외일 때문에 연속 배정이 막힘 · 다른 사람의 희망일에 밀림'),
+  t('<b>많이</b> 배정되는 경우: 희망일·희망요일이 많음 · 레벨 1(배정 제외일 미적용)이라 빈 날을 채움 · 다른 사람들의 제약으로 남은 날을 떠맡음')],
+  eff: t('차이가 큰 칸에 마우스를 올리면 그 사람에게 해당하는 원인을 보여 줍니다.') });
 
 /* ---- 13-5. 근무자 강조 ---- */
 /** 강조 근무자의 근무일 요약 막대 (복사 버튼 포함) */

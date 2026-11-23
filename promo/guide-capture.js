@@ -16,10 +16,12 @@ for(const lang of ['en','ko']){
   const center=async(sel,block='center')=>{await p.evaluate(([s,bl])=>{const e=document.querySelector(s);const y=e.getBoundingClientRect().top+scrollY;
       scrollTo(0,bl==='top'?y-70:y-innerHeight/2+e.getBoundingClientRect().height/2);},[sel,block]);await p.waitForTimeout(150);};
   const shot=async(name,targets)=>{await p.screenshot({path:path.join(dir,name+'.png')});const t={};for(const [k,s] of Object.entries(targets))t[k]=await rect(s);M[name]=t;};
+  // 영어 화면은 내장 공휴일이 없으므로 직접 입력한 모습(크리스마스)으로 촬영
+  const hol=async()=>{if(lang!=='ko'){await p.fill('#holidays','25');await p.waitForTimeout(500);}};
   const gen=async()=>{await p.click('#btnGenerate');await p.waitForFunction(()=>!document.querySelector('#btnGenerate').disabled,null,{timeout:60000});await p.waitForTimeout(400);if(await p.$('#diagDialog[open]'))await p.click('#diagClose');};
 
   // ① 설정 (샘플을 불러온 깨끗한 상태)
-  await p.click('#btnSample');await p.waitForTimeout(700);
+  await p.click('#btnSample');await p.waitForTimeout(700);await hol();
   await p.evaluate(()=>{const el=document.querySelector('#minDFI');el.value='70';el.dispatchEvent(new Event('input'));});await p.waitForTimeout(500);
   await center('#ctrlCard','top');
   await shot('s1',{ym:'#ym',holidays:'#holidays',miniCal:'#miniCal',restW:'.sg-rule',minDFI:'.sg-gen'});
@@ -37,7 +39,7 @@ for(const lang of ['en','ko']){
   await shot('s2c',{dp:'#dp',dpbtn:'#roster [data-dp="1"]',day:'#dp [data-dd="25"]'});
   await p.keyboard.press('Escape');
   // 입력 원상 복구 (생성 결과가 샘플 기준이 되도록)
-  await p.click('#btnSample');await p.click('#askYes');await p.waitForTimeout(700);
+  await p.click('#btnSample');await p.click('#askYes');await p.waitForTimeout(700);await hol();
   await p.evaluate(()=>{const el=document.querySelector('#minDFI');el.value='70';el.dispatchEvent(new Event('input'));});await p.waitForTimeout(500);
   // ③ 생성
   await center('#genCard','top');
