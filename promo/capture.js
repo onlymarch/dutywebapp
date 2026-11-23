@@ -26,4 +26,7 @@ const q=await b.newPage({viewport:{width:900,height:1250},deviceScaleFactor:2});
 // 언어별 결과 달력 머리 부분
 for(const l of ['ko','ja','zh','fr','es','en']){const r=await page(l);await r.click('#btnSample');await r.waitForTimeout(200);await gen(r,70);
  const c=await r.$('.cal-row section');const cb=await c.boundingBox();await r.screenshot({path:__dirname+`/lang_${l}.png`,clip:{x:cb.x,y:cb.y,width:cb.width,height:Math.min(cb.height,330)}});await r.context().close();}
+// 언어별 앱 첫 화면 (머리글 + 설정 상단) — 언어 장면에서 크게 표시
+for(const l of ['en','ko','ja','zh','fr','es']){const r=await page(l);await r.click('#btnSample');await r.waitForTimeout(800);
+ await r.evaluate(()=>scrollTo(0,0));await r.screenshot({path:__dirname+`/top_${l}.png`,clip:{x:0,y:0,width:1280,height:560}});await r.context().close();}
 await b.close();})()

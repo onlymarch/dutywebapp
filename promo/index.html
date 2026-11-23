@@ -6,7 +6,7 @@
   렌더러(render.js)가 프레임마다 document.getAnimations()의 currentTime을 같은 값으로 맞추고
   tick(t)로 숫자 카운터를 갱신한 뒤 캡처합니다. 그래서 끊김 없이 정확한 20초 영상이 됩니다.
   장면: S1 문제(0–2.6) · S2 혼란(2.6–4.2) · S3 등장(4.2–6.0) · S4 입력(6.0–9.0)
-        S5 생성(9.0–11.8) · S6 결과(11.8–15.2) · S7 언어·개인정보(15.2–17.2) · S8 마무리(17.2–20.0)
+        S5 생성(9.0–11.8) · S6 결과(11.8–15.0) · S7 6개 언어(15.0–17.2) · S8 마무리·개인정보(17.2–20.0)
 -->
 <style>
 :root{--bg:#070b18;--ink:#f4f6ff;--sub:#a9b4d6;--acc:#4d74ff;--cy:#38d9ff;--red:#ff4d5e;--grn:#36d399;--gold:#ffcc4d}
@@ -121,17 +121,32 @@ html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);font-f
 .priv h3{font-size:64px;line-height:1.1;font-weight:900;margin:30px 0 20px;letter-spacing:-1px;animation:up .5s ease-out 16.2s both}
 .priv p{font-size:36px;color:var(--sub);animation:up .5s ease-out 16.45s both}
 
+/* ---------- S7 6개 언어 (크게) ---------- */
+.lstage{position:absolute;left:110px;top:175px;width:1420px;height:622px;border-radius:20px;overflow:hidden;box-shadow:0 40px 120px rgba(0,0,0,.6),0 0 0 4px rgba(255,255,255,.9)}
+.lstage img{position:absolute;inset:0;width:100%;opacity:0;animation:lshow .22s cubic-bezier(.2,.8,.2,1) var(--d) both,sOut .1s linear var(--o) forwards}
+@keyframes lshow{from{opacity:0;transform:scale(1.12);filter:blur(10px)}to{opacity:1;transform:none;filter:none}}
+.bigl{position:absolute;left:1180px;top:330px;width:700px;height:300px}
+.bigl span{position:absolute;left:0;top:0;padding:26px 46px;border-radius:28px;background:linear-gradient(135deg,#4d74ff,#38d9ff);font-size:118px;font-weight:900;letter-spacing:-2px;white-space:nowrap;box-shadow:0 30px 90px rgba(56,217,255,.45);opacity:0;animation:lpop .26s cubic-bezier(.2,1.6,.4,1) var(--d) both,sOut .08s linear var(--o) forwards}
+@keyframes lpop{from{opacity:0;transform:scale(.5) rotate(-6deg)}to{opacity:1;transform:rotate(-3deg)}}
+.lchips{position:absolute;left:110px;top:850px;display:flex;gap:18px}
+.lchips span{font-size:40px;font-weight:800;padding:14px 32px;border-radius:999px;border:2px solid rgba(255,255,255,.25);background:rgba(255,255,255,.07);color:#a9b4d6;animation:up .4s ease-out 15.1s both,chipOn .15s ease-out var(--d) forwards,chipOff .15s ease-out var(--o) forwards}
+@keyframes chipOn{to{background:#4d74ff;border-color:#9db4ff;color:#fff;transform:scale(1.12)}}
+@keyframes chipOff{to{background:rgba(54,211,153,.18);border-color:rgba(54,211,153,.7);color:#e9fff5;transform:scale(1)}}
+
 /* ---------- S8 마무리 ---------- */
 .free{position:absolute;left:110px;top:170px;font-size:210px;font-weight:900;letter-spacing:-6px;color:var(--grn);text-shadow:0 0 80px rgba(54,211,153,.4);animation:slam .6s cubic-bezier(.2,1.4,.3,1) 17.35s both}
 .endchips{position:absolute;left:110px;top:440px;display:flex;gap:18px;flex-wrap:wrap;width:1100px}
 .endchips span{font-size:36px;font-weight:700;padding:14px 30px;border-radius:999px;border:2px solid rgba(255,255,255,.3);background:rgba(255,255,255,.06);animation:pop .45s cubic-bezier(.2,1.6,.4,1) var(--d) both}
-.url{position:absolute;left:110px;top:700px;font-size:76px;font-weight:800;letter-spacing:-1px;animation:up .5s ease-out 18.4s both}
+.url{position:absolute;left:110px;top:735px;font-size:76px;font-weight:800;letter-spacing:-1px;animation:up .5s ease-out 18.4s both}
 .url::after{content:"";display:block;height:8px;margin-top:14px;border-radius:8px;background:linear-gradient(90deg,var(--acc),var(--cy));transform-origin:left;animation:line .7s cubic-bezier(.2,.8,.2,1) 18.7s both}
 @keyframes line{from{transform:scaleX(0)}to{transform:scaleX(1)}}
-.name{position:absolute;left:110px;top:870px;font-size:40px;color:var(--sub);font-weight:600;animation:up .5s ease-out 18.6s both}
+.name{position:absolute;left:110px;top:895px;font-size:40px;color:var(--sub);font-weight:600;animation:up .5s ease-out 18.6s both}
 .qr{position:absolute;right:150px;top:300px;width:420px;padding:34px;border-radius:30px;background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.25);animation:pop .6s cubic-bezier(.2,1.6,.4,1) 18.2s both}
 .qr img{width:100%;display:block}
 .qr div{text-align:center;font-size:28px;color:var(--sub);margin-top:20px;font-weight:600}
+.privline{position:absolute;left:110px;top:565px;display:flex;align-items:center;gap:22px;font-size:46px;font-weight:800;animation:up .5s ease-out 18.15s both}
+.privline svg{width:62px;height:72px}
+.privline span{color:#b7f5dc}
 .endzoom{position:absolute;inset:0;animation:ez 2.8s ease-out 17.2s both}
 @keyframes ez{from{transform:scale(1.04)}to{transform:scale(1)}}
 </style></head><body>
@@ -189,7 +204,7 @@ html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);font-f
 </section>
 
 <!-- S6 결과 -->
-<section class="sc" style="--s:11.8s;--e:15.05s">
+<section class="sc" style="--s:11.8s;--e:14.85s">
   <div class="kick up" style="--d:11.85s"><span class="n">3</span><span class="t">Get the fairest plan</span></div>
   <img class="shot res" src="results.png">
   <div class="panel">
@@ -200,17 +215,12 @@ html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);font-f
   </div>
 </section>
 
-<!-- S7 언어·개인정보 -->
-<section class="sc" style="--s:15.2s;--e:17.05s">
-  <div class="kick up" style="--d:15.25s"><span class="n">4</span><span class="t">Works for your team</span></div>
-  <div class="langs" id="langs"></div>
-  <div class="lname" id="lnames"></div>
-  <div class="priv">
-    <svg class="shield" viewBox="0 0 100 118"><defs><linearGradient id="sg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#36d399"/><stop offset="1" stop-color="#38d9ff"/></linearGradient></defs>
-      <path d="M50 4 92 20v32c0 30-18 52-42 62C26 104 8 82 8 52V20Z" fill="url(#sg)"/><path d="M30 60l14 14 28-30" fill="none" stroke="#06101f" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    <h3>Your data never leaves your browser.</h3>
-    <p>No server. No sign-up. No install.</p>
-  </div>
+<!-- S7 6개 언어: 실제 앱 첫 화면을 크게 넘기고, 언어 이름을 대형으로, 아래 칩이 차례로 켜짐 -->
+<section class="sc" style="--s:15.0s;--e:17.05s">
+  <div class="kick up" style="--d:15.05s"><span class="n">4</span><span class="t">6 languages. One click.</span></div>
+  <div class="lstage" id="lstage"></div>
+  <div class="bigl" id="bigl"></div>
+  <div class="lchips" id="lchips"></div>
 </section>
 
 <!-- S8 마무리 -->
@@ -219,6 +229,7 @@ html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);font-f
   <div class="endchips">
     <span style="--d:17.8s">No install</span><span style="--d:17.92s">No sign-up</span><span style="--d:18.04s">6 languages</span><span style="--d:18.16s">Print-ready A4</span>
   </div>
+  <div class="privline"><svg viewBox="0 0 100 118"><path d="M50 4 92 20v32c0 30-18 52-42 62C26 104 8 82 8 52V20Z" fill="#36d399"/><path d="M30 60l14 14 28-30" fill="none" stroke="#06101f" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Your data never leaves your browser.</span></div>
   <div class="url">onlymarch.github.io/dutywebapp</div>
   <div class="name">🩺 Duty Roster Generator</div>
   <div class="qr"><img src="qr.svg"><div>Scan to try it now</div></div>
@@ -248,12 +259,13 @@ for (let i = 0; i < 26; i++){ const b = document.createElement('b'); b.style.top
 const METS = [['M1 Workload accuracy',14.4,25,'#ff4d5e'],['M2 Holiday fairness',16.3,25,'#e09a1a'],['M3 Preference fulfillment',19.8,20,'#36d399'],['M4 Spacing regularity',12.3,15,'#e09a1a'],['M5 Weekday variety',11.3,15,'#e09a1a']];
 document.getElementById('mets').innerHTML = METS.map((m, i) =>
   `<div class="met" style="--d:${13.0 + i * 0.12}s"><div class="l">${m[0]}<span>${m[1]}/${m[2]}</span></div><div class="b"><i style="--c:${m[3]};--w:${(m[1] / m[2] * 100).toFixed(1)}%;--d:${13.1 + i * 0.12}s"></i></div></div>`).join('');
-// S7: 6개 언어 화면을 빠르게 넘김
+// S7: 6개 언어 — 0.31초마다 화면·대형 이름·칩이 함께 바뀜. 지나간 칩은 초록(지원 완료)으로 남김
 const L = [['en','English'],['ko','한국어'],['ja','日本語'],['zh','中文'],['fr','Français'],['es','Español']];
-const t0 = 15.35, step = 0.27;
-document.getElementById('langs').innerHTML = L.map((l, i) => `<img class="lshot" src="lang_${l[0]}.png" style="--d:${t0 + i * step}s;--o:${i < L.length - 1 ? t0 + (i + 1) * step + 0.05 : 99}s">`).join('');
-// 언어 이름: 다음 이름이 나오기 0.1초 전에 사라져 겹치지 않게 함
-document.getElementById('lnames').innerHTML = L.map((l, i) => `<span style="--d:${t0 + i * step + 0.02}s;--o:${i < L.length - 1 ? t0 + (i + 1) * step - 0.1 : 99}s">${l[1]}</span>`).join('');
+const t0 = 15.15, step = 0.31, last = L.length - 1;
+const at = i => t0 + i * step;
+document.getElementById('lstage').innerHTML = L.map((l, i) => `<img src="top_${l[0]}.png" style="--d:${at(i)}s;--o:${i < last ? at(i + 1) + 0.12 : 99}s">`).join('');
+document.getElementById('bigl').innerHTML = L.map((l, i) => `<span style="--d:${at(i)}s;--o:${i < last ? at(i + 1) - 0.06 : 99}s">${l[1]}</span>`).join('');
+document.getElementById('lchips').innerHTML = L.map((l, i) => `<span style="--d:${at(i)}s;--o:${i < last ? at(i + 1) : 99}s">${l[1]}</span>`).join('');
 
 // ---------- 숫자 카운터 (렌더러가 프레임마다 호출) ----------
 const ease = x => 1 - Math.pow(1 - x, 3);

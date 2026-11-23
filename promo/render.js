@@ -7,7 +7,12 @@ await p.evaluate(()=>document.getAnimations().forEach(a=>a.pause()));
 const seek=t=>p.evaluate(t=>{document.getAnimations().forEach(a=>{a.pause();a.currentTime=t*1000;});window.tick(t);},t);
 if(mode==='preview'){for(const t of (process.argv[3]||'').split(',').map(Number)){await seek(t);await p.screenshot({path:__dirname+`/prev_${t}.jpg`,type:'jpeg',quality:80});}}
 else{const FPS=30,DUR=20,N=FPS*DUR;
- const ff=spawn('ffmpeg',['-y','-f','image2pipe','-framerate',String(FPS),'-c:v','mjpeg','-i','-','-c:v','libx264','-pix_fmt','yuv420p','-crf','18','-preset','slow','-movflags','+faststart',require('path').resolve(__dirname,'..','assets','promo-20s.mp4')],{stdio:['pipe','ignore','inherit']});
+ const ff=spawn('ffmpeg',['-y','-f','image2pipe','-framerate',String(FPS),'-c:v','mjpeg','-i','-','-c:v','libx264','-pix_fmt','yuv420p','-crf','18','-preset','slow','-movflags','+faststart',__dirname+'/video-silent.mp4'],{stdio:['pipe','ignore','inherit']});
  for(let i=0;i<N;i++){await seek(i/FPS);const buf=await p.screenshot({type:'jpeg',quality:95});if(!ff.stdin.write(buf))await new Promise(r=>ff.stdin.once('drain',r));if(i%60===0)process.stdout.write(i+' ');}
- ff.stdin.end();await new Promise(r=>ff.on('close',r));console.log('\ndone');}
+ ff.stdin.end();await new Promise(r=>ff.on('close',r));
+ // 배경음악(promo/music.wav, python3 promo/music.py로 생성)을 합쳐 assets/promo-20s.mp4로 저장. -0.8dB → 약 -14 LUFS
+ const out=require('path').resolve(__dirname,'..','assets','promo-20s.mp4'), wav=__dirname+'/music.wav';
+ const args=fs.existsSync(wav)?['-y','-i',__dirname+'/video-silent.mp4','-i',wav,'-map','0:v','-map','1:a','-c:v','copy','-af','volume=-0.8dB','-c:a','aac','-b:a','192k','-shortest','-movflags','+faststart',out]
+                             :['-y','-i',__dirname+'/video-silent.mp4','-c','copy',out];
+ await new Promise(r=>spawn('ffmpeg',args,{stdio:'inherit'}).on('close',r));console.log('\ndone',out);}
 await b.close();})()

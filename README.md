@@ -8,7 +8,7 @@ A free, single-file web app that builds a month of on-call duty rosters for doct
 
 [![20-second intro: from a messy hand-made roster to a fair plan in seconds](assets/promo-preview.gif)](https://onlymarch.github.io/dutywebapp/assets/promo-20s.mp4)
 
-▶ [Watch the 20-second intro in full HD (MP4, 1080p)](https://onlymarch.github.io/dutywebapp/assets/promo-20s.mp4)
+▶ [Watch the 20-second intro in full HD with sound (MP4, 1080p)](https://onlymarch.github.io/dutywebapp/assets/promo-20s.mp4)
 
 - No install, no sign-up, no server — **your roster never leaves your browser**
 - Preferred / available / unavailable dates and weekdays, rest days after duty, monthly limits, weights

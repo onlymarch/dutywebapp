@@ -8,7 +8,7 @@
 
 [![20초 소개 영상: 손으로 짜던 당직표에서 몇 초 만에 공정한 안까지](assets/promo-preview.gif)](https://onlymarch.github.io/dutywebapp/assets/promo-20s.mp4)
 
-▶ [20초 소개 영상 고화질로 보기 (MP4, 1080p, 영어)](https://onlymarch.github.io/dutywebapp/assets/promo-20s.mp4)
+▶ [20초 소개 영상 고화질·음악 포함으로 보기 (MP4, 1080p, 영어)](https://onlymarch.github.io/dutywebapp/assets/promo-20s.mp4)
 
 현재 버전: **v1.14.3** (2026-11-23)
 
