@@ -129,6 +129,7 @@ th[data-tip]:hover,th[data-tip]:focus{color:var(--accent);outline:none}
 #roster th,#roster td{padding:5px 4px}
 #roster td input[type=text]{min-width:78px}
 #roster td input[type=number]{width:64px}
+#roster td input[data-f=max]{width:74px}   /* '무제한' 안내 글자가 잘리지 않도록 */
 #roster td select{min-width:128px}
 #roster tr.empty-row td{text-align:center;padding:26px 8px;color:var(--sub);vertical-align:middle}
 .dow{display:inline-flex;gap:2px}
@@ -414,8 +415,9 @@ body.printing-sheet #printSheet{display:block}
     <table id="roster">
       <!-- data-tip: TIPS 객체의 키. 머리글에 마우스를 올리거나 포커스하면 설명 툴팁 표시 -->
       <thead><tr>
-        <th>#</th><th>성명</th><th data-tip="level" tabindex="0">레벨 <i class="tip-i">ⓘ</i></th><th data-tip="weight" tabindex="0">가중치 <i class="tip-i">ⓘ</i></th><th data-tip="wish" tabindex="0">희망일(0순위) <i class="tip-i">ⓘ</i></th><th data-tip="avail" tabindex="0">가능일(2순위) <i class="tip-i">ⓘ</i></th><th data-tip="avoid" tabindex="0">기피일(불가) <i class="tip-i">ⓘ</i></th><th>달력</th>
-        <th data-tip="wishDow" tabindex="0">희망요일(1순위) <i class="tip-i">ⓘ</i></th><th data-tip="exDow" tabindex="0">제외요일(불가) <i class="tip-i">ⓘ</i></th><th data-tip="max" tabindex="0">월 최대 <i class="tip-i">ⓘ</i></th><th>관리</th>
+        <!-- 열 순서: 기본 정보(성명·레벨·가중치·월 최대) → 달력 → 원하는 날(희망일·가능일·희망요일) → 안 되는 날(제외일·제외요일) → 관리 -->
+        <th>#</th><th>성명</th><th data-tip="level" tabindex="0">레벨 <i class="tip-i">ⓘ</i></th><th data-tip="weight" tabindex="0">가중치 <i class="tip-i">ⓘ</i></th><th data-tip="max" tabindex="0">월 최대 <i class="tip-i">ⓘ</i></th><th>달력</th>
+        <th data-tip="wish" tabindex="0">희망일(0순위) <i class="tip-i">ⓘ</i></th><th data-tip="avail" tabindex="0">가능일(2순위) <i class="tip-i">ⓘ</i></th><th data-tip="wishDow" tabindex="0">희망요일(1순위) <i class="tip-i">ⓘ</i></th><th data-tip="avoid" tabindex="0">제외일(불가) <i class="tip-i">ⓘ</i></th><th data-tip="exDow" tabindex="0">제외요일(불가) <i class="tip-i">ⓘ</i></th><th>관리</th>
       </tr></thead>
       <tbody></tbody>
     </table>
@@ -609,7 +611,7 @@ function buildCalendar(y, m, holidays){
  * 같은 값을 여기서 한 번만 계산하면 시도당 연산량이 크게 줄어듭니다.
  *
  * 반환값
- *   people[i].blocked[d]   : 1이면 d일에 배정 불가 (기피일 또는 제외요일)
+ *   people[i].blocked[d]   : 1이면 d일에 배정 불가 (제외일 또는 제외요일)
  *   people[i].isWish[d]    : 1이면 d일이 희망일 (0순위)
  *   people[i].isAvail[d]   : 1이면 d일이 가능일 (2순위)
  *   people[i].wishAfter[d] : d일 "이후"(d+1 ~ N)에 남은 희망일 수 (희망일 쿼터 보호에 사용)
@@ -644,7 +646,7 @@ function precompute(cfg, cal){
  *
  * [1단계] 기본 후보: 다음 조건을 모두 통과한 사람
  *   - 월 최대 한도 미만
- *   - 기피일·제외요일이 아님
+ *   - 제외일·제외요일이 아님
  *   - 배정 제외일 경과: 마지막 정규 당직일이 휴일이면 restH일, 평일이면 restW일이 지났음
  *     (조건: 오늘 − 마지막 당직일 > 배정 제외일)
  *     (레벨 1은 특례로 이 규칙을 적용하지 않음)
@@ -661,7 +663,7 @@ function precompute(cfg, cal){
  *   → 무작위 항은 동점을 깨고 시도마다 다른 배정을 만들기 위한 것입니다.
  *
  * [4단계] 레벨 4가 뽑히면 조력자(레벨 3)를 붙입니다.
- *   조건: 기피일·제외요일 아님, 전날 정규 당직자 아님
+ *   조건: 제외일·제외요일 아님, 전날 정규 당직자 아님
  *   선택: 마지막 근무(정규·조력 포함) 이후 가장 오래 쉰 사람 → 조력 횟수가 적은 사람 → 무작위
  *   조력은 정규 근무수와 배정 제외일 계산에 포함하지 않습니다.
  *
@@ -766,7 +768,7 @@ function mean(arr){ if (!arr.length) return 0; let s = 0; for (const v of arr) s
  *
  *   M1 양적 정확도 (25) : 가중치 비례 기대 근무수와 실제 근무수의 RMSE.     25 − RMSE×8
  *   M2 질적 배분성 (25) : 개인별 휴일 근무수의 표준편차.                    25 − SD×12
- *   M3 선호도 충족 (20) : 희망일 8 + 희망요일 4 + 가능일 4 + 기피일 회피 4 (각 반영률 × 배점)
+ *   M3 선호도 충족 (20) : 희망일 8 + 희망요일 4 + 가능일 4 + 제외일 회피 4 (각 반영률 × 배점)
  *   M4 간격 규칙성 (15) : 3회 이상 근무자의 근무 간격 SD 평균.             15 − 평균SD×3
  *   M5 요일 다양성 (15) : 개인별 7개 요일 근무수 SD 평균.                  15 − 평균SD×5
  *   각 지표는 0점 아래로 내려가지 않습니다.
@@ -798,7 +800,7 @@ function computeDFI(cfg, cal, duty, assist){
   const m2 = Math.max(0, 25 - holSD * 12);
 
   // ---- M3 선호도 충족률 ----
-  // wT/wH: 희망일 분모/적중, dT/dH: 희망요일, aT/aH: 가능일, vT/vV: 기피일 총수/위반수
+  // wT/wH: 희망일 분모/적중, dT/dH: 희망요일, aT/aH: 가능일, vT/vV: 제외일 총수/위반수
   let wT = 0, wH = 0, dT = 0, dH = 0, aT = 0, aH = 0, vT = 0, vV = 0;
   P.forEach((p, i) => {
     const mine = days[i];
@@ -849,7 +851,7 @@ function computeDFI(cfg, cal, duty, assist){
     metrics: [
       { key: 'M1', name: '양적 정확도', short: '가중치 비례 근무량', desc: '각자 가중치에 비례한 몫만큼 근무했는가', how: '기대 근무수(배정일수 × 본인 가중치 ÷ 가중치 합)와 실제 근무수의 차이를 RMSE로 계산합니다. 25 − RMSE × 8.', score: m1, max: 25, detail: 'RMSE ' + rmse.toFixed(2) },
       { key: 'M2', name: '질적 배분성', short: '휴일 근무 균등', desc: '부담이 큰 주말·공휴일 근무가 고르게 나뉘었는가', how: '개인별 휴일(토·일·공휴일) 근무수의 표준편차입니다. 25 − SD × 12.', score: m2, max: 25, detail: '휴일 SD ' + holSD.toFixed(2) },
-      { key: 'M3', name: '선호도 충족률', short: '희망·기피 반영', desc: '희망일·희망요일·가능일을 얼마나 반영하고 기피일을 피했는가', how: '희망일 8점 + 희망요일 4점 + 가능일 4점 + 기피일 회피 4점의 반영률 합입니다.', score: m3, max: 20, detail: '희망일 ' + m3parts.wish.toFixed(1) + '/8 · 희망요일 ' + m3parts.wishDow.toFixed(1) + '/4 · 가능일 ' + m3parts.avail.toFixed(1) + '/4 · 기피회피 ' + m3parts.avoid.toFixed(1) + '/4' },
+      { key: 'M3', name: '선호도 충족률', short: '희망·제외 반영', desc: '희망일·희망요일·가능일을 얼마나 반영하고 제외일을 피했는가', how: '희망일 8점 + 희망요일 4점 + 가능일 4점 + 제외일 회피 4점의 반영률 합입니다.', score: m3, max: 20, detail: '희망일 ' + m3parts.wish.toFixed(1) + '/8 · 희망요일 ' + m3parts.wishDow.toFixed(1) + '/4 · 가능일 ' + m3parts.avail.toFixed(1) + '/4 · 제외일 회피 ' + m3parts.avoid.toFixed(1) + '/4' },
       { key: 'M4', name: '간격 규칙성', short: '근무 간격 일정', desc: '한 사람의 당직이 몰리지 않고 일정한 간격으로 배치되었는가', how: '3회 이상 근무한 사람의 근무 간격 표준편차 평균입니다. 15 − 평균 SD × 3.', score: m4, max: 15, detail: '평균 간격 SD ' + gapAvg.toFixed(2) },
       { key: 'M5', name: '요일 다양성', short: '요일 분산', desc: '한 사람이 특정 요일에만 반복 배정되지 않았는가', how: '개인별 7개 요일 근무수 분포의 표준편차 평균입니다. 15 − 평균 SD × 5.', score: m5, max: 15, detail: '평균 요일 SD ' + dowAvg.toFixed(2) }
     ]
@@ -950,8 +952,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.10.5', APP_BUILD = '2026-11-22';
+const APP_VERSION = '1.11.0', APP_BUILD = '2026-11-22';
 const CHANGELOG = [
+  '1.11.0 명단 열 순서 변경(성명·레벨·가중치·월 최대·달력·희망일·가능일·희망요일·제외일·제외요일·관리), 용어 기피일 → 제외일',
   '1.10.5 명단의 희망·제외 요일 버튼에서 일요일 테두리를 연한 분홍색, 토요일 테두리를 하늘색으로 표시',
   '1.10.4 출력 양식 달력의 글자 확대: 날짜 9→13px, 이름 12.5→17px(긴 이름 14·12px), 조력자 9→11.5px, 요일 머리글 10→12px. 칸 높이 19.5→22mm(6주 달 16.5→19mm)',
   '1.10.3 근무자별 통계(화면·인쇄·CSV)를 명단에 입력한 순서대로 표시 (이전: 레벨 → 이름 순)',
@@ -983,7 +986,7 @@ const CHANGELOG = [
 const DOW    = ['일', '월', '화', '수', '목', '금', '토'];
 const LEVELS = { 1: 'Lv1 특례', 2: 'Lv2 숙련', 3: 'Lv3 일반(조력)', 4: 'Lv4 초보' };
 const DATE_FIELDS = ['wish', 'avail', 'avoid'];                 // 날짜 목록을 입력하는 명단 필드
-const FLABEL = { wish: '희망일', avail: '가능일', avoid: '기피일' };
+const FLABEL = { wish: '희망일', avail: '가능일', avoid: '제외일' };
 const UNLIMITED = 999;                                           // 월 최대 빈칸 = 무제한
 
 /* 엔진 소스를 메인 스레드에서도 평가해 둡니다 (달력 생성, DFI 재계산, Worker 대체 실행용). */
@@ -1597,8 +1600,10 @@ function renderRoster(){
   if (!state.people.length){ tb.innerHTML = EMPTY_ROW; return; }
 
   // 행 구성 요소. data-label은 모바일 카드형에서 칸 제목으로 쓰입니다.
-  const dateCell = (p, i, f, label) =>
-    `<td data-label="${label}"><input type="text" data-i="${i}" data-f="${f}" value="${esc(p[f])}" aria-label="${esc(personLabel(p, i))} ${label}">` +
+  // 모바일 카드 배치(2열): 성명|레벨, 가중치|월 최대, 달력(전체), 희망일|가능일, 희망요일(전체), 제외일(전체), 제외요일(전체)
+  // cls: 모바일 카드에서 한 줄 전체를 쓰게 할 때 'c-wide'
+  const dateCell = (p, i, f, label, cls = '') =>
+    `<td data-label="${label}" class="${cls}"><input type="text" data-i="${i}" data-f="${f}" value="${esc(p[f])}" aria-label="${esc(personLabel(p, i))} ${label}">` +
     `<div class="ph" id="ph-${i}-${f}">${hintHTML(p[f], N)}</div></td>`;
   const ops = i => `<button type="button" data-op="up" data-i="${i}" title="위로" aria-label="위로">↑</button>` +
                    `<button type="button" data-op="down" data-i="${i}" title="아래로" aria-label="아래로">↓</button>` +
@@ -1610,11 +1615,12 @@ function renderRoster(){
     <td data-label="성명"><input type="text" data-i="${i}" data-f="name" value="${esc(p.name)}" aria-label="${i + 1}번 성명"></td>
     <td data-label="레벨"><select data-i="${i}" data-f="level" aria-label="레벨">${levelOpts(p.level)}</select></td>
     <td data-label="가중치"><input type="number" step="0.1" min="0.1" data-i="${i}" data-f="weight" value="${esc(p.weight)}" aria-label="가중치"></td>
-    ${dateCell(p, i, 'wish', '희망일(0순위)')}${dateCell(p, i, 'avail', '가능일(2순위)')}${dateCell(p, i, 'avoid', '기피일(불가)')}
-    <td data-label="달력에서 고르기"><button type="button" class="btn-dp" data-dp="${i}" aria-label="${esc(personLabel(p, i))} 날짜를 달력에서 지정" title="달력에서 날짜 지정">📅<span class="dp-lbl"> 달력</span></button></td>
-    <td data-label="희망요일(1순위)" class="c-wide">${dowGroup(i, 'wishDow', p.wishDow, false)}</td>
-    <td data-label="제외요일(불가)" class="c-wide">${dowGroup(i, 'exDow', p.exDow, true)}</td>
     <td data-label="월 최대"><input type="number" min="0" data-i="${i}" data-f="max" value="${esc(p.max)}" placeholder="무제한" aria-label="월 최대"></td>
+    <td data-label="달력에서 고르기" class="c-wide"><button type="button" class="btn-dp" data-dp="${i}" aria-label="${esc(personLabel(p, i))} 날짜를 달력에서 지정" title="달력에서 날짜 지정">📅<span class="dp-lbl"> 달력</span></button></td>
+    ${dateCell(p, i, 'wish', '희망일(0순위)')}${dateCell(p, i, 'avail', '가능일(2순위)')}
+    <td data-label="희망요일(1순위)" class="c-wide">${dowGroup(i, 'wishDow', p.wishDow, false)}</td>
+    ${dateCell(p, i, 'avoid', '제외일(불가)', 'c-wide')}
+    <td data-label="제외요일(불가)" class="c-wide">${dowGroup(i, 'exDow', p.exDow, true)}</td>
     <td class="ops ops-desk">${ops(i)}</td>
   </tr>`).join('');
 }
@@ -1686,7 +1692,7 @@ $('#btnAddRow').addEventListener('click', () => {
 });
 
 /* ─────────────────────────── §9 달력형 날짜 선택 팝오버 ───────────────────────────
-   위쪽에서 [희망/가능/기피/지우기] 중 하나를 고른 뒤 날짜를 누르면 그 항목으로 지정합니다.
+   위쪽에서 [희망/가능/제외/지우기] 중 하나를 고른 뒤 날짜를 누르면 그 항목으로 지정합니다.
    같은 항목인 날을 다시 누르면 해제합니다. 한 날짜는 세 항목 중 하나에만 속합니다.
    결과는 명단의 텍스트 입력칸에 "1~3, 5" 형식으로 써 넣습니다(텍스트가 원본). */
 const DP = { i: -1, mode: 'wish', anchor: null };   // i: 대상 행, anchor: 위치 기준이 되는 📅 버튼
@@ -1701,14 +1707,14 @@ function placeDP(){
   let top = r.bottom + 6; if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
   dp.style.left = left + 'px'; dp.style.top = top + 'px';
 }
-/** 한 사람의 희망·가능·기피 날짜를 Set으로 */
+/** 한 사람의 희망·가능·제외 날짜를 Set으로 */
 function personDateSets(p, N){ return { wish: new Set(parseDayList(p.wish, N)), avail: new Set(parseDayList(p.avail, N)), avoid: new Set(parseDayList(p.avoid, N)) }; }
 
 function renderDP(){
   const p = state.people[DP.i]; if (!p){ closeDP(); return; }
   const y = +state.settings.year, m = +state.settings.month, N = curN(), first = new Date(y, m - 1, 1).getDay();
   const S = personDateSets(p, N), hol = new Set(parseDayList(state.settings.holidays, N));
-  const modes = [['wish', '희망일'], ['avail', '가능일'], ['avoid', '기피일'], ['clear', '지우기']];
+  const modes = [['wish', '희망일'], ['avail', '가능일'], ['avoid', '제외일'], ['clear', '지우기']];
 
   let h = `<div class="dp-head"><b>${esc(personLabel(p, DP.i))} · ${y}년 ${m}월</b><button type="button" data-dpx aria-label="닫기">✕</button></div>
     <div class="seg" role="radiogroup" aria-label="지정할 항목">${modes.map(([k, l]) =>
@@ -1722,7 +1728,7 @@ function renderDP(){
     const dayCls = hol.has(d) ? 'pub' : w === 0 ? 'sun' : w === 6 ? 'sat' : '';
     h += `<button type="button" data-dd="${d}" class="${dayCls} ${ex} ${st}" title="${esc(tip)}" aria-label="${d}일${tip ? ' ' + esc(tip) : ''}">${d}</button>`;
   }
-  h += `</div><div class="dp-foot">위에서 항목을 고른 뒤 날짜를 누르면 지정되고, 다시 누르면 해제됩니다. 빗금은 제외요일입니다.<br>희망 ${S.wish.size}일 · 가능 ${S.avail.size}일 · 기피 ${S.avoid.size}일</div>`;
+  h += `</div><div class="dp-foot">위에서 항목을 고른 뒤 날짜를 누르면 지정되고, 다시 누르면 해제됩니다. 빗금은 제외요일입니다.<br>희망 ${S.wish.size}일 · 가능 ${S.avail.size}일 · 제외 ${S.avoid.size}일</div>`;
   $('#dp').innerHTML = h;
 }
 $('#dp').addEventListener('click', e => {
@@ -1801,7 +1807,7 @@ function precheck(){
   const avoidSet = P.map(p => new Set(p.avoid));
   P.forEach((p, i) => {
     const both = p.wish.filter(d => avoidSet[i].has(d));
-    if (both.length) warn(`${p.name}: ${fmtDays(both)}일이 희망일이자 기피일입니다. 기피일이 우선합니다.`);
+    if (both.length) warn(`${p.name}: ${fmtDays(both)}일이 희망일이자 제외일입니다. 제외일이 우선합니다.`);
     const onEx = p.wish.filter(d => p.exDow[dowOf(d)] && !avoidSet[i].has(d));
     if (onEx.length) warn(`${p.name}: 희망일 ${fmtDays(onEx)}일이 제외요일이라 배정되지 않습니다.`);
     if (p.max < UNLIMITED && p.wish.length > p.max) warn(`${p.name}: 희망일 ${p.wish.length}일이 월 최대 ${p.max}회보다 많습니다. 일부만 반영됩니다.`);
@@ -1825,7 +1831,7 @@ function precheck(){
     const helper = P.some((h, i) => h.level === 3 && free(i));
     if (!P.some((p, i) => p.max > 0 && free(i) && (p.level < 4 || helper))) none.push(d);
   }
-  if (none.length) err(`${fmtDays(none)}일에는 배정 가능한 사람이 없습니다(기피일·제외요일·한도). 미배정으로 남습니다.`);
+  if (none.length) err(`${fmtDays(none)}일에는 배정 가능한 사람이 없습니다(제외일·제외요일·한도). 미배정으로 남습니다.`);
   return items;
 }
 function renderPrecheck(){
@@ -2179,7 +2185,7 @@ function renderStats(R){
 /* ---- 13-4. DFI 카드 ---- */
 /** 목표 미달 시 가장 낮은 지표에 대한 수정 안내 */
 const GUIDE = {
-  M1: '가중치 대비 실제 근무수 편차가 큽니다. 아래 통계표의 "차이" 열에서 많이·적게 배정된 사람을 확인하십시오. 기피일·제외요일·월 최대 한도가 특정 인원의 근무를 막고 있는지 보고 가중치를 조정하십시오.',
+  M1: '가중치 대비 실제 근무수 편차가 큽니다. 아래 통계표의 "차이" 열에서 많이·적게 배정된 사람을 확인하십시오. 제외일·제외요일·월 최대 한도가 특정 인원의 근무를 막고 있는지 보고 가중치를 조정하십시오.',
   M2: '휴일 근무가 일부 인원에 쏠렸습니다. 주말 제외요일 설정을 줄이거나 휴일 당직 후 배정 제외일을 줄이면 휴일 배분 후보가 늘어납니다.',
   M3: '희망일이 서로 겹치거나 한도보다 많습니다. 사전 점검의 희망일 충돌 항목을 조정하고 가능일 범위를 넓히십시오.',
   M4: '개인별 근무 간격이 불규칙합니다. 배정 제외일을 1일씩 늘리거나 시뮬레이션 횟수를 늘리십시오.',
@@ -2311,7 +2317,7 @@ function checkEdit(){
   const R = state.result, d = editDay, k = +$('#editDuty').value, a = +$('#editAssist').value, w = [];
   if (k >= 0){
     const p = R.cfg.people[k], day = R.cal.days[d];
-    if (p.avoid.includes(d)) w.push('기피일입니다.');
+    if (p.avoid.includes(d)) w.push('제외일입니다.');
     if (p.exDow[day.dow]) w.push('제외요일입니다.');
     const cnt = R.duty.filter((x, i) => i !== d && x === k).length + 1;
     if (cnt > p.max) w.push(`월 최대 한도(${p.max}) 초과: ${cnt}회`);
@@ -2359,8 +2365,8 @@ $('#editApply').addEventListener('click', () => {
 function showUnfilled(){
   const R = (state.cands && state.cands[0]) || state.result;
   $('#diagTitle').textContent = '⚠️ 미배정일이 있습니다';
-  $('#diagBody').innerHTML = `<p style="color:var(--bad)"><b>${fmtDays(R.unfilled)}일 (${R.unfilled.length}일)</b>에 배정 제외일·기피일·제외요일·한도를 모두 통과한 후보가 없었습니다.</p>
-    <ul><li>레벨 1 인원을 늘리거나 배정 제외일을 줄이십시오.</li><li>해당 날짜의 기피일·제외요일 설정을 확인하십시오(3단계 사전 점검 참고).</li><li>달력의 ✎ 버튼으로 직접 채울 수 있습니다.</li></ul>`;
+  $('#diagBody').innerHTML = `<p style="color:var(--bad)"><b>${fmtDays(R.unfilled)}일 (${R.unfilled.length}일)</b>에 배정 제외일(당직 후)·제외일·제외요일·한도를 모두 통과한 후보가 없었습니다.</p>
+    <ul><li>레벨 1 인원을 늘리거나 배정 제외일을 줄이십시오.</li><li>해당 날짜의 제외일·제외요일 설정을 확인하십시오(3단계 사전 점검 참고).</li><li>달력의 ✎ 버튼으로 직접 채울 수 있습니다.</li></ul>`;
   $('#diagDialog').showModal();
 }
 function showError(msg){
@@ -2599,16 +2605,16 @@ const TIPS = {
   wish: { t: '희망일 — 0순위 (최우선)', items: [
     '그날 배정 가능한 후보 중 희망일인 인원을 가장 먼저 고려합니다.',
     '<b>쿼터 보호</b>: 남은 한도가 앞으로 남은 희망일 수 이하가 되면, 희망일이 아닌 날에는 배정을 보류해 한도를 아껴 둡니다. 그날 후보가 아무도 없으면 보호를 풀어 배정합니다.',
-    '배정 제외일·한도·기피일 규칙이 희망일보다 우선합니다. 따라서 희망일이 항상 보장되지는 않습니다.'],
+    '배정 제외일(당직 후)·한도·제외일 규칙이 희망일보다 우선합니다. 따라서 희망일이 항상 보장되지는 않습니다.'],
     eff: 'DFI M3(선호도 충족률) 중 8점이 희망일 반영률입니다. 같은 날을 여러 명이 희망하면 반영률이 떨어집니다(사전 점검에 표시).' },
   avail: { t: '가능일 — 2순위', items: [
     '희망일·희망요일에 해당하는 사람이 없을 때 다음으로 고려합니다.',
-    '지정하지 않은 날도 배정될 수 있습니다(3순위 일반일). 배정을 막으려면 기피일이나 제외요일을 쓰십시오.'],
+    '지정하지 않은 날도 배정될 수 있습니다(3순위 일반일). 배정을 막으려면 제외일이나 제외요일을 쓰십시오.'],
     eff: 'DFI M3 중 4점은 본인 근무일 가운데 가능일·희망일에 해당하는 비율입니다.' },
-  avoid: { t: '기피일 — 배정 불가', items: [
+  avoid: { t: '제외일 — 배정 불가 (특정 날짜)', items: [
     '해당 날짜에는 정규 당직에 배정하지 않습니다. 레벨 3이면 그날 조력자로도 배정하지 않습니다.',
     '수동 교체로 지정하면 경고가 표시됩니다(적용은 가능).'],
-    eff: '기피일이 많으면 후보가 줄어 미배정일이 생기거나 M1·M2 점수가 떨어질 수 있습니다. DFI M3 중 4점이 기피일 회피율입니다.' },
+    eff: '제외일이 많으면 후보가 줄어 미배정일이 생기거나 M1·M2 점수가 떨어질 수 있습니다. DFI M3 중 4점이 제외일 회피율입니다. 매주 같은 요일이 안 되면 제외요일을 쓰십시오.' },
   wishDow: { t: '희망요일 — 1순위', items: [
     '선택한 요일에는 희망일 다음 순위(1순위)로 고려합니다.',
     '같은 요일을 제외요일과 동시에 고를 수 없습니다. 한쪽을 켜면 다른 쪽이 꺼집니다.'],
