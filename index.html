@@ -21,6 +21,10 @@
      미리보기 수집기는 JS를 실행하지 않으므로 고정 영어 문구로 둡니다. 이미지는 1200×630 (assets/og-image.png).
      og:image는 절대 주소여야 합니다. 저장소·주소가 바뀌면 아래 URL도 함께 바꾸십시오. -->
 <meta name="description" content="Free web app that builds fair monthly on-call duty rosters for doctors in seconds and scores them with a Duty Fairness Index. No install, no sign-up — your data never leaves your browser. 6 languages.">
+<!-- 파비콘: SVG는 파일 안에 넣어(index.html 하나만 써도 표시), PNG는 SVG 미지원 브라우저·iOS 홈 화면용 -->
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232f5bea'/%3E%3Crect x='13' y='16' width='38' height='35' rx='5' fill='%23fff'/%3E%3Crect x='13' y='16' width='38' height='10' rx='5' fill='%23cfdafd'/%3E%3Crect x='13' y='22' width='38' height='4' fill='%23cfdafd'/%3E%3Crect x='21' y='11' width='4' height='10' rx='2' fill='%23fff'/%3E%3Crect x='39' y='11' width='4' height='10' rx='2' fill='%23fff'/%3E%3Cpath d='M22 38.5l6.5 6.5L43 31' fill='none' stroke='%232f5bea' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="canonical" href="https://onlymarch.github.io/dutywebapp/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Duty Roster Generator">
@@ -3653,8 +3657,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.16.0', APP_BUILD = '2026-11-24';
+const APP_VERSION = '1.16.1', APP_BUILD = '2026-11-24';
 const CHANGELOG = [
+  '1.16.1 파비콘 추가(파란 달력·체크 표시): 브라우저 탭·즐겨찾기·iOS 홈 화면 아이콘',
   '1.16.0 최하단에 [▶ 사용법 영상 보기] 추가: 누르면 영상 재생 레이어가 열리고 화면 언어에 맞는 영상(한국어, 그 밖의 언어는 영어)을 재생. 한국어·English 전환, ×·Esc·바깥 클릭으로 닫으면 정지',
   '1.15.0 내장 공휴일은 한국어 화면에서만 자동 입력, 목표 미달 시 명단을 분석한 원인·개선 방법과 도달 가능 상한 추정, 통계표 기대·차이 툴팁과 차이 큰 칸의 개인별 원인 툴팁',
   '1.14.3 링크 미리보기 카드(Open Graph·X 카드 메타 태그, assets/og-image.png 1200×630), 영어 README 추가',
