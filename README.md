@@ -17,13 +17,13 @@ A free, single-file web app that builds a month of on-call duty rosters for doct
 
 ![Monthly duty calendar with Duty Fairness Index](assets/screenshot-en.png)
 
-Current version: **v1.15.0** (2026-11-23)
+Current version: **v1.16.0** (2026-11-24)
 
 > This is a scheduling aid. Please have the person responsible check the final roster before publishing it.
 
 ## How to use
 
-🎬 **30-second video guide** (with narration): [English](https://onlymarch.github.io/dutywebapp/assets/guide-en-30s.mp4) · [한국어](https://onlymarch.github.io/dutywebapp/assets/guide-ko-30s.mp4)
+🎬 **30-second video guide** (with narration; also available from **▶ Watch the video guide** at the bottom of the app): [English](https://onlymarch.github.io/dutywebapp/assets/guide-en-30s.mp4) · [한국어](https://onlymarch.github.io/dutywebapp/assets/guide-ko-30s.mp4)
 
 1. **Settings** — Pick the target month. Type your public holidays or click them on the mini calendar (in the Korean interface, Korean public holidays are filled in automatically). Use the sliders to set rest days after a duty (0–5) and the target DFI (50–100, in steps of 5). The number of attempts is automatic (see *Attempts* below).
 2. **Staff roster** — Enter name, level, weight, monthly max, preferred dates, preferred weekdays, available dates, unavailable dates and unavailable weekdays. Write dates like `3, 15, 20~22`; ranges accept both `~` and `-`. `-5` means days 1–5 and `25-` means the 25th to the end of the month. If a range ends past the last day (e.g. `15-31` in February), it is cut at the month end. You can also pick dates on a calendar with the 📅 button.
@@ -94,7 +94,7 @@ Download `index.html` and open it in a browser. Nothing to install.
 | File | Contents |
 |---|---|
 | `index.html` | The whole app (UI, scheduling engine, DFI, storage, printing, translations) |
-| `tests/ui-qa.js` | UI test suite (24 categories, 142 checks, including all languages) |
+| `tests/ui-qa.js` | UI test suite (25 categories, 148 checks, including all languages) |
 | `README.ko.md` | Korean README |
 | `assets/` | Screenshots, link-preview image, promo videos (20 s, landscape and vertical), GIF preview and 30-second guide videos (English, Korean) |
 | `promo/` | Source for the promo and guide videos (screen capture, motion graphics, renderer) |
@@ -116,7 +116,7 @@ npx playwright install chromium
 node tests/ui-qa.js
 ```
 
-The last line should read `총 142건 · 통과 142 · 실패 0` ("142 total · 142 passed · 0 failed"). Tests have been run on Chromium only, not on Safari or iOS.
+The last line should read `총 148건 · 통과 148 · 실패 0` ("148 total · 148 passed · 0 failed"). Tests have been run on Chromium only, not on Safari or iOS.
 
 ## Feedback
 

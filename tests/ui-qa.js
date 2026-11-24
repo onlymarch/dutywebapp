@@ -2,13 +2,14 @@
  * 인터페이스 오류 탐색 테스트 (Playwright, Chromium)
  * 실행: npx playwright install chromium   (최초 1회)
  *       node tests/ui-qa.js [index.html 경로]
- * 24개 범주(A~X) 142개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
+ * 25개 범주(A~Y) 148개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
  * 숫자 경계값, 극단적 명단, 날짜 팝오버, 연타·중단, Worker 차단 환경, 수동 교체, 프로필 이름,
  * 저장 전 입력 보존, 대규모 명단, 모바일 배치, 키보드 조작, 출력, 공휴일 입력, 손상된 저장값, 이전 결과 조작,
  * 기간 입력(~와 -의 변형, 날짜 형식 기간, 열린 기간 -5·20-), 실행 요약(소요 시간·개선 기록),
  * 다국어(W: en·ja·zh·fr·es 각각 화면·툴팁·팝오버·대화상자·출력·CSV에 한글이 남지 않는지, 한국어 복원,
  *   결과 표시 중 재전환, 새로 고침 후 유지, 360px 가로 넘침, 12月25日 형식 해석),
- * v1.15(X: 내장 공휴일은 한국어에서만, 목표 미달 원인·개선 목록, 통계 기대·차이 툴팁). 첫 실행은 브라우저 언어를 감지해 저장하고, 이후에는 저장된 언어를 씁니다.
+ * v1.15(X: 내장 공휴일은 한국어에서만, 목표 미달 원인·개선 목록, 통계 기대·차이 툴팁),
+ * v1.16(Y: 최하단 사용법 영상 링크와 재생 레이어 열기·언어 전환·닫으면 정지). 첫 실행은 브라우저 언어를 감지해 저장하고, 이후에는 저장된 언어를 씁니다.
  * 각 항목은 JS 예외·콘솔 오류·브라우저 기본 대화상자 발생도 함께 실패로 기록합니다.
  */
 
@@ -388,6 +389,29 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
  const hg=/[가-힣]/.test(enDiag+enTip);
  log('X7 영어: 원인 목록·통계 툴팁 번역',!hg,hg?(enDiag+enTip).match(/.{0,20}[가-힣]+.{0,20}/)[0]:enDiag.replace(/\s+/g,' ').slice(0,70));
  errsOK(p,'X'); await p.context().close();}
+
+// Y. v1.16: 최하단 사용법 영상 링크 → 재생 레이어
+{const p=await fresh(b);
+ const foot=await p.evaluate(()=>{const f=document.querySelector('footer.app-foot');const m=document.querySelector('main');return !!f&&!!(m.compareDocumentPosition(f)&Node.DOCUMENT_POSITION_FOLLOWING);});
+ log('Y1 본문 아래 바닥글에 영상 링크',foot&&(await p.textContent('#btnGuide')).includes('사용법 영상'),'');
+ await p.click('#btnGuide'); await p.waitForTimeout(300);
+ const st=await p.evaluate(()=>{const v=document.querySelector('#guideVideo');return {open:document.querySelector('#guideDialog').open,src:v.getAttribute('src')||'',ko:document.querySelector('[data-vlang="ko"]').getAttribute('aria-pressed')};});
+ log('Y2 클릭 → 레이어 열림·한국어 영상',st.open&&/guide-ko-30s\.mp4$/.test(st.src)&&st.ko==='true',st.src);
+ await p.click('[data-vlang="en"]'); await p.waitForTimeout(200);
+ log('Y3 English 전환',/guide-en-30s\.mp4$/.test(await p.getAttribute('#guideVideo','src')),'');
+ await p.keyboard.press('Escape'); await p.waitForTimeout(200);
+ const cl=await p.evaluate(()=>{const v=document.querySelector('#guideVideo');return {open:document.querySelector('#guideDialog').open,src:v.getAttribute('src'),paused:v.paused};});
+ log('Y4 Esc로 닫으면 정지·영상 해제',!cl.open&&!cl.src&&cl.paused,JSON.stringify(cl));
+ await p.click('#btnGuide'); await p.waitForTimeout(200); await p.click('#guideClose'); await p.waitForTimeout(150);
+ const c2=await p.evaluate(()=>document.querySelector('#guideDialog').open);
+ await p.click('#btnGuide'); await p.waitForTimeout(200); await p.mouse.click(5,5); await p.waitForTimeout(150);
+ const c3=await p.evaluate(()=>document.querySelector('#guideDialog').open);
+ log('Y5 ×·바깥 클릭으로 닫힘',!c2&&!c3,'');
+ await p.selectOption('#langSelect','ja'); await p.waitForTimeout(150);
+ await p.click('#btnGuide'); await p.waitForTimeout(200);
+ const ja=await p.evaluate(()=>[document.querySelector('#btnGuide').textContent,document.querySelector('#guideTitle').textContent,document.querySelector('#guideVideo').getAttribute('src')]);
+ log('Y6 다른 언어: 번역·영어 영상',!/[가-힣]/.test(ja[0]+ja[1])&&/guide-en/.test(ja[2]),ja.join(' · '));
+ errsOK(p,'Y'); await p.context().close();}
 
 await b.close();
 const f=results.filter(r=>!r.ok); console.log(`\n총 ${results.length}건 · 통과 ${results.length-f.length} · 실패 ${f.length}`);
