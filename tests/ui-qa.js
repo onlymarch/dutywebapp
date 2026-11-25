@@ -2,7 +2,7 @@
  * 인터페이스 오류 탐색 테스트 (Playwright, Chromium)
  * 실행: npx playwright install chromium   (최초 1회)
  *       node tests/ui-qa.js [index.html 경로]
- * 29개 범주(A~Z, AA~AC) 172개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
+ * 30개 범주(A~Z, AA~AD) 175개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
  * 숫자 경계값, 극단적 명단, 날짜 팝오버, 연타·중단, Worker 차단 환경, 수동 교체, 프로필 이름,
  * 저장 전 입력 보존, 대규모 명단, 모바일 배치, 키보드 조작, 출력, 공휴일 입력, 손상된 저장값, 이전 결과 조작,
  * 기간 입력(~와 -의 변형, 날짜 형식 기간, 열린 기간 -5·20-), 실행 요약(소요 시간·개선 기록),
@@ -13,7 +13,8 @@
  * v1.17(Z: 첫 방문 안내 띠의 표시·종료 조건과 유지, 샘플 체험, 기존 사용자 미표시, 머리글 ? 버튼, 번역),
  * v1.19(AA: 이름 끌어 놓기 맞바꾸기·실행 취소, 규칙 위반 빨간 테두리와 이유·[무시], 언어 전환, ✎ 교체 위반 표시),
  * v1.20(AB: 상위 3개 안 원본 보존, 카드를 누르면 처음 안으로 되돌림·실행 취소, 다른 안 선택),
- * v1.20.1(AC: 끌기 시작 시 그 사람 강조, Esc 취소, 출력 옵션 기본값과 기본 출력물). 첫 실행은 브라우저 언어를 감지해 저장하고, 이후에는 저장된 언어를 씁니다.
+ * v1.20.1(AC: 끌기 시작 시 그 사람 강조, Esc 취소, 출력 옵션 기본값과 기본 출력물),
+ * v1.20.2(AD: 실행 그래프의 미배정 안 빨간 속빈 점·하락 점선·설명, 번역). 첫 실행은 브라우저 언어를 감지해 저장하고, 이후에는 저장된 언어를 씁니다.
  * 각 항목은 JS 예외·콘솔 오류·브라우저 기본 대화상자 발생도 함께 실패로 기록합니다.
  */
 
@@ -523,6 +524,20 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
  const doc=await p.evaluate(()=>buildPrintDoc(false));
  log('AC4 기본 출력물: 결재란·DFI 요약 없음',!/결재/.test(doc)&&!/공정성 지수|DFI 요약/.test(doc.replace(/<style[\s\S]*?<\/style>/g,'')),'');
  errsOK(p,'AC'); await p.context().close();}
+
+// AD. v1.20.2: 실행 그래프 — 미배정 안 표시와 점수 하락 구간
+{const p=await fresh(b); await p.click('#wClose'); await p.click('#btnSample'); await p.waitForTimeout(300); await gen(p);
+ const none=await p.evaluate(()=>{state.run.hist=[{a:1,total:70,unf:0},{a:9,total:75,unf:0}];state.run.attempts=500;renderRunSummary();
+   return {note:!!document.querySelector('.run-note'),hollow:document.querySelectorAll('#runSvg circle[fill="#fff"]').length,dash:document.querySelectorAll('#runSvg line[stroke="var(--bad)"]').length};});
+ log('AD1 미배정 없는 기록: 빨간 표시·설명 없음',!none.note&&!none.hollow&&!none.dash,JSON.stringify(none));
+ const st=await p.evaluate(()=>{state.run.hist=[{a:1,total:68.2,unf:1},{a:3,total:71,unf:1},{a:4,total:67.6,unf:0},{a:11,total:73.6,unf:0}];state.run.attempts=2000;renderRunSummary();
+   const svg=document.querySelector('#runSvg');return {note:(document.querySelector('.run-note')||{}).textContent||'',hollow:svg.querySelectorAll('circle[fill="#fff"]').length,
+     dash:svg.querySelectorAll('line[stroke="var(--bad)"][stroke-dasharray]').length,txt:[...svg.querySelectorAll('text[fill="var(--bad)"]')].map(x=>x.textContent)};});
+ log('AD2 미배정 안: 빨간 속빈 점·하락 점선·라벨·설명',st.hollow===2&&st.dash===1&&st.txt.length===2&&/미배정/.test(st.note),st.txt.join(' / '));
+ await p.selectOption('#langSelect','fr'); await p.waitForTimeout(200);
+ const fr=await p.evaluate(()=>document.querySelector('.run-chart').textContent);
+ log('AD3 다른 언어: 그래프 라벨·설명 번역',!/[가-힣]/.test(fr),fr.replace(/\s+/g,' ').slice(0,60));
+ errsOK(p,'AD'); await p.context().close();}
 
 await b.close();
 const f=results.filter(r=>!r.ok); console.log(`\n총 ${results.length}건 · 통과 ${results.length-f.length} · 실패 ${f.length}`);

@@ -17,7 +17,7 @@ A free, single-file web app that builds a month of on-call duty rosters for doct
 
 ![Monthly duty calendar with Duty Fairness Index](assets/screenshot-en.png)
 
-Current version: **v1.20.1** (2026-11-25)
+Current version: **v1.20.2** (2026-11-25)
 
 > This is a scheduling aid. Please have the person responsible check the final roster before publishing it.
 
@@ -94,7 +94,7 @@ Download `index.html` and open it in a browser. Nothing to install.
 | File | Contents |
 |---|---|
 | `index.html` | The whole app (UI, scheduling engine, DFI, storage, printing, translations) |
-| `tests/ui-qa.js` | UI test suite (29 categories, 172 checks, including all languages) |
+| `tests/ui-qa.js` | UI test suite (30 categories, 175 checks, including all languages) |
 | `README.ko.md` | Korean README |
 | `assets/` | App icon (`favicon.svg`, `favicon-32.png`, `apple-touch-icon.png`), screenshots, link-preview image, promo videos (20 s, landscape and vertical), GIF preview and 30-second guide videos (English, Korean) |
 | `promo/` | Source for the promo and guide videos (screen capture, motion graphics, renderer) |
@@ -116,7 +116,7 @@ npx playwright install chromium
 node tests/ui-qa.js
 ```
 
-The last line should read `총 172건 · 통과 172 · 실패 0` ("172 total · 172 passed · 0 failed"). Tests have been run on Chromium only, not on Safari or iOS.
+The last line should read `총 175건 · 통과 175 · 실패 0` ("175 total · 175 passed · 0 failed"). Tests have been run on Chromium only, not on Safari or iOS.
 
 ## Feedback
 

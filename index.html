@@ -274,6 +274,7 @@ th[data-tip]:hover,th[data-tip]:focus{color:var(--accent);outline:none}
 .cand-sum{font-size:12px;color:var(--sub)}
 .cand-diff{font-size:12px;color:#8a5a00;background:var(--hl-weak);border-radius:6px;padding:4px 8px}
 /* 선택한 안을 사용자가 고친 상태: 카드는 처음 안 그대로이며, 누르면 처음 안으로 되돌림 */
+.run-note{font-size:11.5px;color:var(--bad);margin-top:2px}
 .cand-edit{font-size:12px;color:var(--accent);background:var(--accent-weak);border-radius:6px;padding:4px 8px}
 .mini-cal2{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}
 .mini-cal2 .h{font-size:10px;text-align:center;color:var(--sub);font-weight:700}
@@ -1084,7 +1085,7 @@ if (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScop
  *   - <b> 등 강조 태그가 든 원문은 번역문에도 같은 태그를 둡니다(툴팁·정적 HTML 일부).
  *   - 다섯 언어 모두 같은 키를 같은 순서로 두며, 앱 구역(§) 순서로 묶었습니다.
  *   - 키가 없으면 화면에 한국어 원문이 그대로 표시됩니다.
- *   키 502개 × 5개 언어 (en·ja·zh·fr·es). 한국어(ko)는 원문을 그대로 쓰므로 사전이 없습니다.
+ *   키 504개 × 5개 언어 (en·ja·zh·fr·es). 한국어(ko)는 원문을 그대로 쓰므로 사전이 없습니다.
  * ============================================================================= */
 const I18N = {
 /* ──────────────── en: English ──────────────── */
@@ -1618,6 +1619,9 @@ en: {
   "{plan}의 처음 배정으로 되돌렸습니다 (수정 {n}건 취소).": "Back to the original {plan} ({n} {n:edit|edits} discarded).",
   "{plan}을 선택했습니다. 이전 안의 수정 {n}건은 적용되지 않습니다.": "{plan} selected. The {n} {n:edit|edits} to the previous plan are not carried over.",
   "수정한 당직표를 다시 불러왔습니다.": "Your edited roster is back.",
+  // ── v1.20.2: 실행 그래프의 미배정 표시 ──
+  "미배정 {a}→{b}일": "unassigned {a}→{b}",
+  "빨간 속빈 점 = 미배정일이 있는 안. 미배정일이 적은 안을 DFI보다 먼저 고르므로, 미배정일이 줄면 점수가 내려갈 수 있습니다(빨간 점선).": "Hollow red dot = plan with unassigned days. Plans with fewer unassigned days are ranked first, ahead of DFI, so the score can drop when unassigned days go down (red dashed line).",
 },
 /* ──────────────── ja: 日本語 ──────────────── */
 ja: {
@@ -2150,6 +2154,9 @@ ja: {
   "{plan}의 처음 배정으로 되돌렸습니다 (수정 {n}건 취소).": "{plan}の元の割り当てに戻しました(修正{n}件を取り消し)。",
   "{plan}을 선택했습니다. 이전 안의 수정 {n}건은 적용되지 않습니다.": "{plan}を選択しました。前の案の修正{n}件は適用されません。",
   "수정한 당직표를 다시 불러왔습니다.": "修正した当直表を戻しました。",
+  // ── v1.20.2: 실행 그래프의 미배정 표시 ──
+  "미배정 {a}→{b}일": "未割当 {a}→{b}日",
+  "빨간 속빈 점 = 미배정일이 있는 안. 미배정일이 적은 안을 DFI보다 먼저 고르므로, 미배정일이 줄면 점수가 내려갈 수 있습니다(빨간 점선).": "赤い白抜きの点 = 未割当日がある案。未割当日が少ない案をDFIより優先するため、未割当日が減ると点数が下がることがあります(赤い点線)。",
 },
 /* ──────────────── zh: 中文(简体) ──────────────── */
 zh: {
@@ -2682,6 +2689,9 @@ zh: {
   "{plan}의 처음 배정으로 되돌렸습니다 (수정 {n}건 취소).": "已恢复为原始{plan}(撤销{n}处修改)。",
   "{plan}을 선택했습니다. 이전 안의 수정 {n}건은 적용되지 않습니다.": "已选择{plan}。之前方案的{n}处修改不会保留。",
   "수정한 당직표를 다시 불러왔습니다.": "已恢复修改后的值班表。",
+  // ── v1.20.2: 실행 그래프의 미배정 표시 ──
+  "미배정 {a}→{b}일": "未排班 {a}→{b}天",
+  "빨간 속빈 점 = 미배정일이 있는 안. 미배정일이 적은 안을 DFI보다 먼저 고르므로, 미배정일이 줄면 점수가 내려갈 수 있습니다(빨간 점선).": "红色空心点 = 有未排班日的方案。未排班日少的方案优先于DFI,因此未排班日减少时分数可能下降(红色虚线)。",
 },
 /* ──────────────── fr: Français ──────────────── */
 fr: {
@@ -3214,6 +3224,9 @@ fr: {
   "{plan}의 처음 배정으로 되돌렸습니다 (수정 {n}건 취소).": "Retour au {plan} d’origine ({n} {n:modification annulée|modifications annulées}).",
   "{plan}을 선택했습니다. 이전 안의 수정 {n}건은 적용되지 않습니다.": "{plan} sélectionné. Les {n} {n:modification|modifications} du plan précédent ne sont pas reprises.",
   "수정한 당직표를 다시 불러왔습니다.": "Votre planning modifié est rétabli.",
+  // ── v1.20.2: 실행 그래프의 미배정 표시 ──
+  "미배정 {a}→{b}일": "non attribués {a}→{b}",
+  "빨간 속빈 점 = 미배정일이 있는 안. 미배정일이 적은 안을 DFI보다 먼저 고르므로, 미배정일이 줄면 점수가 내려갈 수 있습니다(빨간 점선).": "Point rouge creux = plan avec des jours non attribués. Les plans avec moins de jours non attribués passent avant le DFI : le score peut donc baisser quand ces jours diminuent (pointillés rouges).",
 },
 /* ──────────────── es: Español ──────────────── */
 es: {
@@ -3746,6 +3759,9 @@ es: {
   "{plan}의 처음 배정으로 되돌렸습니다 (수정 {n}건 취소).": "Se volvió al {plan} original ({n} {n:cambio descartado|cambios descartados}).",
   "{plan}을 선택했습니다. 이전 안의 수정 {n}건은 적용되지 않습니다.": "{plan} seleccionado. Los {n} {n:cambio|cambios} del plan anterior no se conservan.",
   "수정한 당직표를 다시 불러왔습니다.": "Se restauró su cuadrante modificado.",
+  // ── v1.20.2: 실행 그래프의 미배정 표시 ──
+  "미배정 {a}→{b}일": "sin asignar {a}→{b}",
+  "빨간 속빈 점 = 미배정일이 있는 안. 미배정일이 적은 안을 DFI보다 먼저 고르므로, 미배정일이 줄면 점수가 내려갈 수 있습니다(빨간 점선).": "Punto rojo hueco = plan con días sin asignar. Los planes con menos días sin asignar van antes que el DFI, así que la puntuación puede bajar cuando esos días disminuyen (línea roja discontinua).",
 }
 };
 </script>
@@ -3790,8 +3806,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.20.1', APP_BUILD = '2026-11-25';
+const APP_VERSION = '1.20.2', APP_BUILD = '2026-11-25';
 const CHANGELOG = [
+  '1.20.2 실행 요약 그래프: 미배정일이 있는 안은 빨간 속빈 점과 "미배정 n일", 미배정일이 줄어 점수가 내려간 곳은 빨간 점선과 "미배정 a→b일"로 표시하고 설명 한 줄 추가',
   '1.20.1 이름을 끌기 시작하면 그 사람의 근무일을 강조(클릭과 같음). 출력 옵션 기본값: 통계표만 켜고 DFI 요약·강조한 근무자 표시·결재란은 끔',
   '1.20.0 상위 3개 안은 생성된 그대로 보존하고, 수동 교체·끌어 놓기는 선택한 안의 사본에만 적용. 안 카드를 누르면(선택 중인 안도) 그 안의 처음 배정으로 되돌리며, 버린 수정은 실행 취소로 다시 불러올 수 있음',
   '1.19.0 당직표 달력에서 이름을 다른 날로 끌어 놓아 두 날의 배정을 맞바꾸기(마우스·터치 길게 누르기, 레벨 4의 백업은 함께 이동, DFI 재계산·실행 취소). 처음 규칙에 어긋나면 그 날을 빨간 테두리로 표시하고 [무시]로 지움(✎ 수동 교체도 같음)',
@@ -5128,6 +5145,7 @@ function renderRunSummary(){
       <figcaption>${L('시도 횟수에 따른 최고 DFI')} <span>· ${L('가로축은 로그 눈금(1·10·100·1,000) · 점 = 최고 안이 바뀐 시점 · 마우스를 올리거나 선택 후 ←→ 키로 확인')}</span></figcaption>
       <svg id="runSvg" tabindex="0" role="img" aria-label="${esc(t('최고 DFI가 {a}에서 {b}로 {n}번 갱신되었고, 마지막 갱신은 {last}번째 시도입니다.', { a: H[0].total.toFixed(1), b: last.total.toFixed(1), n: H.length, last: fmtN(last.a) }))}"></svg>
       <div class="run-tip hidden" id="runTip"></div>
+      ${H.some(h => h.unf) ? `<div class="run-note">${esc(t('빨간 속빈 점 = 미배정일이 있는 안. 미배정일이 적은 안을 DFI보다 먼저 고르므로, 미배정일이 줄면 점수가 내려갈 수 있습니다(빨간 점선).'))}</div>` : ''}
     </figure>
     <details class="run-table"><summary>${esc(t('최고점 갱신 기록 표 ({n}건)', { n: H.length }))}</summary>
       <table><thead><tr><th>${L('순서')}</th><th>${L('시도 번호')}</th><th>DFI</th><th>${L('미배정일')}</th></tr></thead><tbody>${
@@ -5157,9 +5175,22 @@ function drawRunChart(){
   // 그 시도 번호까지의 최고 기록 (이진 탐색)
   const bestAt = a => { let i = 0, j = H.length - 1, k = 0; while (i <= j){ const mid = (i + j) >> 1; if (H[mid].a <= a){ k = mid; i = mid + 1; } else j = mid - 1; } return k; };
 
-  let d = `M${X(H[0].a)},${Y(H[0].total)}`;
-  for (let i = 1; i < H.length; i++) d += `H${X(H[i].a)}V${Y(H[i].total)}`;
+  // 계단선: 오르는 곳은 실선. 내려가는 곳은 미배정일이 줄어 DFI가 낮은 안이 1위가 된 경우이므로 빨간 점선 + 라벨
+  let d = `M${X(H[0].a)},${Y(H[0].total)}`, drops = '';
+  for (let i = 1; i < H.length; i++){
+    const x = X(H[i].a), y0 = Y(H[i - 1].total), y1 = Y(H[i].total);
+    if (H[i].total < H[i - 1].total){
+      d += `H${x}M${x},${y1}`;
+      drops += `<line x1="${x}" x2="${x}" y1="${y0}" y2="${y1}" stroke="var(--bad)" stroke-width="2" stroke-dasharray="3 3"/>` +
+               `<text x="${x + 5}" y="${Math.min(m.t + ih - 3, (y0 + y1) / 2 + 3)}" font-size="10" fill="var(--bad)">${esc(t('미배정 {a}→{b}일', { a: H[i - 1].unf, b: H[i].unf }))}</text>`;
+    } else d += `H${x}V${y1}`;
+  }
   d += `H${X(N)}`;
+  // 점: 미배정일이 있는 안은 빨간 속빈 원 + '미배정 n일' (같은 미배정 수가 이어지면 첫 점에만 라벨)
+  const dots = H.map((h, i) => h.unf
+    ? `<circle cx="${X(h.a)}" cy="${Y(h.total)}" r="4" fill="#fff" stroke="var(--bad)" stroke-width="2"/>` +
+      (i === 0 || H[i - 1].unf !== h.unf ? `<text x="${X(h.a)}" y="${Math.max(m.t + 8, Y(h.total) - 8)}" text-anchor="${i === 0 ? 'start' : 'middle'}" font-size="10" fill="var(--bad)">${esc(t('미배정 {n}', { n: fmtDayCount(h.unf) }))}</text>` : '')
+    : `<circle cx="${X(h.a)}" cy="${Y(h.total)}" r="4" fill="var(--accent)" stroke="#fff" stroke-width="2"/>`).join('');
   const yt = [lo, Math.round((lo + hi) / 2), hi];
   // 눈금: 1, 10, 100, 1,000 … 과 마지막 시도 수 (마지막과 너무 가까운 10의 거듭제곱은 생략)
   const xt = []; for (let v = 1; v < N; v *= 10) if (X(N) - X(v) > 34) xt.push(v); xt.push(N);
@@ -5170,8 +5201,7 @@ function drawRunChart(){
     yt.map(v => `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="#eceff4"/><text class="ax" x="${m.l - 6}" y="${Y(v) + 3}" text-anchor="end">${v}</text>`).join('') +
     xt.map(a => `<line x1="${X(a)}" x2="${X(a)}" y1="${m.t + ih}" y2="${m.t + ih + 3}" stroke="#c5cbd6"/><text class="ax" x="${X(a)}" y="${Ht - 6}" text-anchor="${a === 1 ? 'start' : a === N ? 'end' : 'middle'}">${fmtN(a)}</text>`).join('') +
     `<line x1="${lx}" x2="${lx}" y1="${m.t}" y2="${m.t + ih}" stroke="#9aa3b2" stroke-dasharray="3 3"/>` +
-    `<path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>` +
-    H.map(h => `<circle cx="${X(h.a)}" cy="${Y(h.total)}" r="4" fill="var(--accent)" stroke="#fff" stroke-width="2"/>`).join('') +
+    `<path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>` + drops + dots +
     `<text x="${lblRight ? lx + 6 : lx - 6}" y="${Math.max(m.t + 9, ly - 8)}" text-anchor="${lblRight ? 'start' : 'end'}" font-size="11" font-weight="700" fill="var(--ink)">${esc(t('{n}번째', { n: fmtN(last.a) }))} · ${last.total.toFixed(1)}</text>` +
     `<line id="runCross" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}" stroke="var(--ink)" stroke-width="1" visibility="hidden"/>` +
     `<circle id="runDot" r="5" fill="var(--accent)" stroke="#fff" stroke-width="2" visibility="hidden"/>` +

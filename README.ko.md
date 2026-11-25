@@ -10,7 +10,7 @@
 
 ▶ [20초 소개 영상 고화질·음악 포함으로 보기 (MP4, 1080p, 영어)](https://onlymarch.github.io/dutywebapp/assets/promo-20s.mp4) · [세로형 쇼츠·릴스용 (1080×1920)](https://onlymarch.github.io/dutywebapp/assets/promo-shorts-20s.mp4)
 
-현재 버전: **v1.20.1** (2026-11-25)
+현재 버전: **v1.20.2** (2026-11-25)
 
 > 당직표 작성을 돕는 도구입니다. 게시하기 전에 담당자가 최종 당직표를 확인하십시오.
 
@@ -108,7 +108,7 @@
 | 파일 | 내용 |
 |---|---|
 | `index.html` | 웹앱 전체 (화면, 배정 엔진, DFI 계산, 저장, 출력, 번역 사전) |
-| `tests/ui-qa.js` | 인터페이스 오류 탐색 테스트 (29개 범주 172개 항목, 다국어 포함) |
+| `tests/ui-qa.js` | 인터페이스 오류 탐색 테스트 (30개 범주 175개 항목, 다국어 포함) |
 | `README.md` | 영어 안내 (저장소 첫 화면) |
 | `README.ko.md` | 한국어 안내 (이 문서) |
 | `assets/` | 앱 아이콘(`favicon.svg`, `favicon-32.png`, `apple-touch-icon.png`), 화면 캡처, 링크 미리보기 이미지(`og-image.png`, 1200×630), 20초 소개 영상(가로 `promo-20s.mp4`, 세로 `promo-shorts-20s.mp4`)과 미리보기 GIF, 30초 사용법 영상(`guide-ko-30s.mp4`, `guide-en-30s.mp4`) |
@@ -131,7 +131,7 @@ npx playwright install chromium
 node tests/ui-qa.js
 ```
 
-마지막 줄에 `총 172건 · 통과 172 · 실패 0`이 나오면 정상입니다. 테스트는 Chromium에서만 확인했으며, Safari·iOS에서는 확인하지 않았습니다.
+마지막 줄에 `총 175건 · 통과 175 · 실패 0`이 나오면 정상입니다. 테스트는 Chromium에서만 확인했으며, Safari·iOS에서는 확인하지 않았습니다.
 
 ## 라이선스
 
