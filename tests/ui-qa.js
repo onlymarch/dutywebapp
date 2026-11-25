@@ -167,11 +167,11 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
  const un=await p.$$eval('#cal .cell.unfilled',a=>a.length); await p.click('[data-cand="1"] .cand-rank');
  await p.click('#undoBtn').catch(()=>{}); await p.click('[data-cand="0"] .cand-rank'); 
  log('J1 미배정으로 교체 후 다른 안에서 취소',(await p.textContent('#dfiTotal'))===t0&&un===1,`DFI ${t0}→${await p.textContent('#dfiTotal')}`);
- // 레벨4로 교체 + 조력자 없음
+ // 레벨4로 교체 + 백업 없음
  const l4=await p.evaluate(()=>state.result.cfg.people.findIndex(x=>x.level===4));
  await p.click('#cal [data-edit="10"]'); await p.selectOption('#editDuty',String(l4)); await p.selectOption('#editAssist','-1');
  const w=await p.textContent('#editWarn'); await p.click('#editApply');
- log('J2 레벨4 조력자 없음 경고',w.includes('조력자가 필요'),w.slice(0,40));
+ log('J2 레벨4 백업 없음 경고',w.includes('백업이 필요'),w.slice(0,40));
  await p.keyboard.press('Escape');
  errsOK(p,'J'); await p.context().close();}
 

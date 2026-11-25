@@ -12,12 +12,12 @@ A free, single-file web app that builds a month of on-call duty rosters for doct
 
 - No install, no sign-up, no server — **your roster never leaves your browser**
 - Preferred / available / unavailable dates and weekdays, rest days after duty, monthly limits, weights
-- Junior staff can be paired with an assistant automatically
+- Junior staff are automatically paired with a Regular-level backup
 - Interface in English, 한국어, 日本語, 中文, Français and Español
 
 ![Monthly duty calendar with Duty Fairness Index](assets/screenshot-en.png)
 
-Current version: **v1.17.0** (2026-11-25)
+Current version: **v1.18.0** (2026-11-25)
 
 > This is a scheduling aid. Please have the person responsible check the final roster before publishing it.
 
@@ -48,7 +48,7 @@ Pick a language from the dropdown at the top of the page: **English · 한국어
 | Rest days after duty | No duty for *n* days after a duty, set separately for weekday and holiday duties. With 1, someone on duty on the 3rd is available again from the 5th. |
 | Weight | Share of the workload (default 1.0). Expected duties = assigned days × own weight ÷ sum of weights. |
 | Preferred-date quota | If someone's remaining limit is no more than their remaining preferred dates, they are held back on other days. |
-| Level | 1 Exempt (rest days don't apply) · 2 Senior · 3 Regular (can assist) · 4 Junior (needs a level-3 assistant) |
+| Level | 1 Expert (rest days don't apply) · 2 Senior · 3 Regular (can be the backup) · 4 Junior + backup (needs a level-3 backup on the same day) |
 
 Within the same priority, the person with the fewest duties so far in that category (holiday / Thu–Fri / Mon–Wed) and on that weekday goes first. Ties are broken at random, so every attempt gives a different plan.
 
@@ -74,7 +74,7 @@ Scored out of 100. If some days are left unassigned, the total is multiplied by 
 
 Grades: S ≥ 90, A ≥ 80, B ≥ 70, C < 70. Hover (or tap) the ⓘ marks and metric bars to see how each score is calculated and how to improve it.
 
-**When the score is below target**, a *Likely causes and fixes* list opens under the score. It checks the roster for concrete reasons — a monthly max below someone's fair share, too few available days, Level 4 staff with no free assistant, rest days that are too long, weekend exclusions piling holidays onto others, clashing preferred dates, bunched available dates, few duties per person — names the people involved and suggests a fix for each. It also shows an estimated best possible score for the roster (whole-number duty counts and uneven holiday splits make 100 unreachable), so you can tell whether the target itself is too high.
+**When the score is below target**, a *Likely causes and fixes* list opens under the score. It checks the roster for concrete reasons — a monthly max below someone's fair share, too few available days, Level 4 staff with no free backup, rest days that are too long, weekend exclusions piling holidays onto others, clashing preferred dates, bunched available dates, few duties per person — names the people involved and suggests a fix for each. It also shows an estimated best possible score for the roster (whole-number duty counts and uneven holiday splits make 100 unreachable), so you can tell whether the target itself is too high.
 
 **Statistics by staff**: the *Expected* and *Diff.* headers explain how they are calculated. Differences of ±1 or more are coloured; hover one to see the likely reason for that person (e.g. a low monthly max, many unavailable dates, Level 4, Level 1 filling gaps, preferred dates given priority).
 
