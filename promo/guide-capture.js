@@ -8,6 +8,7 @@ const APP='file://'+path.resolve(__dirname,'..','index.html'), S=1.2;
 for(const lang of ['en','ko']){
   const dir=path.join(__dirname,'guide',lang);fs.mkdirSync(dir,{recursive:true});
   const ctx=await b.newContext({viewport:{width:1600,height:900},deviceScaleFactor:S,locale:lang==='en'?'en-US':'ko-KR'});
+  await ctx.addInitScript(()=>{try{localStorage.setItem('dfiDuty:welcomeDone','1')}catch(e){}});   // 첫 방문 안내 띠 없이 촬영
   const p=await ctx.newPage();await p.goto(APP);await p.selectOption('#langSelect',lang);
   await p.addStyleTag({content:'.toast{display:none!important}*{scroll-behavior:auto!important}main{padding-bottom:560px!important}'});   // 아래 여백: 맨 아래 카드도 화면 가운데로 스크롤 가능
   const M={};

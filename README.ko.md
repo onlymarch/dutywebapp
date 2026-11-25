@@ -10,13 +10,13 @@
 
 ▶ [20초 소개 영상 고화질·음악 포함으로 보기 (MP4, 1080p, 영어)](https://onlymarch.github.io/dutywebapp/assets/promo-20s.mp4) · [세로형 쇼츠·릴스용 (1080×1920)](https://onlymarch.github.io/dutywebapp/assets/promo-shorts-20s.mp4)
 
-현재 버전: **v1.16.1** (2026-11-24)
+현재 버전: **v1.17.0** (2026-11-25)
 
 > 당직표 작성을 돕는 도구입니다. 게시하기 전에 담당자가 최종 당직표를 확인하십시오.
 
 ## 사용 순서
 
-🎬 **30초 사용법 영상** (음성 안내 포함, 웹앱 맨 아래 **▶ 사용법 영상 보기**로도 볼 수 있습니다): [한국어](https://onlymarch.github.io/dutywebapp/assets/guide-ko-30s.mp4) · [English](https://onlymarch.github.io/dutywebapp/assets/guide-en-30s.mp4)
+🎬 **30초 사용법 영상** (음성 안내 포함. 웹앱에서는 머리글의 **?** 버튼이나 맨 아래 **▶ 사용법 영상 보기**로 열 수 있습니다. 처음 방문하면 맨 위에 영상·샘플 체험 안내 띠가 나오며, 한 번 닫으면 다시 나오지 않습니다): [한국어](https://onlymarch.github.io/dutywebapp/assets/guide-ko-30s.mp4) · [English](https://onlymarch.github.io/dutywebapp/assets/guide-en-30s.mp4)
 
 1. **설정**: 대상 연월을 고릅니다. 한국어 화면에서는 한국 공휴일이 자동으로 입력됩니다(다른 언어 화면에서는 직접 입력하거나 달력을 누릅니다). 슬라이더로 배정 제외일(0~5일)과 목표 DFI(50~100점, 5점 단위)를 정합니다. 시도 횟수는 자동입니다(아래 '시도 횟수' 참고).
 2. **근무자 명단**: 성명, 레벨, 가중치, 월 최대 횟수, 희망일·희망요일·가능일, 제외일·제외요일을 입력합니다. 날짜는 `3, 15, 20~22`처럼 쓰며, 기간은 `~`와 `-`를 모두 쓸 수 있습니다. `-5`는 1~5일, `25-`는 25일부터 그 달 말일까지입니다. 끝 날짜가 말일을 넘으면(2월에 `15-31`) 말일까지로 맞춥니다. 📅 버튼으로 달력에서 고를 수도 있습니다.
@@ -106,7 +106,7 @@
 | 파일 | 내용 |
 |---|---|
 | `index.html` | 웹앱 전체 (화면, 배정 엔진, DFI 계산, 저장, 출력, 번역 사전) |
-| `tests/ui-qa.js` | 인터페이스 오류 탐색 테스트 (25개 범주 148개 항목, 다국어 포함) |
+| `tests/ui-qa.js` | 인터페이스 오류 탐색 테스트 (26개 범주 156개 항목, 다국어 포함) |
 | `README.md` | 영어 안내 (저장소 첫 화면) |
 | `README.ko.md` | 한국어 안내 (이 문서) |
 | `assets/` | 앱 아이콘(`favicon.svg`, `favicon-32.png`, `apple-touch-icon.png`), 화면 캡처, 링크 미리보기 이미지(`og-image.png`, 1200×630), 20초 소개 영상(가로 `promo-20s.mp4`, 세로 `promo-shorts-20s.mp4`)과 미리보기 GIF, 30초 사용법 영상(`guide-ko-30s.mp4`, `guide-en-30s.mp4`) |
@@ -129,7 +129,7 @@ npx playwright install chromium
 node tests/ui-qa.js
 ```
 
-마지막 줄에 `총 148건 · 통과 148 · 실패 0`이 나오면 정상입니다. 테스트는 Chromium에서만 확인했으며, Safari·iOS에서는 확인하지 않았습니다.
+마지막 줄에 `총 156건 · 통과 156 · 실패 0`이 나오면 정상입니다. 테스트는 Chromium에서만 확인했으며, Safari·iOS에서는 확인하지 않았습니다.
 
 ## 라이선스
 

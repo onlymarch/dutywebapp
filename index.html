@@ -410,6 +410,15 @@ body.printing-sheet #printSheet{display:block}
    제목 오른쪽, 배지보다 앞에 둡니다. 좁은 화면에서는 머리글이 줄바꿈되어도 맨 앞 컨트롤로 보이게 합니다. */
 .top-right{display:flex;gap:8px;flex-wrap:wrap;align-items:center;min-width:0}
 .lang-pick{display:inline-flex;align-items:center;gap:4px;font-size:12px}
+/* 머리글 ? 버튼: 언제든 사용법 영상 열기 */
+.help-btn{width:26px;height:26px;border-radius:50%;padding:0;border:1px solid #5a6582;background:transparent;color:#fff;font-weight:700;font-size:14px;line-height:24px;cursor:pointer;flex:none}
+.help-btn:hover{background:#38415a}
+/* 첫 방문 안내 띠: 저장된 명단이 없을 때만, 한 번 닫거나 영상을 보거나 생성하면 다시 나오지 않음 */
+.welcome{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;background:var(--accent-weak);border:1px solid #c9d6fb;border-radius:12px;padding:10px 12px 10px 16px}
+.welcome .w-msg{flex:1 1 260px;font-size:14px}
+.welcome .w-msg b{color:var(--accent)}
+.welcome .w-act{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.welcome .w-close{background:transparent;border:none;font-size:20px;line-height:1;color:var(--sub);padding:2px 6px}
 .lang-pick select{width:auto;padding:3px 6px;font-size:12px;border-radius:999px;border-color:#4a5574;background:#2a3246;color:#fff}
 .lang-pick select:focus{outline:2px solid #9db4ff}
 /* 좁은 화면: 언어 선택과 배지를 한 줄로 흘려 머리글(상단 고정)이 세 줄이 되지 않게 합니다. select는 iOS 확대 방지로 16px */
@@ -424,6 +433,7 @@ body.printing-sheet #printSheet{display:block}
 <header class="top">
   <h1>🩺 당직배정 웹앱 <span class="ver" id="appVer"></span></h1>
   <div class="top-right">
+    <button type="button" class="help-btn" id="btnHelp" aria-label="사용법 영상 (30초)" title="사용법 영상 (30초)">?</button>
     <!-- 언어 선택: 항목 이름은 각 언어의 고유 이름이므로 번역하지 않습니다(data-i18n-skip). §0-1 참고 -->
     <label class="lang-pick" data-i18n-skip><span aria-hidden="true">🌐</span><select id="langSelect" aria-label="Language">
       <option value="ko">한국어</option><option value="en">English</option><option value="ja">日本語</option>
@@ -438,6 +448,15 @@ body.printing-sheet #printSheet{display:block}
 </header>
 
 <main>
+<!-- 첫 방문 안내 (스크립트의 "첫 방문 안내 띠" 참고) -->
+<div class="welcome no-print hidden" id="welcome" role="region" aria-label="처음 사용 안내">
+  <div class="w-msg"><b>처음이신가요?</b> 30초 영상으로 사용법을 보거나, 샘플 데이터로 바로 체험해 보십시오.</div>
+  <div class="w-act">
+    <button type="button" class="primary" id="wGuide">▶ 30초 사용법 영상</button>
+    <button type="button" id="wSample">샘플로 체험하기</button>
+    <button type="button" class="w-close" id="wClose" aria-label="닫기" title="닫기 (머리글의 ? 버튼으로 언제든 볼 수 있습니다)">×</button>
+  </div>
+</div>
 <!-- ===================== 1. 설정 ===================== -->
 <section class="card" id="ctrlCard">
   <h2><span class="step">1</span>⚙️ 설정</h2>
@@ -1051,7 +1070,7 @@ if (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScop
  *   - <b> 등 강조 태그가 든 원문은 번역문에도 같은 태그를 둡니다(툴팁·정적 HTML 일부).
  *   - 다섯 언어 모두 같은 키를 같은 순서로 두며, 앱 구역(§) 순서로 묶었습니다.
  *   - 키가 없으면 화면에 한국어 원문이 그대로 표시됩니다.
- *   키 485개 × 5개 언어 (en·ja·zh·fr·es). 한국어(ko)는 원문을 그대로 쓰므로 사전이 없습니다.
+ *   키 493개 × 5개 언어 (en·ja·zh·fr·es). 한국어(ko)는 원문을 그대로 쓰므로 사전이 없습니다.
  * ============================================================================= */
 const I18N = {
 /* ──────────────── en: English ──────────────── */
@@ -1565,6 +1584,15 @@ en: {
   "30초 · 음성 안내": "30 s · narrated",
   "사용법 영상": "Video guide",
   "영상을 불러오지 못했습니다. 인터넷 연결을 확인하십시오.": "Couldn't load the video. Check your internet connection.",
+  // ── v1.17: 첫 방문 안내·머리글 ? 버튼 ──
+  "사용법 영상 (30초)": "Video guide (30 s)",
+  "처음 사용 안내": "Getting started",
+  "처음이신가요?": "New here?",
+  "30초 영상으로 사용법을 보거나, 샘플 데이터로 바로 체험해 보십시오.": "Watch a 30-second video guide, or try it right away with sample data.",
+  "▶ 30초 사용법 영상": "▶ 30-second video guide",
+  "샘플로 체험하기": "Try with sample data",
+  "닫기 (머리글의 ? 버튼으로 언제든 볼 수 있습니다)": "Close (you can always open the video with the ? button at the top)",
+  "사용법 영상은 머리글의 ? 버튼으로 언제든 볼 수 있습니다.": "You can open the video guide any time with the ? button at the top.",
 },
 /* ──────────────── ja: 日本語 ──────────────── */
 ja: {
@@ -2077,6 +2105,15 @@ ja: {
   "30초 · 음성 안내": "30秒・音声ガイド付き",
   "사용법 영상": "使い方動画",
   "영상을 불러오지 못했습니다. 인터넷 연결을 확인하십시오.": "動画を読み込めませんでした。インターネット接続を確認してください。",
+  // ── v1.17: 첫 방문 안내·머리글 ? 버튼 ──
+  "사용법 영상 (30초)": "使い方動画(30秒)",
+  "처음 사용 안내": "はじめての方へ",
+  "처음이신가요?": "はじめてですか?",
+  "30초 영상으로 사용법을 보거나, 샘플 데이터로 바로 체험해 보십시오.": "30秒の動画で使い方を確認するか、サンプルデータですぐに試してみてください。",
+  "▶ 30초 사용법 영상": "▶ 30秒の使い方動画",
+  "샘플로 체험하기": "サンプルで試す",
+  "닫기 (머리글의 ? 버튼으로 언제든 볼 수 있습니다)": "閉じる(上部の ? ボタンでいつでも見られます)",
+  "사용법 영상은 머리글의 ? 버튼으로 언제든 볼 수 있습니다.": "使い方動画は上部の ? ボタンでいつでも見られます。",
 },
 /* ──────────────── zh: 中文(简体) ──────────────── */
 zh: {
@@ -2589,6 +2626,15 @@ zh: {
   "30초 · 음성 안내": "30秒 · 语音讲解",
   "사용법 영상": "使用视频",
   "영상을 불러오지 못했습니다. 인터넷 연결을 확인하십시오.": "无法加载视频。请检查网络连接。",
+  // ── v1.17: 첫 방문 안내·머리글 ? 버튼 ──
+  "사용법 영상 (30초)": "使用视频(30秒)",
+  "처음 사용 안내": "新手指引",
+  "처음이신가요?": "第一次使用?",
+  "30초 영상으로 사용법을 보거나, 샘플 데이터로 바로 체험해 보십시오.": "观看30秒使用视频,或用示例数据立即体验。",
+  "▶ 30초 사용법 영상": "▶ 30秒使用视频",
+  "샘플로 체험하기": "用示例体验",
+  "닫기 (머리글의 ? 버튼으로 언제든 볼 수 있습니다)": "关闭(随时可点顶部的 ? 按钮观看)",
+  "사용법 영상은 머리글의 ? 버튼으로 언제든 볼 수 있습니다.": "随时可点击顶部的 ? 按钮观看使用视频。",
 },
 /* ──────────────── fr: Français ──────────────── */
 fr: {
@@ -3101,6 +3147,15 @@ fr: {
   "30초 · 음성 안내": "30 s · commenté",
   "사용법 영상": "Guide vidéo",
   "영상을 불러오지 못했습니다. 인터넷 연결을 확인하십시오.": "Impossible de charger la vidéo. Vérifiez votre connexion Internet.",
+  // ── v1.17: 첫 방문 안내·머리글 ? 버튼 ──
+  "사용법 영상 (30초)": "Guide vidéo (30 s)",
+  "처음 사용 안내": "Premiers pas",
+  "처음이신가요?": "Première visite ?",
+  "30초 영상으로 사용법을 보거나, 샘플 데이터로 바로 체험해 보십시오.": "Regardez le guide vidéo de 30 secondes ou essayez tout de suite avec des données d’exemple.",
+  "▶ 30초 사용법 영상": "▶ Guide vidéo (30 s)",
+  "샘플로 체험하기": "Essayer avec l’exemple",
+  "닫기 (머리글의 ? 버튼으로 언제든 볼 수 있습니다)": "Fermer (la vidéo reste accessible avec le bouton ? en haut)",
+  "사용법 영상은 머리글의 ? 버튼으로 언제든 볼 수 있습니다.": "Le guide vidéo reste accessible à tout moment avec le bouton ? en haut.",
 },
 /* ──────────────── es: Español ──────────────── */
 es: {
@@ -3613,6 +3668,15 @@ es: {
   "30초 · 음성 안내": "30 s · narrado",
   "사용법 영상": "Vídeo guía",
   "영상을 불러오지 못했습니다. 인터넷 연결을 확인하십시오.": "No se pudo cargar el vídeo. Compruebe su conexión a Internet.",
+  // ── v1.17: 첫 방문 안내·머리글 ? 버튼 ──
+  "사용법 영상 (30초)": "Vídeo guía (30 s)",
+  "처음 사용 안내": "Primeros pasos",
+  "처음이신가요?": "¿Es su primera vez?",
+  "30초 영상으로 사용법을 보거나, 샘플 데이터로 바로 체험해 보십시오.": "Vea el vídeo guía de 30 segundos o pruébelo ya con datos de ejemplo.",
+  "▶ 30초 사용법 영상": "▶ Vídeo guía (30 s)",
+  "샘플로 체험하기": "Probar con el ejemplo",
+  "닫기 (머리글의 ? 버튼으로 언제든 볼 수 있습니다)": "Cerrar (puede ver el vídeo cuando quiera con el botón ? de arriba)",
+  "사용법 영상은 머리글의 ? 버튼으로 언제든 볼 수 있습니다.": "Puede abrir el vídeo guía en cualquier momento con el botón ? de arriba.",
 }
 };
 </script>
@@ -3657,8 +3721,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.16.1', APP_BUILD = '2026-11-24';
+const APP_VERSION = '1.17.0', APP_BUILD = '2026-11-25';
 const CHANGELOG = [
+  '1.17.0 처음 쓰는 사람을 위한 안내: 저장된 명단이 없는 첫 방문에만 맨 위 안내 띠(30초 영상·샘플 체험·닫기, 영상을 보거나 닫거나 생성하면 다시 안 나옴), 머리글에 언제든 영상을 여는 ? 버튼',
   '1.16.1 파비콘 추가(파란 달력·체크 표시): 브라우저 탭·즐겨찾기·iOS 홈 화면 아이콘',
   '1.16.0 최하단에 [▶ 사용법 영상 보기] 추가: 누르면 영상 재생 레이어가 열리고 화면 언어에 맞는 영상(한국어, 그 밖의 언어는 영어)을 재생. 한국어·English 전환, ×·Esc·바깥 클릭으로 닫으면 정지',
   '1.15.0 내장 공휴일은 한국어 화면에서만 자동 입력, 목표 미달 시 명단을 분석한 원인·개선 방법과 도달 가능 상한 추정, 통계표 기대·차이 툴팁과 차이 큰 칸의 개인별 원인 툴팁',
@@ -3875,12 +3940,28 @@ $('#guideVideo').addEventListener('error', () => {
   if (!v.dataset.remote){ v.dataset.remote = '1'; v.src = GUIDE_REMOTE(v.dataset.lang); v.play().catch(() => {}); }
   else $('#guideErr').classList.remove('hidden');
 });
-$('#btnGuide').addEventListener('click', () => {
-  hideTip(); closeDP();
+function openGuide(){
+  hideTip(); closeDP(); welcomeDone();   // 영상을 한 번 열면 첫 방문 안내는 더 보이지 않음
   const d = $('#guideDialog');
   try { d.showModal(); } catch(e){ d.setAttribute('open', ''); }
   setGuideLang(LANG === 'ko' ? 'ko' : 'en', true);
-});
+}
+$('#btnGuide').addEventListener('click', openGuide);
+$('#btnHelp').addEventListener('click', openGuide);
+
+/* ── 첫 방문 안내 띠 ──
+ * 보이는 조건: 저장된 프로필(명단)이 하나도 없고, 아직 안내를 끝내지 않았을 때.
+ * 끝나는 때: 영상을 열거나 × 를 누르거나 당직표를 한 번 생성했을 때. 이 사실은 브라우저에 기억합니다.
+ * 이미 쓰던 사람(저장된 명단이 있는 사람)에게는 처음부터 보이지 않으므로 익숙한 사용자의 화면은 바뀌지 않습니다. */
+const WELCOME_KEY = 'dfiDuty:welcomeDone';
+function welcomeIsDone(){ try { return localStorage.getItem(WELCOME_KEY) === '1'; } catch(e){ return false; } }
+function welcomeDone(){
+  $('#welcome').classList.add('hidden');
+  try { localStorage.setItem(WELCOME_KEY, '1'); } catch(e){}
+}
+$('#wGuide').addEventListener('click', openGuide);
+$('#wClose').addEventListener('click', () => { welcomeDone(); toast(t('사용법 영상은 머리글의 ? 버튼으로 언제든 볼 수 있습니다.')); });
+$('#wSample').addEventListener('click', () => $('#btnSample').click());   // 안내는 유지(생성하면 사라짐)
 $('#guideDialog').addEventListener('click', e => {
   const b = e.target.closest('[data-vlang]');
   if (b) setGuideLang(b.dataset.vlang, true);
@@ -4855,6 +4936,7 @@ function onProgress(p){
 }
 /** 시뮬레이션 완료: 결과를 state.cands로 옮기고 화면을 그립니다. */
 function onDone(res){
+  welcomeDone();   // 당직표를 한 번 만들었으면 첫 방문 안내는 끝
   setRunning(false); cleanupWorker();
   if (res.error){ setProg(() => t('중단: 사전 검증 실패')); showError(simErrorText(res)); return; }
   const cal = Engine.buildCalendar(cfgSnapshot.year, cfgSnapshot.month, cfgSnapshot.holidays), at = new Date();
@@ -5902,6 +5984,9 @@ let hideTip = () => {};                             // setupTips가 채움 (언�
     } else { b.textContent = t('저장 불가 — JSON 백업을 이용하십시오'); b.className = 'badge bad'; }
   };
   renderStoreBadge();
+
+  // 첫 방문 안내: 프로필을 불러오기 전에 '저장된 명단이 있었는지'로 판단
+  if (!welcomeIsDone() && !Store.list().length && !Store.getLast()) $('#welcome').classList.remove('hidden');
 
   const last = Store.getLast();
   if (last && applyProfile(last, true)) toast(t("'{name}' 프로필을 불러왔습니다.", { name: last }));

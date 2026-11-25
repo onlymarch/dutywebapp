@@ -1,6 +1,6 @@
 // 영상용 실제 앱 화면 캡처 (영어). 사용: node promo/capture.js
 const {chromium}=require('playwright');(async()=>{const b=await chromium.launch();
-async function page(lang){const ctx=await b.newContext({viewport:{width:1280,height:1100},deviceScaleFactor:2,locale:lang==='en'?'en-US':lang});const p=await ctx.newPage();
+async function page(lang){const ctx=await b.newContext({viewport:{width:1280,height:1100},deviceScaleFactor:2,locale:lang==='en'?'en-US':lang});await ctx.addInitScript(()=>{try{localStorage.setItem('dfiDuty:welcomeDone','1')}catch(e){}});const p=await ctx.newPage();
  await p.goto('file://'+require('path').resolve(__dirname,'..','index.html'));await p.selectOption('#langSelect',lang);await p.addStyleTag({content:'header.top{position:static!important}.toast{display:none!important}'});return p;}
 async function gen(p,tgt){await p.evaluate(t=>{const el=document.querySelector('#minDFI');el.value=String(t);el.dispatchEvent(new Event('input'));},tgt);
  await p.click('#btnGenerate');await p.waitForFunction(()=>!document.querySelector('#btnGenerate').disabled,null,{timeout:60000});await p.waitForTimeout(300);if(await p.$('#diagDialog[open]'))await p.click('#diagClose');}
