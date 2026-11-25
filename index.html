@@ -812,7 +812,20 @@ function precompute(cfg, cal){
     cfg.people.forEach((p, i) => { if (p.level === 3 && !people[i].blocked[d]) list.push(i); });
     helpersOn.push(list);
   }
-  return { people, helpersOn };
+  // runAttempt 안쪽 반복에서 객체 속성 대신 읽는 평평한 배열 (사람 i, 날짜 d → i*(N+1)+d)
+  const n = cfg.people.length, S = N + 1;
+  const flat = (key, T) => { const a = new T(n * S); people.forEach((x, i) => a.set(x[key], i * S)); return a; };
+  const wishDowF = new Uint8Array(n * 7);
+  cfg.people.forEach((p, i) => { for (let w = 0; w < 7; w++) if (p.wishDow[w]) wishDowF[i * 7 + w] = 1; });
+  const catIdx = new Uint8Array(S);                                  // 0=휴일(H) 1=목·금(TF) 2=월~수(MW)
+  for (let d = 1; d <= N; d++) catIdx[d] = cal.days[d].cat === 'H' ? 0 : cal.days[d].cat === 'TF' ? 1 : 2;
+  return { people, helpersOn, S, catIdx, wishDowF,
+    blockedF: flat('blocked', Uint8Array), isWishF: flat('isWish', Uint8Array), isAvailF: flat('isAvail', Uint8Array), wishAfterF: flat('wishAfter', Int16Array),
+    maxA: Float64Array.from(cfg.people, p => p.max),                   // 한도는 무제한(큰 값)일 수 있어 실수 배열
+    lvA: Uint8Array.from(cfg.people, p => p.level), wtA: Float64Array.from(cfg.people, p => p.weight),
+    // 작업용 배열: 시도마다 새로 만들지 않고 0으로 되돌려 씀 (가비지 컬렉션 감소)
+    w: { count: new Int16Array(n), last: new Int16Array(n), lastAny: new Int16Array(n), lastWasHol: new Uint8Array(n),
+         assistCnt: new Int16Array(n), catCnt: new Int16Array(n * 3), dowCnt: new Int16Array(n * 7), rank: new Int8Array(n), base: [], quota: [] } };
 }
 
 /**
@@ -848,22 +861,19 @@ function precompute(cfg, cal){
  *   assist[d] : d일 백업 인덱스 (-1 = 없음)
  */
 function runAttempt(cfg, cal, pre){
-  const P = cfg.people, N = cal.N, n = P.length, X = pre.people;
+  const N = cal.N, n = cfg.people.length, S = pre.S, restW = cfg.restW, restH = cfg.restH;
+  const { blockedF, isWishF, isAvailF, wishAfterF, wishDowF, maxA, lvA, wtA, catIdx } = pre;
 
-  // ---- 시도별 상태 (사람 인덱스로 접근하는 typed array) ----
-  const count      = new Int16Array(n);            // 정규 근무 횟수
-  const last       = new Int16Array(n).fill(-99);  // 마지막 정규 근무일 (-99 = 아직 없음)
-  const lastAny    = new Int16Array(n).fill(-99);  // 마지막 근무일 (정규 + 백업)
-  const lastWasHol = new Uint8Array(n);            // 마지막 정규 근무가 휴일이었는지
-  const assistCnt  = new Int16Array(n);            // 백업 횟수
-  const catCnt     = { H: new Int16Array(n), TF: new Int16Array(n), MW: new Int16Array(n) };
-  const dowCnt     = new Int16Array(n * 7);        // dowCnt[i*7 + 요일]
+  // ---- 시도별 상태 (재사용 배열을 초기화) ----
+  const { count, last, lastAny, lastWasHol, assistCnt, catCnt, dowCnt, rank, base, quota } = pre.w;
+  count.fill(0); last.fill(-99); lastAny.fill(-99); lastWasHol.fill(0); assistCnt.fill(0); catCnt.fill(0); dowCnt.fill(0);
+  // count: 정규 근무 횟수 · last: 마지막 정규 근무일(-99 = 없음) · lastAny: 마지막 근무일(정규+백업)
+  // lastWasHol: 마지막 정규 근무가 휴일 · assistCnt: 백업 횟수 · catCnt[i*3+분류] · dowCnt[i*7+요일]
 
   const duty = new Array(N + 1).fill(-1), assist = new Array(N + 1).fill(-1), unfilled = [];
-  const base = [], quota = [], rank = new Int8Array(n);   // 날마다 재사용하는 작업 배열
 
   for (let d = 1; d <= N; d++){
-    const day = cal.days[d], prev = d > 1 ? duty[d - 1] : -1;
+    const day = cal.days[d], dow = day.dow, prev = d > 1 ? duty[d - 1] : -1;
     const helpers = pre.helpersOn[d];
     // 전날 정규 당직자를 제외하고도 백업이 남는지
     const anyHelper = helpers.length > 1 || (helpers.length === 1 && helpers[0] !== prev);
@@ -871,49 +881,51 @@ function runAttempt(cfg, cal, pre){
     // ---- 1단계: 기본 후보 ----
     base.length = 0;
     for (let i = 0; i < n; i++){
-      const p = P[i];
-      if (count[i] >= p.max) continue;
-      if (X[i].blocked[d]) continue;
-      if (p.level !== 1 && last[i] > 0){
-        const rest = lastWasHol[i] ? cfg.restH : cfg.restW;
+      if (count[i] >= maxA[i]) continue;
+      if (blockedF[i * S + d]) continue;
+      if (lvA[i] !== 1 && last[i] > 0){
+        const rest = lastWasHol[i] ? restH : restW;
         if (d - last[i] <= rest) continue;
       }
-      if (p.level >= 4 && !anyHelper) continue;
+      if (lvA[i] >= 4 && !anyHelper) continue;
       base.push(i);
     }
 
     // ---- 2단계: 희망일 쿼터 보호 (후보가 0명이면 해제) ----
     quota.length = 0;
-    for (const i of base){
-      const p = P[i];
-      if (p.max >= 999 || X[i].isWish[d] || (p.max - count[i]) > X[i].wishAfter[d]) quota.push(i);
+    for (let k = 0; k < base.length; k++){
+      const i = base[k];
+      if (maxA[i] >= 999 || isWishF[i * S + d] || (maxA[i] - count[i]) > wishAfterF[i * S + d]) quota.push(i);
     }
     const cand = quota.length ? quota : base;
     if (!cand.length){ unfilled.push(d); continue; }
 
     // ---- 3단계: 우선순위가 가장 높은 사람 중 점수 최저 ----
     let minR = 4;
-    for (const i of cand){
-      const r = X[i].isWish[d] ? 0 : P[i].wishDow[day.dow] ? 1 : X[i].isAvail[d] ? 2 : 3;
+    for (let k = 0; k < cand.length; k++){
+      const i = cand[k];
+      const r = isWishF[i * S + d] ? 0 : wishDowF[i * 7 + dow] ? 1 : isAvailF[i * S + d] ? 2 : 3;
       rank[i] = r; if (r < minR) minR = r;
     }
-    const catArr = catCnt[day.cat];
+    const cat = catIdx[d];
     let pick = -1, bestScore = Infinity;
-    for (const i of cand){
+    for (let k = 0; k < cand.length; k++){
+      const i = cand[k];
       if (rank[i] !== minR) continue;
-      const sc = catArr[i] / P[i].weight + dowCnt[i * 7 + day.dow] * 2 + Math.random() * 0.1;
+      const sc = catCnt[i * 3 + cat] / wtA[i] + dowCnt[i * 7 + dow] * 2 + Math.random() * 0.1;
       if (sc < bestScore){ bestScore = sc; pick = i; }
     }
 
     // 배정 반영
     count[pick]++; last[pick] = d; lastAny[pick] = d; lastWasHol[pick] = day.isHol ? 1 : 0;
-    catArr[pick]++; dowCnt[pick * 7 + day.dow]++;
+    catCnt[pick * 3 + cat]++; dowCnt[pick * 7 + dow]++;
     duty[d] = pick;
 
     // ---- 4단계: 레벨 4의 백업 ----
-    if (P[pick].level >= 4){
+    if (lvA[pick] >= 4){
       let bestH = -1, bGap = 0, bAs = 0, bRnd = 0;
-      for (const j of helpers){
+      for (let k = 0; k < helpers.length; k++){
+        const j = helpers[k];
         if (j === prev) continue;
         const gap = d - lastAny[j], as = -assistCnt[j], rnd = Math.random();
         // 사전식 비교: 쉰 기간(큰 쪽) → 백업 횟수(적은 쪽) → 무작위
@@ -927,7 +939,6 @@ function runAttempt(cfg, cal, pre){
   return { duty, assist, unfilled };
 }
 
-/** 모표준편차(분모 n). 원소가 2개 미만이면 0입니다. */
 function sd(arr){
   if (arr.length < 2) return 0;
   let m = 0; for (const v of arr) m += v; m /= arr.length;
@@ -956,45 +967,61 @@ function mean(arr){ if (!arr.length) return 0; let s = 0; for (const v of arr) s
  *   M1 {rmse} · M2 {holSD} · M3 {wish, wishDow, avail, avoid}(각 항목 점수) · M4 {gapAvg} · M5 {dowAvg}
  *   이름·설명 문구는 앱의 metricText()에서 번역해 만듭니다.
  */
+/**
+ * computeDFI가 시도마다 다시 만들던 값을 cfg(와 달력)당 한 번만 계산해 둡니다.
+ * 결과 값은 이전 계산과 똑같습니다(목록에 중복이 있으면 그대로 셈).
+ */
+const DFI_PREP = new WeakMap();
+function dfiPrep(cfg, cal){
+  const c = DFI_PREP.get(cfg); if (c && c.cal === cal) return c;
+  const P = cfg.people, N = cal.N, inM = x => x >= 1 && x <= N;
+  const isHol = new Uint8Array(N + 1), dow = new Uint8Array(N + 1);
+  for (let d = 1; d <= N; d++){ isHol[d] = cal.days[d].isHol ? 1 : 0; dow[d] = cal.days[d].dow; }
+  const per = P.map(p => {
+    const ok = new Uint8Array(N + 1);                               // 가능일 + 희망일("가능"으로 인정)
+    if (p.avail.length) p.avail.concat(p.wish).forEach(x => { if (inM(x)) ok[x] = 1; });
+    return { wish: p.wish.filter(inM), avoid: p.avoid.filter(inM), ok, hasAvail: p.avail.length > 0, hasWishDow: p.wishDow.some(Boolean) };
+  });
+  const r = { cal, isHol, dow, per, W: P.reduce((a, p) => a + p.weight, 0) || 1 };
+  DFI_PREP.set(cfg, r); return r;
+}
+
 function computeDFI(cfg, cal, duty, assist){
-  const P = cfg.people, N = cal.N, n = P.length;
+  const P = cfg.people, N = cal.N, n = P.length, X = dfiPrep(cfg, cal), isHol = X.isHol, dowOf = X.dow;
 
   // 사람별 정규 근무일 목록
-  const days = P.map(() => []);
+  const days = []; for (let i = 0; i < n; i++) days.push([]);
   let filled = 0;
   for (let d = 1; d <= N; d++) if (duty[d] >= 0){ days[duty[d]].push(d); filled++; }
   const counts = days.map(a => a.length);
 
   // ---- M1 양적 정확도: 기대 근무수 = 채운 일수 × 본인 가중치 ÷ 가중치 합 ----
-  const W = P.reduce((a, p) => a + p.weight, 0) || 1;
+  const W = X.W;
   let se = 0;
   P.forEach((p, i) => { const e = filled * p.weight / W; se += (counts[i] - e) * (counts[i] - e); });
   const rmse = n ? Math.sqrt(se / n) : 0;
   const m1 = Math.max(0, 25 - rmse * 8);
 
   // ---- M2 질적 배분성: 휴일 근무수의 SD ----
-  const holCounts = days.map(a => a.filter(d => cal.days[d].isHol).length);
+  const holCounts = days.map(a => { let c = 0; for (let k = 0; k < a.length; k++) c += isHol[a[k]]; return c; });
   const holSD = sd(holCounts);
   const m2 = Math.max(0, 25 - holSD * 12);
 
   // ---- M3 선호도 충족률 ----
   // wT/wH: 희망일 분모/적중, dT/dH: 희망요일, aT/aH: 가능일, vT/vV: 제외일 총수/위반수
   let wT = 0, wH = 0, dT = 0, dH = 0, aT = 0, aH = 0, vT = 0, vV = 0;
-  P.forEach((p, i) => {
-    const mine = days[i];
-    const wish = p.wish.filter(x => x >= 1 && x <= N);
+  for (let i = 0; i < n; i++){
+    const p = P[i], q = X.per[i], mine = days[i], wish = q.wish;
     if (wish.length){
       // 희망일이 한도보다 많으면 한도만큼만 분모로 잡습니다 (모두 들어줄 수 없으므로)
-      const denom = Math.min(wish.length, p.max), hit = wish.filter(x => duty[x] === i).length;
+      let hit = 0; for (let k = 0; k < wish.length; k++) if (duty[wish[k]] === i) hit++;
+      const denom = Math.min(wish.length, p.max);
       wT += denom; wH += Math.min(hit, denom);
     }
-    if (p.wishDow.some(Boolean)) mine.forEach(x => { dT++; if (p.wishDow[cal.days[x].dow]) dH++; });
-    if (p.avail.length){
-      const ok = new Set(p.avail.concat(p.wish));        // 희망일도 "가능"으로 인정
-      mine.forEach(x => { aT++; if (ok.has(x)) aH++; });
-    }
-    p.avoid.forEach(x => { if (x >= 1 && x <= N){ vT++; if (duty[x] === i) vV++; } });
-  });
+    if (q.hasWishDow) for (let k = 0; k < mine.length; k++){ dT++; if (p.wishDow[dowOf[mine[k]]]) dH++; }
+    if (q.hasAvail) for (let k = 0; k < mine.length; k++){ aT++; if (q.ok[mine[k]]) aH++; }   // 희망일도 "가능"으로 인정
+    for (let k = 0; k < q.avoid.length; k++){ vT++; if (duty[q.avoid[k]] === i) vV++; }
+  }
   const ratio = (h, t) => t ? h / t : 1;                // 해당 항목이 없으면 만점
   const m3parts = { wish: 8 * ratio(wH, wT), wishDow: 4 * ratio(dH, dT), avail: 4 * ratio(aH, aT), avoid: 4 * (vT ? 1 - vV / vT : 1) };
   const m3 = m3parts.wish + m3parts.wishDow + m3parts.avail + m3parts.avoid;
@@ -1013,7 +1040,7 @@ function computeDFI(cfg, cal, duty, assist){
   const dowSDs = [];
   days.forEach(a => {
     if (!a.length) return;
-    const c = [0, 0, 0, 0, 0, 0, 0]; a.forEach(x => { c[cal.days[x].dow]++; });
+    const c = [0, 0, 0, 0, 0, 0, 0]; for (let k = 0; k < a.length; k++) c[dowOf[a[k]]]++;
     dowSDs.push(sd(c));
   });
   const dowAvg = mean(dowSDs);
@@ -1075,7 +1102,9 @@ function* simulate(cfg){
   const LIMIT = cfg.timeLimitMs || 5000, STEP = 100, t0 = Date.now();
   const TOPN = 3, top = [], hist = [], hitKeys = new Set();
   const better = (x, y) => x.unfilled.length !== y.unfilled.length ? x.unfilled.length < y.unfilled.length : x.dfi.total > y.dfi.total;
-  const keyOf = r => r.duty.join(',') + '|' + r.assist.join(',');
+  // 중복 검사 키: 정규·백업 배정을 한 글자씩(사람 번호 + 2) 이은 문자열. 같은 배정 ⇔ 같은 키
+  const kbuf = new Uint16Array(2 * cal.N + 2);
+  const keyOf = r => { for (let d = 0; d <= cal.N; d++){ kbuf[d] = r.duty[d] + 2; kbuf[cal.N + 1 + d] = r.assist[d] + 2; } return String.fromCharCode.apply(null, kbuf); };
 
   let a = 0, stop = 'max';
   while (a < MAX){
@@ -3947,8 +3976,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.21.0', APP_BUILD = '2026-11-25';
+const APP_VERSION = '1.21.1', APP_BUILD = '2026-11-25';
 const CHANGELOG = [
+  '1.21.1 엔진 최적화(결과 동일): 사람·날짜 조건을 평평한 배열로, 시도별 작업 배열 재사용, DFI 계산의 반복 준비 작업을 캐시, 중복 검사 키를 문자 코드로. 20,000회 381→254ms(목표 이상 안이 많을 때 468→269ms)',
   '1.21.0 QR 공유: [📱 QR로 공유]로 결과를 담은 링크·QR코드를 만들고(서버 전송 없음, # 뒤에 저장), 찍으면 보기 전용 당직표가 열림(이름 누르면 강조, 출력 가능, 받는 쪽 명단·설정은 그대로). 출력 옵션에 QR코드 체크박스(기본 꺼짐)',
   '1.20.3 출력 양식: 좌우 여백 1.5cm(본문 폭 180mm), 근무자별 통계표의 열 폭을 모두 같게, 달력 칸 높이 20% 축소(22→17.6mm, 6주 달 19→15.2mm)',
   '1.20.2 실행 요약 그래프: 미배정일이 있는 안은 빨간 속빈 점과 "미배정 n일", 미배정일이 줄어 점수가 내려간 곳은 빨간 점선과 "미배정 a→b일"로 표시하고 설명 한 줄 추가',
