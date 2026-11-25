@@ -29,7 +29,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Duty Roster Generator">
 <meta property="og:title" content="Duty Roster Generator — fair on-call schedules in seconds">
-<meta property="og:description" content="Free, no install, no sign-up. Preferences, rest days and assistants built in; plans scored by a Duty Fairness Index. Your data never leaves your browser.">
+<meta property="og:description" content="Free, no install, no sign-up. Preferences, rest days and backups built in; plans scored by a Duty Fairness Index. Your data never leaves your browser.">
 <meta property="og:url" content="https://onlymarch.github.io/dutywebapp/">
 <meta property="og:image" content="https://onlymarch.github.io/dutywebapp/assets/og-image.png">
 <meta property="og:image:width" content="1200">
@@ -602,9 +602,10 @@ body.printing-sheet #printSheet{display:block}
       <div class="row muted" style="gap:12px;margin:4px 0 8px">
         <span>출력 옵션:</span>
         <label><input type="checkbox" id="poStats" checked> 통계표</label>
-        <label><input type="checkbox" id="poDFI" checked> DFI 요약</label>
-        <label><input type="checkbox" id="poHL" checked> 강조한 근무자 표시</label>
-        <label><input type="checkbox" id="poSign" checked> 결재란</label>
+        <!-- 기본값: 통계표만 켬. DFI 요약·강조한 근무자 표시·결재란은 필요할 때 켬 -->
+        <label><input type="checkbox" id="poDFI"> DFI 요약</label>
+        <label><input type="checkbox" id="poHL"> 강조한 근무자 표시</label>
+        <label><input type="checkbox" id="poSign"> 결재란</label>
       </div>
       <!-- data-needs-result: 결과가 없으면 비활성화 (updateOutBar) -->
       <div class="row">
@@ -3789,8 +3790,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.20.0', APP_BUILD = '2026-11-25';
+const APP_VERSION = '1.20.1', APP_BUILD = '2026-11-25';
 const CHANGELOG = [
+  '1.20.1 이름을 끌기 시작하면 그 사람의 근무일을 강조(클릭과 같음). 출력 옵션 기본값: 통계표만 켜고 DFI 요약·강조한 근무자 표시·결재란은 끔',
   '1.20.0 상위 3개 안은 생성된 그대로 보존하고, 수동 교체·끌어 놓기는 선택한 안의 사본에만 적용. 안 카드를 누르면(선택 중인 안도) 그 안의 처음 배정으로 되돌리며, 버린 수정은 실행 취소로 다시 불러올 수 있음',
   '1.19.0 당직표 달력에서 이름을 다른 날로 끌어 놓아 두 날의 배정을 맞바꾸기(마우스·터치 길게 누르기, 레벨 4의 백업은 함께 이동, DFI 재계산·실행 취소). 처음 규칙에 어긋나면 그 날을 빨간 테두리로 표시하고 [무시]로 지움(✎ 수동 교체도 같음)',
   '1.18.0 레벨 이름 변경: Lv1 교수급 · Lv2 펠로우급 · Lv3 전공의급 · Lv4 신입(백업 필요) (영어: Expert · Senior · Regular · Junior + backup). 조력·조력자 → 백업(현장 용어). 첫 방문 안내 문구 "체험해보세요"',
@@ -5597,7 +5599,8 @@ function renderHlInfo(R){
   box.dataset.text = text; box.classList.remove('hidden');
 }
 /** 강조만 바뀔 때: 다시 그리지 않고 클래스만 바꿉니다. */
-function applyHighlight(){
+/** 강조 적용. noInfo: 달력 위 강조 안내 줄을 그리지 않음(끌기 중에 달력이 밀려 내려가지 않도록) */
+function applyHighlight(noInfo){
   const hl = state.hl, on = hl >= 0;
   $$('#results [data-pid]').forEach(el => {
     const me = +el.dataset.pid === hl;
@@ -5608,7 +5611,7 @@ function applyHighlight(){
   $$('#candGrid .mini-cal2').forEach(m => m.classList.toggle('has-hl', on));
   $$('#stats tr[data-row]').forEach(tr => tr.classList.toggle('hl-row', +tr.dataset.row === hl));
   $$('#stats .stats-name').forEach(el => el.classList.remove('highlight-bold'));   // 표에서는 행 배경으로만 표시
-  renderHlInfo(state.result);
+  if (!noInfo) renderHlInfo(state.result);
 }
 function setHighlight(pid){ state.hl = (state.hl === pid) ? -1 : pid; applyHighlight(); }
 $('#hlInfo').addEventListener('click', e => {
@@ -5787,7 +5790,7 @@ $('#cal').addEventListener('click', e => {
  *  - 마우스: 이름을 누른 채 5px 이상 움직이면 끌기 시작
  *  - 터치: 이름을 0.35초 길게 누르면 끌기 시작(그 전에 움직이면 평소처럼 화면 스크롤)
  *  - 다른 날 칸 위에서 놓으면 두 날의 배정을 맞바꿈. 칸 밖에서 놓거나 Esc를 누르면 취소
- *  - 끌기 뒤에 따라오는 클릭(이름 강조)은 한 번 무시
+ *  - 끌기를 시작하면 그 사람의 근무일을 강조(이름 클릭과 같음). 끌기 뒤에 따라오는 클릭은 한 번 무시(강조가 풀리지 않게)
  */
 const dnd = { st: null };
 function dndCellAt(x, y){
@@ -5798,6 +5801,7 @@ function dndCellAt(x, y){
 function dndStart(){
   const s = dnd.st; s.on = true;
   document.body.classList.add('dnd-on'); hideTip();
+  if (s.pid >= 0 && state.hl !== s.pid){ state.hl = s.pid; applyHighlight(true); }   // 옮길 사람의 다른 근무일이 보이도록(안내 줄은 놓은 뒤에)
   const g = document.createElement('div'); g.className = 'dnd-ghost'; g.textContent = s.name; document.body.appendChild(g); s.ghost = g;
   const src = $(`#cal .cell[data-day="${s.from}"]`); src && src.classList.add('drag-src');
   if (navigator.vibrate && s.touch) try { navigator.vibrate(15); } catch(e){}
@@ -5820,13 +5824,14 @@ function dndEnd(drop){
   s.ghost.remove(); document.body.classList.remove('dnd-on');
   $$('#cal .drop-target, #cal .drag-src').forEach(c => c.classList.remove('drop-target', 'drag-src'));
   dnd.suppressClick = true; setTimeout(() => { dnd.suppressClick = false; }, 0);
-  if (drop && s.over) swapDays(s.from, s.over);
+  if (drop && s.over) swapDays(s.from, s.over);   // 다시 그리면서 강조 안내 줄도 그림
+  else renderHlInfo(state.result);
 }
 $('#cal').addEventListener('pointerdown', e => {
   const nm = e.target.closest('.duty-name'); if (!nm || e.button > 0 || !state.result) return;
   const cell = nm.closest('.cell[data-day]'); if (!cell) return;
   const touch = e.pointerType !== 'mouse';
-  dnd.st = { from: +cell.dataset.day, name: nm.textContent, x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, touch, on: false, over: 0 };
+  dnd.st = { from: +cell.dataset.day, pid: +nm.dataset.pid, name: nm.textContent, x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, touch, on: false, over: 0 };
   if (touch) dnd.st.timer = setTimeout(() => { if (dnd.st && !dnd.st.on) dndStart(); }, 350);
 });
 document.addEventListener('pointermove', e => {

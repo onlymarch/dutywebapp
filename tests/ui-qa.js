@@ -2,7 +2,7 @@
  * 인터페이스 오류 탐색 테스트 (Playwright, Chromium)
  * 실행: npx playwright install chromium   (최초 1회)
  *       node tests/ui-qa.js [index.html 경로]
- * 28개 범주(A~Z, AA~AB) 168개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
+ * 29개 범주(A~Z, AA~AC) 172개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
  * 숫자 경계값, 극단적 명단, 날짜 팝오버, 연타·중단, Worker 차단 환경, 수동 교체, 프로필 이름,
  * 저장 전 입력 보존, 대규모 명단, 모바일 배치, 키보드 조작, 출력, 공휴일 입력, 손상된 저장값, 이전 결과 조작,
  * 기간 입력(~와 -의 변형, 날짜 형식 기간, 열린 기간 -5·20-), 실행 요약(소요 시간·개선 기록),
@@ -12,7 +12,8 @@
  * v1.16(Y: 최하단 사용법 영상 링크와 재생 레이어 열기·언어 전환·닫으면 정지),
  * v1.17(Z: 첫 방문 안내 띠의 표시·종료 조건과 유지, 샘플 체험, 기존 사용자 미표시, 머리글 ? 버튼, 번역),
  * v1.19(AA: 이름 끌어 놓기 맞바꾸기·실행 취소, 규칙 위반 빨간 테두리와 이유·[무시], 언어 전환, ✎ 교체 위반 표시),
- * v1.20(AB: 상위 3개 안 원본 보존, 카드를 누르면 처음 안으로 되돌림·실행 취소, 다른 안 선택). 첫 실행은 브라우저 언어를 감지해 저장하고, 이후에는 저장된 언어를 씁니다.
+ * v1.20(AB: 상위 3개 안 원본 보존, 카드를 누르면 처음 안으로 되돌림·실행 취소, 다른 안 선택),
+ * v1.20.1(AC: 끌기 시작 시 그 사람 강조, Esc 취소, 출력 옵션 기본값과 기본 출력물). 첫 실행은 브라우저 언어를 감지해 저장하고, 이후에는 저장된 언어를 씁니다.
  * 각 항목은 JS 예외·콘솔 오류·브라우저 기본 대화상자 발생도 함께 실패로 기록합니다.
  */
 
@@ -465,7 +466,7 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
  const b0=await dutyAt(pair.ok);
  await drag(...pair.ok);
  const s1=await dutyAt(pair.ok), u1=await p.evaluate(()=>!document.querySelector('#undoBar').classList.contains('hidden')), hl1=await p.evaluate(()=>state.hl);
- log('AA1 끌어 놓기 → 두 날 맞바꿈·실행 취소 막대',s1[0]===b0[1]&&s1[1]===b0[0]&&u1&&hl1<0,pair.ok.join('↔'));
+ log('AA1 끌어 놓기 → 두 날 맞바꿈·실행 취소 막대·옮긴 사람 강조',s1[0]===b0[1]&&s1[1]===b0[0]&&u1&&hl1===b0[0],pair.ok.join('↔'));
  await p.click('#undoBtn'); await p.waitForTimeout(200);
  log('AA2 실행 취소로 원래대로',JSON.stringify(await dutyAt(pair.ok))===JSON.stringify(b0),'');
  await drag(...pair.bad);
@@ -481,7 +482,7 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
  const d0=await p.evaluate(()=>state.result.duty.join());
  const sb=await (await p.$('#cal [data-day="1"] .duty-name')).boundingBox();
  await p.mouse.move(sb.x+5,sb.y+5);await p.mouse.down();await p.mouse.move(sb.x+15,sb.y+8,{steps:3});await p.mouse.up();await p.waitForTimeout(150);
- log('AA6 같은 칸에 놓으면 변화 없음·강조 안 됨',(await p.evaluate(()=>state.result.duty.join()))===d0&&(await p.evaluate(()=>state.hl))<0,'');
+ log('AA6 같은 칸에 놓으면 변화 없음(강조만)',(await p.evaluate(()=>state.result.duty.join()))===d0&&(await p.evaluate(()=>state.hl===state.result.duty[1])),'');
  // ✎ 수동 교체: 전날 당직자(레벨 2~3)를 다음 날에 넣으면 배정 제외일 위반 → 빨간 테두리
  const tgt=await p.evaluate(()=>{const R=state.result,P=R.cfg.people;for(let d=2;d<=R.cal.N;d++){const k=R.duty[d-1];if(k>=0&&P[k].level>1&&P[k].level<4&&R.duty[d]!==k&&!R.flags.has(d))return [d,k];}return null;});
  await p.click(`#cal [data-edit="${tgt[0]}"]`); await p.waitForTimeout(150);
@@ -506,6 +507,22 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
  await p.evaluate(()=>swapDays(3,4)); await p.click('[data-cand="0"]'); await p.waitForTimeout(200);
  log('AB5 2안 수정 후 1안 선택 → 처음 1안',await p.evaluate(()=>state.sel===0&&state.result.duty.join()===state.cands[0].duty.join()&&!state.result.edited.size),'');
  errsOK(p,'AB'); await p.context().close();}
+
+// AC. v1.20.1: 끌기 시작 시 강조 · 출력 옵션 기본값
+{const p=await fresh(b); await p.click('#wClose'); await p.click('#btnSample'); await p.waitForTimeout(300); await gen(p);
+ await p.evaluate(()=>document.querySelector('#cal').scrollIntoView({block:'center'})); await p.waitForTimeout(150);
+ const pid=await p.evaluate(()=>state.result.duty[3]);
+ const sb=await (await p.$('#cal [data-day="3"] .duty-name')).boundingBox();
+ await p.mouse.move(sb.x+sb.width/2,sb.y+sb.height/2); await p.mouse.down(); await p.mouse.move(sb.x+30,sb.y+20,{steps:4});
+ const mid=await p.evaluate(id=>({hl:state.hl,bold:[...document.querySelectorAll('#cal .duty-name.highlight-bold')].every(e=>+e.dataset.pid===id),n:document.querySelectorAll('#cal .highlight-bold').length,dim:document.querySelector('#cal').classList.contains('has-hl')}),pid);
+ await p.keyboard.press('Escape'); await p.mouse.up(); await p.waitForTimeout(150);
+ log('AC1 끌기 시작하면 그 사람의 근무일 강조',mid.hl===pid&&mid.bold&&mid.n>=1&&mid.dim,`${mid.n}일 강조`);
+ log('AC2 Esc로 끌기 취소 시 배정 그대로',await p.evaluate(id=>state.result.duty[3]===id,pid),'');
+ const po=await p.evaluate(()=>['poStats','poDFI','poHL','poSign'].map(i=>document.getElementById(i).checked));
+ log('AC3 출력 옵션 기본값: 통계표만 켬',JSON.stringify(po)==='[true,false,false,false]',JSON.stringify(po));
+ const doc=await p.evaluate(()=>buildPrintDoc(false));
+ log('AC4 기본 출력물: 결재란·DFI 요약 없음',!/결재/.test(doc)&&!/공정성 지수|DFI 요약/.test(doc.replace(/<style[\s\S]*?<\/style>/g,'')),'');
+ errsOK(p,'AC'); await p.context().close();}
 
 await b.close();
 const f=results.filter(r=>!r.ok); console.log(`\n총 ${results.length}건 · 통과 ${results.length-f.length} · 실패 ${f.length}`);
