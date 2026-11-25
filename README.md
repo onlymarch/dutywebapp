@@ -17,7 +17,7 @@ A free, single-file web app that builds a month of on-call duty rosters for doct
 
 ![Monthly duty calendar with Duty Fairness Index](assets/screenshot-en.png)
 
-Current version: **v1.20.2** (2026-11-25)
+Current version: **v1.20.3** (2026-11-25)
 
 > This is a scheduling aid. Please have the person responsible check the final roster before publishing it.
 

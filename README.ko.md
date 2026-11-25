@@ -10,7 +10,7 @@
 
 ▶ [20초 소개 영상 고화질·음악 포함으로 보기 (MP4, 1080p, 영어)](https://onlymarch.github.io/dutywebapp/assets/promo-20s.mp4) · [세로형 쇼츠·릴스용 (1080×1920)](https://onlymarch.github.io/dutywebapp/assets/promo-shorts-20s.mp4)
 
-현재 버전: **v1.20.2** (2026-11-25)
+현재 버전: **v1.20.3** (2026-11-25)
 
 > 당직표 작성을 돕는 도구입니다. 게시하기 전에 담당자가 최종 당직표를 확인하십시오.
 
