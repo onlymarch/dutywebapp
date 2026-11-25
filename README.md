@@ -17,7 +17,7 @@ A free, single-file web app that builds a month of on-call duty rosters for doct
 
 ![Monthly duty calendar with Duty Fairness Index](assets/screenshot-en.png)
 
-Current version: **v1.20.3** (2026-11-25)
+Current version: **v1.21.0** (2026-11-25)
 
 > This is a scheduling aid. Please have the person responsible check the final roster before publishing it.
 
@@ -29,7 +29,7 @@ Current version: **v1.20.3** (2026-11-25)
 2. **Staff roster** — Enter name, level, weight, monthly max, preferred dates, preferred weekdays, available dates, unavailable dates and unavailable weekdays. Write dates like `3, 15, 20~22`; ranges accept both `~` and `-`. `-5` means days 1–5 and `25-` means the 25th to the end of the month. If a range ends past the last day (e.g. `15-31` in February), it is cut at the month end. You can also pick dates on a calendar with the 📅 button.
 3. **Generate** — A pre-check flags conflicting input before you start. When it finishes, you see how many attempts were made, how long it took, when the best score last improved, and a chart of the best DFI over attempts.
 4. **Results** — Compare the top 3 plans by DFI and choose one. Click a name (or a row in the stats table) to highlight that person's days; **drag a name onto another day** to swap the two days (that person's other duty days light up while you drag) (on phones: press and hold, then drag), or use ✎ to pick someone manually. The DFI is recalculated and you can undo. If a change breaks the original rules, that day gets a red outline — hover to see why, and click **Ignore** to clear the mark. Your changes apply only to a working copy: the three plan cards always keep the generated rosters, and clicking a card (including the selected one) brings back that plan as it was generated — with undo if you change your mind.
-5. **Print & save** — One-page A4 print (statistics table by default; DFI summary, highlighted person and an approval box can be switched on), a printable HTML file, CSV, or JSON backup.
+5. **Print & save** — One-page A4 print (statistics table by default; DFI summary, highlighted person, an approval box and a QR code can be switched on), a printable HTML file, CSV, or JSON backup. **📱 Share by QR** shows a QR code and link: scanning it with a phone opens a view-only copy of the roster (tap a name to see that person's days; it can be printed and does not touch the viewer's own data).
 
 ## Languages
 
@@ -83,6 +83,7 @@ Grades: S ≥ 90, A ≥ 80, B ≥ 70, C < 70. Hover (or tap) the ⓘ marks and m
 There is no server. Settings and rosters are stored only in your browser (cookies and localStorage) and are never sent anywhere.
 
 - To move to another device or browser, use **JSON backup** and **JSON restore**.
+- **QR / link sharing** puts the roster (names and assignments only) in the part of the link after `#`, which browsers never send to the web server. Anyone who has the QR image or the link can read the names, so share it only with the people who need it.
 - Clearing browser data deletes what you saved. Keep important rosters as JSON files.
 
 ## Run locally
@@ -94,7 +95,7 @@ Download `index.html` and open it in a browser. Nothing to install.
 | File | Contents |
 |---|---|
 | `index.html` | The whole app (UI, scheduling engine, DFI, storage, printing, translations) |
-| `tests/ui-qa.js` | UI test suite (30 categories, 175 checks, including all languages) |
+| `tests/ui-qa.js` | UI test suite (31 categories, 185 checks, including all languages) |
 | `README.ko.md` | Korean README |
 | `assets/` | App icon (`favicon.svg`, `favicon-32.png`, `apple-touch-icon.png`), screenshots, link-preview image, promo videos (20 s, landscape and vertical), GIF preview and 30-second guide videos (English, Korean) |
 | `promo/` | Source for the promo and guide videos (screen capture, motion graphics, renderer) |
@@ -116,7 +117,7 @@ npx playwright install chromium
 node tests/ui-qa.js
 ```
 
-The last line should read `총 175건 · 통과 175 · 실패 0` ("175 total · 175 passed · 0 failed"). Tests have been run on Chromium only, not on Safari or iOS.
+The last line should read `총 185건 · 통과 185 · 실패 0` ("185 total · 185 passed · 0 failed"). Tests have been run on Chromium only, not on Safari or iOS.
 
 ## Feedback
 
@@ -125,3 +126,5 @@ Bug reports and ideas — especially about duty rules in your country or hospita
 ## License
 
 MIT
+
+Includes [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) v1.4.4 by Kazuhiko Arase (MIT). "QR Code" is a registered trademark of DENSO WAVE INCORPORATED.

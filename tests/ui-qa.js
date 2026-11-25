@@ -2,7 +2,7 @@
  * 인터페이스 오류 탐색 테스트 (Playwright, Chromium)
  * 실행: npx playwright install chromium   (최초 1회)
  *       node tests/ui-qa.js [index.html 경로]
- * 30개 범주(A~Z, AA~AD) 175개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
+ * 31개 범주(A~Z, AA~AE) 185개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
  * 숫자 경계값, 극단적 명단, 날짜 팝오버, 연타·중단, Worker 차단 환경, 수동 교체, 프로필 이름,
  * 저장 전 입력 보존, 대규모 명단, 모바일 배치, 키보드 조작, 출력, 공휴일 입력, 손상된 저장값, 이전 결과 조작,
  * 기간 입력(~와 -의 변형, 날짜 형식 기간, 열린 기간 -5·20-), 실행 요약(소요 시간·개선 기록),
@@ -14,7 +14,8 @@
  * v1.19(AA: 이름 끌어 놓기 맞바꾸기·실행 취소, 규칙 위반 빨간 테두리와 이유·[무시], 언어 전환, ✎ 교체 위반 표시),
  * v1.20(AB: 상위 3개 안 원본 보존, 카드를 누르면 처음 안으로 되돌림·실행 취소, 다른 안 선택),
  * v1.20.1(AC: 끌기 시작 시 그 사람 강조, Esc 취소, 출력 옵션 기본값과 기본 출력물),
- * v1.20.2(AD: 실행 그래프의 미배정 안 빨간 속빈 점·하락 점선·설명, 번역). 첫 실행은 브라우저 언어를 감지해 저장하고, 이후에는 저장된 언어를 씁니다.
+ * v1.20.2(AD: 실행 그래프의 미배정 안 빨간 속빈 점·하락 점선·설명, 번역),
+ * v1.21(AE: QR 공유 링크, 출력물 QR 옵션, 공유받은 보기 전용 화면·강조·저장 데이터 불변·번역·닫기, 깨진 링크). 첫 실행은 브라우저 언어를 감지해 저장하고, 이후에는 저장된 언어를 씁니다.
  * 각 항목은 JS 예외·콘솔 오류·브라우저 기본 대화상자 발생도 함께 실패로 기록합니다.
  */
 
@@ -538,6 +539,41 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
  const fr=await p.evaluate(()=>document.querySelector('.run-chart').textContent);
  log('AD3 다른 언어: 그래프 라벨·설명 번역',!/[가-힣]/.test(fr),fr.replace(/\s+/g,' ').slice(0,60));
  errsOK(p,'AD'); await p.context().close();}
+
+// AE. v1.21: QR 공유 · 공유받은 당직표(보기 전용) · 출력물 QR
+{const p=await fresh(b); await p.click('#wClose'); await p.click('#btnSample'); await p.waitForTimeout(300); await gen(p);
+ await p.evaluate(()=>{state.result.cfg.people[0].name='김|민~정';swapDays(2,10);});
+ await p.click('#btnShare'); await p.waitForTimeout(250);
+ const url=await p.inputValue('#shareLink'), hasQR=!!(await p.$('#shareQR svg path'));
+ log('AE1 [QR로 공유] → QR·링크(#s=)·개인정보 안내',hasQR&&/#s=[A-Za-z0-9_-]+$/.test(url)&&!!(await p.$('#shareDialog .share-warn')),`링크 ${url.length}자`);
+ const ref=await p.evaluate(()=>({d:state.result.duty.join(),a:state.result.assist.join(),y:state.result.cfg.year,m:state.result.cfg.month}));
+ await p.click('#shareClose');
+ // 출력물 QR 옵션
+ log('AE2 출력 옵션 QR 기본 꺼짐',!(await p.isChecked('#poQR')),'');
+ await p.check('#poQR'); const doc=await p.evaluate(()=>buildPrintDoc(false));
+ log('AE3 QR 켜면 출력물 머리에 QR',/class="ps-qr"><svg/.test(doc),'');
+ // 공유받은 쪽: 다른 브라우저(저장된 명단 있음)에서 링크 열기
+ const q=await fresh(b); await q.click('#wClose'); await q.click('#btnSample'); await q.waitForTimeout(800);
+ const before=await q.evaluate(()=>JSON.stringify(Object.keys(localStorage).sort().map(k=>[k,localStorage.getItem(k)])));
+ await q.goto(FILE+url.slice(url.indexOf('#'))); await q.waitForTimeout(400);
+ const sh=await q.evaluate(()=>({mode:document.body.classList.contains('shared-mode'),d:state.shared.duty.join(),a:state.shared.assist.join(),n0:state.shared.cfg.people[0].name,
+   mainHidden:getComputedStyle(document.querySelector('#ctrlCard')).display==='none',cells:document.querySelectorAll('#shCal .cell:not(.empty)').length}));
+ log('AE4 링크 열기 → 보기 전용 화면·배정 그대로',sh.mode&&sh.d===ref.d&&sh.a===ref.a&&sh.mainHidden&&sh.cells>=28,`이름0 "${sh.n0}"`);
+ log('AE5 이름의 | ~ 는 공백으로',sh.n0==='김 민 정','');
+ await q.click('#shCal [data-spid="2"]'); await q.waitForTimeout(150);
+ const hl=await q.evaluate(()=>({n:document.querySelectorAll('#shCal .highlight-bold').length,line:!document.querySelector('#shPerson').classList.contains('hidden')}));
+ log('AE6 이름 누르면 강조·근무일 줄',hl.n>=1&&hl.line,`${hl.n}칸`);
+ const after=await q.evaluate(()=>JSON.stringify(Object.keys(localStorage).sort().map(k=>[k,localStorage.getItem(k)])));
+ log('AE7 받는 쪽 저장 데이터 변경 없음',before===after,'');
+ await q.selectOption('#langSelect','es'); await q.waitForTimeout(200);
+ const es=await q.evaluate(()=>document.querySelector('#sharedView').textContent);
+ log('AE8 다른 언어: 공유 화면 번역',!/[가-힣]/.test(es.replace(/김 민 정/g,'')),es.replace(/\s+/g,' ').slice(0,60));
+ await q.click('#shExit'); await q.waitForTimeout(500);
+ log('AE9 [닫고 앱 사용하기] → 원래 앱·내 명단',await q.evaluate(()=>!document.body.classList.contains('shared-mode')&&!location.hash&&state.people.length>0),'');
+ // 깨진 링크
+ await q.goto(FILE+'#s=@@@broken'); await q.waitForTimeout(600);
+ log('AE10 깨진 링크 → 보통 화면·안내',await q.evaluate(()=>!document.body.classList.contains('shared-mode')&&!location.hash),await q.textContent('#toast'));
+ errsOK(p,'AE'); errsOK(q,'AE-q'); await q.context().close(); await p.context().close();}
 
 await b.close();
 const f=results.filter(r=>!r.ok); console.log(`\n총 ${results.length}건 · 통과 ${results.length-f.length} · 실패 ${f.length}`);
