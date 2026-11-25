@@ -273,6 +273,8 @@ th[data-tip]:hover,th[data-tip]:focus{color:var(--accent);outline:none}
 .cand-m .best{background:#e6f4ea}                    /* 세 안 중 그 지표 최고점 */
 .cand-sum{font-size:12px;color:var(--sub)}
 .cand-diff{font-size:12px;color:#8a5a00;background:var(--hl-weak);border-radius:6px;padding:4px 8px}
+/* 선택한 안을 사용자가 고친 상태: 카드는 처음 안 그대로이며, 누르면 처음 안으로 되돌림 */
+.cand-edit{font-size:12px;color:var(--accent);background:var(--accent-weak);border-radius:6px;padding:4px 8px}
 .mini-cal2{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}
 .mini-cal2 .h{font-size:10px;text-align:center;color:var(--sub);font-weight:700}
 .mini-cal2 .c{font-size:11px;border:1px solid #eceff4;border-radius:4px;padding:1px 3px;min-height:34px;line-height:1.25;overflow:hidden}
@@ -1081,7 +1083,7 @@ if (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScop
  *   - <b> 등 강조 태그가 든 원문은 번역문에도 같은 태그를 둡니다(툴팁·정적 HTML 일부).
  *   - 다섯 언어 모두 같은 키를 같은 순서로 두며, 앱 구역(§) 순서로 묶었습니다.
  *   - 키가 없으면 화면에 한국어 원문이 그대로 표시됩니다.
- *   키 498개 × 5개 언어 (en·ja·zh·fr·es). 한국어(ko)는 원문을 그대로 쓰므로 사전이 없습니다.
+ *   키 502개 × 5개 언어 (en·ja·zh·fr·es). 한국어(ko)는 원문을 그대로 쓰므로 사전이 없습니다.
  * ============================================================================= */
 const I18N = {
 /* ──────────────── en: English ──────────────── */
@@ -1610,6 +1612,11 @@ en: {
   "규칙에 어긋나는 날을 빨간 테두리로 표시했습니다: {days}일. 마우스를 올리면 이유가 보이고, [무시]를 누르면 표시가 사라집니다.": "Days that break the rules are outlined in red: {days}. Hover to see why; click [Ignore] to clear the mark.",
   "{a}일 ↔ {b}일 맞바꿈 · DFI {x} → {y}": "Swapped {a} ↔ {b} · DFI {x} → {y}",
   "{a}일 ↔ {b}일 맞바꿈을 취소했습니다.": "Swap {a} ↔ {b} undone.",
+  // ── v1.20: 상위 3개 안 보존·되돌리기 ──
+  "✎ 수정 {n}건 적용 중 · 이 카드를 누르면 처음 {plan}으로 되돌립니다": "✎ {n} {n:edit|edits} applied · click this card to go back to the original {plan}",
+  "{plan}의 처음 배정으로 되돌렸습니다 (수정 {n}건 취소).": "Back to the original {plan} ({n} {n:edit|edits} discarded).",
+  "{plan}을 선택했습니다. 이전 안의 수정 {n}건은 적용되지 않습니다.": "{plan} selected. The {n} {n:edit|edits} to the previous plan are not carried over.",
+  "수정한 당직표를 다시 불러왔습니다.": "Your edited roster is back.",
 },
 /* ──────────────── ja: 日本語 ──────────────── */
 ja: {
@@ -2137,6 +2144,11 @@ ja: {
   "규칙에 어긋나는 날을 빨간 테두리로 표시했습니다: {days}일. 마우스를 올리면 이유가 보이고, [무시]를 누르면 표시가 사라집니다.": "ルールに反する日を赤枠で表示しました:{days}日。マウスを合わせると理由が表示され、[無視]を押すと表示が消えます。",
   "{a}일 ↔ {b}일 맞바꿈 · DFI {x} → {y}": "{a}日 ↔ {b}日を入れ替え · DFI {x} → {y}",
   "{a}일 ↔ {b}일 맞바꿈을 취소했습니다.": "{a}日 ↔ {b}日の入れ替えを取り消しました。",
+  // ── v1.20: 상위 3개 안 보존·되돌리기 ──
+  "✎ 수정 {n}건 적용 중 · 이 카드를 누르면 처음 {plan}으로 되돌립니다": "✎ 修正{n}件を適用中 · このカードを押すと元の{plan}に戻ります",
+  "{plan}의 처음 배정으로 되돌렸습니다 (수정 {n}건 취소).": "{plan}の元の割り当てに戻しました(修正{n}件を取り消し)。",
+  "{plan}을 선택했습니다. 이전 안의 수정 {n}건은 적용되지 않습니다.": "{plan}を選択しました。前の案の修正{n}件は適用されません。",
+  "수정한 당직표를 다시 불러왔습니다.": "修正した当直表を戻しました。",
 },
 /* ──────────────── zh: 中文(简体) ──────────────── */
 zh: {
@@ -2664,6 +2676,11 @@ zh: {
   "규칙에 어긋나는 날을 빨간 테두리로 표시했습니다: {days}일. 마우스를 올리면 이유가 보이고, [무시]를 누르면 표시가 사라집니다.": "已用红框标出违反规则的日期:{days}日。将鼠标移上去可查看原因,点击[忽略]即可清除标记。",
   "{a}일 ↔ {b}일 맞바꿈 · DFI {x} → {y}": "{a}日 ↔ {b}日已互换 · DFI {x} → {y}",
   "{a}일 ↔ {b}일 맞바꿈을 취소했습니다.": "已撤销{a}日 ↔ {b}日的互换。",
+  // ── v1.20: 상위 3개 안 보존·되돌리기 ──
+  "✎ 수정 {n}건 적용 중 · 이 카드를 누르면 처음 {plan}으로 되돌립니다": "✎ 已应用{n}处修改 · 点击此卡片可恢复为原始{plan}",
+  "{plan}의 처음 배정으로 되돌렸습니다 (수정 {n}건 취소).": "已恢复为原始{plan}(撤销{n}处修改)。",
+  "{plan}을 선택했습니다. 이전 안의 수정 {n}건은 적용되지 않습니다.": "已选择{plan}。之前方案的{n}处修改不会保留。",
+  "수정한 당직표를 다시 불러왔습니다.": "已恢复修改后的值班表。",
 },
 /* ──────────────── fr: Français ──────────────── */
 fr: {
@@ -3191,6 +3208,11 @@ fr: {
   "규칙에 어긋나는 날을 빨간 테두리로 표시했습니다: {days}일. 마우스를 올리면 이유가 보이고, [무시]를 누르면 표시가 사라집니다.": "Les jours qui enfreignent les règles sont encadrés en rouge : {days}. Survolez pour voir pourquoi ; cliquez sur [Ignorer] pour effacer.",
   "{a}일 ↔ {b}일 맞바꿈 · DFI {x} → {y}": "Échange {a} ↔ {b} · DFI {x} → {y}",
   "{a}일 ↔ {b}일 맞바꿈을 취소했습니다.": "Échange {a} ↔ {b} annulé.",
+  // ── v1.20: 상위 3개 안 보존·되돌리기 ──
+  "✎ 수정 {n}건 적용 중 · 이 카드를 누르면 처음 {plan}으로 되돌립니다": "✎ {n} {n:modification appliquée|modifications appliquées} · cliquez sur cette carte pour revenir au {plan} d’origine",
+  "{plan}의 처음 배정으로 되돌렸습니다 (수정 {n}건 취소).": "Retour au {plan} d’origine ({n} {n:modification annulée|modifications annulées}).",
+  "{plan}을 선택했습니다. 이전 안의 수정 {n}건은 적용되지 않습니다.": "{plan} sélectionné. Les {n} {n:modification|modifications} du plan précédent ne sont pas reprises.",
+  "수정한 당직표를 다시 불러왔습니다.": "Votre planning modifié est rétabli.",
 },
 /* ──────────────── es: Español ──────────────── */
 es: {
@@ -3718,6 +3740,11 @@ es: {
   "규칙에 어긋나는 날을 빨간 테두리로 표시했습니다: {days}일. 마우스를 올리면 이유가 보이고, [무시]를 누르면 표시가 사라집니다.": "Los días que incumplen las reglas se marcan en rojo: {days}. Pase el ratón para ver el motivo; pulse [Ignorar] para quitar la marca.",
   "{a}일 ↔ {b}일 맞바꿈 · DFI {x} → {y}": "Intercambio {a} ↔ {b} · DFI {x} → {y}",
   "{a}일 ↔ {b}일 맞바꿈을 취소했습니다.": "Intercambio {a} ↔ {b} deshecho.",
+  // ── v1.20: 상위 3개 안 보존·되돌리기 ──
+  "✎ 수정 {n}건 적용 중 · 이 카드를 누르면 처음 {plan}으로 되돌립니다": "✎ {n} {n:cambio aplicado|cambios aplicados} · pulse esta tarjeta para volver al {plan} original",
+  "{plan}의 처음 배정으로 되돌렸습니다 (수정 {n}건 취소).": "Se volvió al {plan} original ({n} {n:cambio descartado|cambios descartados}).",
+  "{plan}을 선택했습니다. 이전 안의 수정 {n}건은 적용되지 않습니다.": "{plan} seleccionado. Los {n} {n:cambio|cambios} del plan anterior no se conservan.",
+  "수정한 당직표를 다시 불러왔습니다.": "Se restauró su cuadrante modificado.",
 }
 };
 </script>
@@ -3762,8 +3789,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.19.0', APP_BUILD = '2026-11-25';
+const APP_VERSION = '1.20.0', APP_BUILD = '2026-11-25';
 const CHANGELOG = [
+  '1.20.0 상위 3개 안은 생성된 그대로 보존하고, 수동 교체·끌어 놓기는 선택한 안의 사본에만 적용. 안 카드를 누르면(선택 중인 안도) 그 안의 처음 배정으로 되돌리며, 버린 수정은 실행 취소로 다시 불러올 수 있음',
   '1.19.0 당직표 달력에서 이름을 다른 날로 끌어 놓아 두 날의 배정을 맞바꾸기(마우스·터치 길게 누르기, 레벨 4의 백업은 함께 이동, DFI 재계산·실행 취소). 처음 규칙에 어긋나면 그 날을 빨간 테두리로 표시하고 [무시]로 지움(✎ 수동 교체도 같음)',
   '1.18.0 레벨 이름 변경: Lv1 교수급 · Lv2 펠로우급 · Lv3 전공의급 · Lv4 신입(백업 필요) (영어: Expert · Senior · Regular · Junior + backup). 조력·조력자 → 백업(현장 용어). 첫 방문 안내 문구 "체험해보세요"',
   '1.17.0 처음 쓰는 사람을 위한 안내: 저장된 명단이 없는 첫 방문에만 맨 위 안내 띠(30초 영상·샘플 체험·닫기, 영상을 보거나 닫거나 생성하면 다시 안 나옴), 머리글에 언제든 영상을 여는 ? 버튼',
@@ -4977,6 +5005,14 @@ function onProgress(p){
   setProg(() => t('{n}회 · 목표 이상 {hits}/{need}안 · {sec} · 현재 최고 DFI {best} ({imp}번째 시도)',
     { n: fmtN(p.attempt), hits: p.hits, need: p.need, sec: fmtSec(ms), best: p.best.toFixed(1), imp: fmtN(p.lastImp) }));
 }
+/**
+ * 상위 3개 안(state.cands)은 생성된 그대로 보존하고, 화면·출력·수동 변경은 그 사본(state.result)에만 적용합니다.
+ * 그래서 안 카드를 누르면 언제든 그 안의 처음 배정으로 돌아갈 수 있습니다.
+ */
+function workingCopy(c){
+  return Object.assign({}, c, { duty: c.duty.slice(), assist: c.assist.slice(), unfilled: c.unfilled.slice(),
+                                edited: new Set(), flags: new Set(), _stats: null });
+}
 /** 시뮬레이션 완료: 결과를 state.cands로 옮기고 화면을 그립니다. */
 function onDone(res){
   welcomeDone();   // 당직표를 한 번 만들었으면 첫 방문 안내는 끝
@@ -4985,7 +5021,7 @@ function onDone(res){
   const cal = Engine.buildCalendar(cfgSnapshot.year, cfgSnapshot.month, cfgSnapshot.holidays), at = new Date();
   state.cands = res.top.map((t, i) => ({ rank: i + 1, cfg: cfgSnapshot, cal, duty: t.duty, assist: t.assist, unfilled: t.unfilled,
     dfi: t.dfi, attempt: t.attempt, edited: new Set(), flags: new Set(), at }));
-  Object.assign(state, { sel: 0, result: state.cands[0], hl: -1, genSig: cfgSig(cfgSnapshot) });
+  Object.assign(state, { sel: 0, result: workingCopy(state.cands[0]), hl: -1, genSig: cfgSig(cfgSnapshot) });
 
   state.run = { ms: performance.now() - runStart, attempts: res.attempts, hist: res.hist, hits: res.hits, stop: res.stop,
                 target: cfgSnapshot.minDFI, max: cfgSnapshot.maxAttempts, min: cfgSnapshot.minAttempts, need: cfgSnapshot.targetHits,
@@ -5262,8 +5298,9 @@ function renderCandidates(){
       : `<div class="cand-sum">${esc(t('{n}번째 시도에서 발견', { n: fmtN(R.attempt) }))}</div>`;
     const label = t('{plan} DFI {v} {g}등급', { plan: planLabel(i + 1), v: D.total.toFixed(1), g: D.grade }) + (sel ? ' ' + t('선택됨') : '');
     const sum = t('정규 {a}~{b}회 · 휴일 {c}~{d}회 · 백업 {e}회 · 미배정 {f}',
-      { a: Math.min(...tot), b: Math.max(...tot), c: Math.min(...hol), d: Math.max(...hol), e: asTot, f: fmtDayCount(R.unfilled.length) }) +
-      (R.edited.size ? ' · ' + t('수정 {n}건', { n: R.edited.size }) : '');
+      { a: Math.min(...tot), b: Math.max(...tot), c: Math.min(...hol), d: Math.max(...hol), e: asTot, f: fmtDayCount(R.unfilled.length) });
+    const nEd = sel && state.result && state.result.edited ? state.result.edited.size : 0;
+    const editLine = nEd ? `<div class="cand-edit">${esc(t('✎ 수정 {n}건 적용 중 · 이 카드를 누르면 처음 {plan}으로 되돌립니다', { n: nEd, plan: planLabel(i + 1) }))}</div>` : '';
 
     return `<div class="cand ${sel ? 'sel' : ''}" data-cand="${i}" role="button" tabindex="0" aria-pressed="${sel}" aria-label="${esc(label)}">
       <div class="cand-top"><span class="cand-rank">${esc(planLabel(i + 1))}</span>${sel ? `<span class="sel-pill">${esc(t('✓ 출력 선택됨'))}</span>` : `<span class="pick-pill">${esc(t('눌러서 선택'))}</span>`}
@@ -5271,6 +5308,7 @@ function renderCandidates(){
       <div class="cand-m">${metrics}</div>
       <div class="cand-sum">${esc(sum)}</div>
       ${diffLine}
+      ${editLine}
       ${state.miniOpen ? miniCalendar(R, i > 0 ? new Set(diffDays) : null) : ''}
     </div>`;
   }).join('') + (C.length < 3 ? `<div class="muted" style="align-self:center">${esc(t('서로 다른 배정안이 {n}개만 나왔습니다. 목표 DFI를 올리거나 늘리거나 제약을 완화하십시오.', { n: C.length }))}</div>` : '');
@@ -5596,15 +5634,22 @@ function renderResults(){
 }
 function selectCand(i){
   if (!state.cands || !state.cands[i]) return;
-  state.sel = i; state.result = state.cands[i]; renderResults();
-  toast(t('{plan}을 선택했습니다. 출력·CSV·수동 교체는 이 안에 적용됩니다.', { plan: planLabel(i + 1) }));
+  const prev = state.result, prevSel = state.sel, nEd = prev && prev.edited ? prev.edited.size : 0;
+  if (i === prevSel && !nEd) return;                       // 이미 선택된 처음 안 그대로: 할 일 없음
+  state.sel = i; state.result = workingCopy(state.cands[i]); renderResults();
+  if (!nEd){ toast(t('{plan}을 선택했습니다. 출력·CSV·수동 교체는 이 안에 적용됩니다.', { plan: planLabel(i + 1) })); return; }
+  const msg = i === prevSel ? t('{plan}의 처음 배정으로 되돌렸습니다 (수정 {n}건 취소).', { plan: planLabel(i + 1), n: nEd })
+                            : t('{plan}을 선택했습니다. 이전 안의 수정 {n}건은 적용되지 않습니다.', { plan: planLabel(i + 1), n: nEd });
+  showUndo(() => msg, () => {
+    state.sel = prevSel; state.result = prev; renderResults(); toast(t('수정한 당직표를 다시 불러왔습니다.'));
+  });
 }
 
 /* 결과 영역 클릭 위임: ✎ 수동 교체 > 이름 강조 > 안 선택 > 통계표 행(강조) > 빈 곳(강조 해제) 순으로 판정 */
 $('#results').addEventListener('click', e => {
   const edit = e.target.closest('[data-edit]'); if (edit){ openEdit(+edit.dataset.edit); return; }
   const nm = e.target.closest('[data-pid]'); if (nm){ setHighlight(+nm.dataset.pid); return; }
-  const cd = e.target.closest('[data-cand]'); if (cd){ if (+cd.dataset.cand !== state.sel) selectCand(+cd.dataset.cand); return; }
+  const cd = e.target.closest('[data-cand]'); if (cd){ selectCand(+cd.dataset.cand); return; }
   const row = e.target.closest('#stats tr[data-row]'); if (row){ setHighlight(+row.dataset.row); return; }   // 통계표 행의 아무 칸
   if (state.hl >= 0 && (e.target.closest('#cal') || e.target.closest('#stats'))) setHighlight(state.hl);
 });
@@ -5613,7 +5658,7 @@ $('#results').addEventListener('keydown', e => {
   const cd = e.target.closest && e.target.closest('[data-cand]');
   if (!cd || e.target !== cd || (e.key !== 'Enter' && e.key !== ' ')) return;
   e.preventDefault();
-  const i = +cd.dataset.cand; if (i !== state.sel) selectCand(i);
+  const i = +cd.dataset.cand; selectCand(i);
   setTimeout(() => { const n = $(`[data-cand="${i}"]`); n && n.focus(); }, 0);
 });
 

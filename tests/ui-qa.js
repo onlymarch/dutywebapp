@@ -2,7 +2,7 @@
  * 인터페이스 오류 탐색 테스트 (Playwright, Chromium)
  * 실행: npx playwright install chromium   (최초 1회)
  *       node tests/ui-qa.js [index.html 경로]
- * 27개 범주(A~Z, AA) 163개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
+ * 28개 범주(A~Z, AA~AB) 168개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
  * 숫자 경계값, 극단적 명단, 날짜 팝오버, 연타·중단, Worker 차단 환경, 수동 교체, 프로필 이름,
  * 저장 전 입력 보존, 대규모 명단, 모바일 배치, 키보드 조작, 출력, 공휴일 입력, 손상된 저장값, 이전 결과 조작,
  * 기간 입력(~와 -의 변형, 날짜 형식 기간, 열린 기간 -5·20-), 실행 요약(소요 시간·개선 기록),
@@ -11,7 +11,8 @@
  * v1.15(X: 내장 공휴일은 한국어에서만, 목표 미달 원인·개선 목록, 통계 기대·차이 툴팁),
  * v1.16(Y: 최하단 사용법 영상 링크와 재생 레이어 열기·언어 전환·닫으면 정지),
  * v1.17(Z: 첫 방문 안내 띠의 표시·종료 조건과 유지, 샘플 체험, 기존 사용자 미표시, 머리글 ? 버튼, 번역),
- * v1.19(AA: 이름 끌어 놓기 맞바꾸기·실행 취소, 규칙 위반 빨간 테두리와 이유·[무시], 언어 전환, ✎ 교체 위반 표시). 첫 실행은 브라우저 언어를 감지해 저장하고, 이후에는 저장된 언어를 씁니다.
+ * v1.19(AA: 이름 끌어 놓기 맞바꾸기·실행 취소, 규칙 위반 빨간 테두리와 이유·[무시], 언어 전환, ✎ 교체 위반 표시),
+ * v1.20(AB: 상위 3개 안 원본 보존, 카드를 누르면 처음 안으로 되돌림·실행 취소, 다른 안 선택). 첫 실행은 브라우저 언어를 감지해 저장하고, 이후에는 저장된 언어를 씁니다.
  * 각 항목은 JS 예외·콘솔 오류·브라우저 기본 대화상자 발생도 함께 실패로 기록합니다.
  */
 
@@ -487,6 +488,24 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
  await p.selectOption('#editDuty',String(tgt[1])); await p.click('#editApply'); await p.waitForTimeout(200);
  log('AA7 ✎ 수동 교체 위반도 빨간 테두리',await p.evaluate(d=>document.querySelector(`#cal [data-day="${d}"]`).classList.contains('violate'),tgt[0]),`${tgt[0]}일`);
  errsOK(p,'AA'); await p.context().close();}
+
+// AB. v1.20: 상위 3개 안은 생성된 그대로 보존 · 카드를 누르면 처음 안으로 되돌림
+{const p=await fresh(b); await p.click('#wClose'); await p.click('#btnSample'); await p.waitForTimeout(300); await gen(p);
+ const o=await p.evaluate(()=>({d:state.cands[0].duty.join(),v:state.cands[0].dfi.total.toFixed(1)}));
+ await p.evaluate(()=>{swapDays(2,10);swapDays(5,20);}); await p.waitForTimeout(200);
+ const m=await p.evaluate(()=>({cand:state.cands[0].duty.join(),res:state.result.duty.join(),card:document.querySelector('[data-cand="0"] .cand-score').textContent,line:!!document.querySelector('[data-cand="0"] .cand-edit')}));
+ log('AB1 수동 변경해도 1안 카드·원본은 그대로',m.cand===o.d&&m.res!==o.d&&m.card===o.v&&m.line,`카드 ${m.card}`);
+ await p.click('[data-cand="0"]'); await p.waitForTimeout(200);
+ const r=await p.evaluate(()=>({res:state.result.duty.join(),ed:state.result.edited.size,viol:document.querySelectorAll('#cal .violate').length,line:!!document.querySelector('.cand-edit'),dfi:state.result.dfi.total.toFixed(1)}));
+ log('AB2 1안 카드를 누르면 처음 1안으로',r.res===o.d&&!r.ed&&!r.viol&&!r.line&&r.dfi===o.v,`DFI ${r.dfi}`);
+ await p.click('#undoBtn'); await p.waitForTimeout(200);
+ log('AB3 실행 취소로 수정한 당직표 복원',await p.evaluate(()=>state.result.edited.size)===4,'');
+ await p.click('[data-cand="1"]'); await p.waitForTimeout(200);
+ const s2=await p.evaluate(()=>({sel:state.sel,same:state.result.duty.join()===state.cands[1].duty.join(),copy:state.result!==state.cands[1],c0:state.cands[0].duty.join()}));
+ log('AB4 다른 안 선택: 그 안의 처음 배정(사본), 1안 원본 유지',s2.sel===1&&s2.same&&s2.copy&&s2.c0===o.d,'');
+ await p.evaluate(()=>swapDays(3,4)); await p.click('[data-cand="0"]'); await p.waitForTimeout(200);
+ log('AB5 2안 수정 후 1안 선택 → 처음 1안',await p.evaluate(()=>state.sel===0&&state.result.duty.join()===state.cands[0].duty.join()&&!state.result.edited.size),'');
+ errsOK(p,'AB'); await p.context().close();}
 
 await b.close();
 const f=results.filter(r=>!r.ok); console.log(`\n총 ${results.length}건 · 통과 ${results.length-f.length} · 실패 ${f.length}`);
