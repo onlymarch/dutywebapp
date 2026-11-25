@@ -17,7 +17,7 @@ A free, single-file web app that builds a month of on-call duty rosters for doct
 
 ![Monthly duty calendar with Duty Fairness Index](assets/screenshot-en.png)
 
-Current version: **v1.22.0** (2026-11-25)
+Current version: **v1.23.0** (2026-11-25)
 
 > This is a scheduling aid. Please have the person responsible check the final roster before publishing it.
 
@@ -83,6 +83,8 @@ Grades: S ≥ 90, A ≥ 80, B ≥ 70, C < 70. Hover (or tap) the ⓘ marks and m
 
 There is no server. Settings and rosters are stored only in your browser (cookies and localStorage) and are never sent anywhere.
 
+**Anonymous usage stats.** On the public site only, the app counts visits and how often features are used, with [GoatCounter](https://www.goatcounter.com/) (no cookies, no personal identifiers). What is sent: the page path and a feature name such as `generate`, `print`, `csv`, `qr-share` or `guide-video`. What is never sent: names, rosters, assignments or settings. Opening a shared link counts as a visit to `?shared` only; the roster after `#` is not sent. Tick **Don't send stats** at the bottom of the page to turn it off in your browser. Nothing is loaded when you open `index.html` as a local file.
+
 - To move to another device or browser, use **JSON backup** and **JSON restore**.
 - **QR / link sharing** puts the roster (names and assignments only) in the part of the link after `#`, which browsers never send to the web server. Anyone who has the QR image or the link can read the names, so share it only with the people who need it.
 - Clearing browser data deletes what you saved. Keep important rosters as JSON files.
@@ -96,7 +98,7 @@ Download `index.html` and open it in a browser. Nothing to install.
 | File | Contents |
 |---|---|
 | `index.html` | The whole app (UI, scheduling engine, DFI, storage, printing, translations) |
-| `tests/ui-qa.js` | UI test suite (31 categories, 185 checks, including all languages) |
+| `tests/ui-qa.js` | UI test suite (32 categories, 191 checks, including all languages) |
 | `README.ko.md` | Korean README |
 | `assets/` | App icon (`favicon.svg`, `favicon-32.png`, `apple-touch-icon.png`), screenshots, link-preview image, promo videos (20 s, landscape and vertical), GIF preview and 30-second guide videos (English, Korean) |
 | `promo/` | Source for the promo and guide videos (screen capture, motion graphics, renderer) |
@@ -118,7 +120,7 @@ npx playwright install chromium
 node tests/ui-qa.js
 ```
 
-The last line should read `총 185건 · 통과 185 · 실패 0` ("185 total · 185 passed · 0 failed"). Tests have been run on Chromium only, not on Safari or iOS.
+The last line should read `총 191건 · 통과 191 · 실패 0` ("191 total · 191 passed · 0 failed"). Tests have been run on Chromium only, not on Safari or iOS.
 
 ## Feedback
 

@@ -2,7 +2,7 @@
  * 인터페이스 오류 탐색 테스트 (Playwright, Chromium)
  * 실행: npx playwright install chromium   (최초 1회)
  *       node tests/ui-qa.js [index.html 경로]
- * 31개 범주(A~Z, AA~AE) 185개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
+ * 32개 범주(A~Z, AA~AF) 191개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
  * 숫자 경계값, 극단적 명단, 날짜 팝오버, 연타·중단, Worker 차단 환경, 수동 교체, 프로필 이름,
  * 저장 전 입력 보존, 대규모 명단, 모바일 배치, 키보드 조작, 출력, 공휴일 입력, 손상된 저장값, 이전 결과 조작,
  * 기간 입력(~와 -의 변형, 날짜 형식 기간, 열린 기간 -5·20-), 실행 요약(소요 시간·개선 기록),
@@ -15,7 +15,8 @@
  * v1.20(AB: 상위 3개 안 원본 보존, 카드를 누르면 처음 안으로 되돌림·실행 취소, 다른 안 선택),
  * v1.20.1(AC: 끌기 시작 시 그 사람 강조, Esc 취소, 출력 옵션 기본값과 기본 출력물),
  * v1.20.2(AD: 실행 그래프의 미배정 안 빨간 속빈 점·하락 점선·설명, 번역),
- * v1.21(AE: QR 공유 링크, 출력물 QR 옵션, 공유받은 보기 전용 화면·강조·저장 데이터 불변·번역·닫기, 깨진 링크). 첫 실행은 브라우저 언어를 감지해 저장하고, 이후에는 저장된 언어를 씁니다.
+ * v1.21(AE: QR 공유 링크, 출력물 QR 옵션, 공유받은 보기 전용 화면·강조·저장 데이터 불변·번역·닫기, 깨진 링크),
+ * v1.23(AF: 익명 사용 통계 — https에서만 로드, 기능 이름만 전송, 이름 미포함, 공유 링크는 ?shared, 보내지 않기, file:// 미요청, 번역). 첫 실행은 브라우저 언어를 감지해 저장하고, 이후에는 저장된 언어를 씁니다.
  * 각 항목은 JS 예외·콘솔 오류·브라우저 기본 대화상자 발생도 함께 실패로 기록합니다.
  */
 
@@ -574,6 +575,35 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
  await q.goto(FILE+'#s=@@@broken'); await q.waitForTimeout(600);
  log('AE10 깨진 링크 → 보통 화면·안내',await q.evaluate(()=>!document.body.classList.contains('shared-mode')&&!location.hash),await q.textContent('#toast'));
  errsOK(p,'AE'); errsOK(q,'AE-q'); await q.context().close(); await p.context().close();}
+
+// AF. v1.23: 익명 사용 통계 — 공개 사이트(https)에서만, 이름 등 데이터는 보내지 않음, 보내지 않기
+{const html=require('fs').readFileSync(FILE.replace('file://',''),'utf8'), BASE='https://onlymarch.github.io/dutywebapp/';
+ const FAKE=`(function(){var g=window.goatcounter||{};window.__gc=[{pv:typeof g.path==='function'?g.path(location.pathname+location.search):location.pathname}];g.count=function(o){window.__gc.push(o)};window.goatcounter=g;})();`;
+ const ctx=await b.newContext({viewport:{width:1280,height:900},locale:'ko-KR'}); const net=[];
+ await ctx.route('**/*',r=>{const u=r.request().url();net.push(u);
+   if(u.startsWith(BASE))return r.fulfill({status:200,contentType:'text/html',body:html});
+   if(u==='https://gc.zgo.at/count.js')return r.fulfill({status:200,contentType:'application/javascript',body:FAKE});
+   return r.abort();});
+ const p=await ctx.newPage(); p.errs=[]; p.on('pageerror',e=>p.errs.push('pageerror: '+e.message));
+ await p.goto(BASE); await p.waitForTimeout(400);
+ await p.click('#wClose'); await p.click('#btnSample'); await p.waitForTimeout(300); await gen(p);
+ await p.click('#btnShare'); await p.waitForTimeout(150); const url=await p.inputValue('#shareLink'); await p.click('#shareClose');
+ const gc=await p.evaluate(()=>window.__gc), names=await p.evaluate(()=>state.people.map(x=>x.name));
+ const evs=gc.filter(x=>x.event).map(x=>x.path);
+ log('AF1 https: 방문 1건 + 기능 이름만',gc[0].pv==='/dutywebapp/'&&evs.includes('ev/generate')&&evs.includes('ev/qr-share')&&gc.every(x=>Object.keys(x).every(k=>['pv','path','title','event'].includes(k))),evs.join(' '));
+ log('AF2 보내는 내용에 이름 없음',!names.some(n=>JSON.stringify(gc).includes(n)),'');
+ const q=await ctx.newPage(); await q.goto(url); await q.waitForTimeout(400);
+ const sv=await q.evaluate(()=>window.__gc[0].pv);
+ log('AF3 공유 링크 방문: 경로만(?shared), # 뒤 미전송',sv==='/dutywebapp/?shared'&&!net.some(u=>u.includes('gc.zgo')&&u.includes('#')),sv);
+ await p.check('#statsOff'); await p.evaluate(()=>{window.__gc=[]}); await p.click('#btnGuide'); await p.keyboard.press('Escape');
+ const n0=await p.evaluate(()=>window.__gc.length); net.length=0; await p.reload(); await p.waitForTimeout(400);
+ log('AF4 [통계 보내지 않기] → 기록 0·새로 고침 후 스크립트도 안 불러옴',n0===0&&!net.some(u=>u.includes('gc.zgo.at'))&&await p.isChecked('#statsOff'),'');
+ errsOK(p,'AF'); await ctx.close();}
+{const p=await fresh(b); const req=[]; p.on('request',r=>req.push(r.url())); await p.reload(); await p.waitForTimeout(300);
+ log('AF5 파일로 열면 통계 요청 없음',!req.some(u=>u.includes('gc.zgo.at'))&&!(await p.$('#gcScript')),'');
+ await p.selectOption('#langSelect','zh'); await p.waitForTimeout(150);
+ log('AF6 안내 문구 번역',!/[가-힣]/.test(await p.textContent('.stats-note')),(await p.textContent('.stats-note')).replace(/\s+/g,' ').trim().slice(0,40));
+ errsOK(p,'AF5'); await p.context().close();}
 
 await b.close();
 const f=results.filter(r=>!r.ok); console.log(`\n총 ${results.length}건 · 통과 ${results.length-f.length} · 실패 ${f.length}`);
