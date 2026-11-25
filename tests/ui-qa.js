@@ -36,7 +36,7 @@ async function fresh(b,opt={}){
 // 슬라이더 값 설정: 브라우저가 격자(min+k×step)에 맞춰 보정하므로 아무 값이나 넣어도 됩니다.
 const setRange=(p,sel,v)=>p.evaluate(([sel,v])=>{const el=document.querySelector(sel);el.value=String(v);el.dispatchEvent(new Event('input'));},[sel,v]);
 const closeDiag=async p=>{ if(await p.$('#diagDialog[open]')) await p.click('#diagClose'); };
-async function gen(p){ /* 시도 횟수는 자동(목표 이상 5안 또는 최대 20,000회) */
+async function gen(p){ /* 시도 횟수는 자동(목표 이상 5안 또는 최대 50,000회) */
   await p.click('#btnGenerate'); await p.waitForFunction(()=>!document.querySelector('#btnGenerate').disabled,null,{timeout:60000}); await p.waitForTimeout(150); await closeDiag(p); }
 const setPeople=(p,people)=>p.evaluate(ps=>{state.people=ps.map(x=>Object.assign(blankPerson(),x));renderRoster();scheduleSave();},people);
 const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.join(' | ')); };
@@ -109,11 +109,11 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
 
 // E. 숫자 입력 경계값
 {const p=await fresh(b); await p.click('#btnSample'); await p.waitForTimeout(300);
- // E1. 시도 횟수 자동: 낮은 목표는 최소 500회에서 멈추고(목표 이상 5안 확보), 도달 불가 목표는 최대 20,000회
+ // E1. 시도 횟수 자동: 낮은 목표는 최소 500회에서 멈추고(목표 이상 5안 확보), 도달 불가 목표는 최대 50,000회
  for(const [v,expStop] of [['50','target'],['60','target'],['100','max']]){ p.errs=[]; await setRange(p,'#minDFI',v);
    await p.click('#btnGenerate'); await p.waitForFunction(()=>!document.querySelector('#btnGenerate').disabled,null,{timeout:60000}); await closeDiag(p);
    const r=await p.evaluate(()=>state.run), t=await p.textContent('#progText');
-   const ok=!p.errs.length&&r.stop===expStop&&(expStop==='max'?r.attempts===20000:r.hits>=5&&r.attempts===500);
+   const ok=!p.errs.length&&r.stop===expStop&&(expStop==='max'?r.attempts===50000:r.hits>=5&&r.attempts===500);
    log('E1 목표 '+v+' → '+expStop,ok,`${r.attempts}회 · ${r.stop} · 목표 이상 ${r.hits}안 · `+t.slice(0,40)); }
  log('E5 시뮬레이션 횟수 설정 없음',!(await p.$('#maxAttempts')),'');
  // 슬라이더 격자 보정: 목표 DFI 50~100(5 단위)
@@ -203,7 +203,7 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
 {const p=await fresh(b); const ps=Array.from({length:40},(_,i)=>({name:'사람'+i,level:1+i%4,wish:String(1+i%28),avoid:String(2+i%27)}));
  await setPeople(p,ps); const t=Date.now(); await gen(p); const ms=Date.now()-t;
  const t2=Date.now(); await p.click('#cal [data-pid]'); const hl=Date.now()-t2;
- log('M1 40명 생성(최대 20,000회)',!p.errs.length&&ms<30000,`${ms}ms, 강조 반응 ${hl}ms`);
+ log('M1 40명 생성(최대 50,000회·5초 제한)',!p.errs.length&&ms<30000,`${ms}ms, 강조 반응 ${hl}ms`);
  errsOK(p,'M'); await p.context().close();}
 
 // N. 모바일: 팝오버·카드·결과
@@ -293,7 +293,7 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
  await p.click('#btnSample'); await p.waitForTimeout(300); await setRange(p,'#minDFI','100'); await p.waitForTimeout(450);
  await p.click('#btnGenerate'); await p.waitForFunction(()=>!document.querySelector('#btnGenerate').disabled,null,{timeout:60000}); await closeDiag(p);
  const r=await p.evaluate(()=>state.run), t=await p.textContent('#progText'), adv=await p.textContent('.run-advice');
- log('V1 5초 제한에서 멈춤',r.stop==='time'&&r.attempts<20000&&/시간 제한/.test(t),`${r.attempts}회 · ${t.slice(0,45)}`);
+ log('V1 5초 제한에서 멈춤',r.stop==='time'&&r.attempts<50000&&/시간 제한/.test(t),`${r.attempts}회 · ${t.slice(0,45)}`);
  log('V2 시간 제한 안내',/느려/.test(adv),adv.slice(0,50));
  errsOK(p,'V'); await p.context().close();}
 

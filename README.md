@@ -17,7 +17,7 @@ A free, single-file web app that builds a month of on-call duty rosters for doct
 
 ![Monthly duty calendar with Duty Fairness Index](assets/screenshot-en.png)
 
-Current version: **v1.21.1** (2026-11-25)
+Current version: **v1.22.0** (2026-11-25)
 
 > This is a scheduling aid. Please have the person responsible check the final roster before publishing it.
 
@@ -57,8 +57,9 @@ Within the same priority, the person with the fewest duties so far in that categ
 You don't set the number of attempts; it depends on the target DFI.
 
 - At least **500** attempts are made. After that, the run stops once **5 different plans** reach the target DFI. A low target finishes near 500 attempts.
-- Otherwise it keeps going up to **20,000** attempts. The higher the target, the longer the search.
-- If the browser is slow, the run stops after **5 seconds** with the best plans found so far (this takes precedence over the 500 minimum).
+- Otherwise it keeps going up to **50,000** attempts. The higher the target, the longer the search. On a typical desktop browser 50,000 attempts take about 1 second (about 50,000 per second).
+- If the browser is slow, the run stops after **5 seconds** with the best plans found so far (this takes precedence over the 500 minimum). On slower phones this time limit may end the run before 50,000 attempts.
+- When the run ends, the summary shows how many attempts were made and why it stopped (target reached / maximum reached / time limit).
 
 ## Duty Fairness Index (DFI)
 
