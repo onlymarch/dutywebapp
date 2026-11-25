@@ -2,7 +2,7 @@
  * 인터페이스 오류 탐색 테스트 (Playwright, Chromium)
  * 실행: npx playwright install chromium   (최초 1회)
  *       node tests/ui-qa.js [index.html 경로]
- * 26개 범주(A~Z) 156개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
+ * 27개 범주(A~Z, AA) 163개 항목: 특수문자·XSS, 생성 중 프로필 전환, 실행 취소 범위, JSON 복원 검증,
  * 숫자 경계값, 극단적 명단, 날짜 팝오버, 연타·중단, Worker 차단 환경, 수동 교체, 프로필 이름,
  * 저장 전 입력 보존, 대규모 명단, 모바일 배치, 키보드 조작, 출력, 공휴일 입력, 손상된 저장값, 이전 결과 조작,
  * 기간 입력(~와 -의 변형, 날짜 형식 기간, 열린 기간 -5·20-), 실행 요약(소요 시간·개선 기록),
@@ -10,7 +10,8 @@
  *   결과 표시 중 재전환, 새로 고침 후 유지, 360px 가로 넘침, 12月25日 형식 해석),
  * v1.15(X: 내장 공휴일은 한국어에서만, 목표 미달 원인·개선 목록, 통계 기대·차이 툴팁),
  * v1.16(Y: 최하단 사용법 영상 링크와 재생 레이어 열기·언어 전환·닫으면 정지),
- * v1.17(Z: 첫 방문 안내 띠의 표시·종료 조건과 유지, 샘플 체험, 기존 사용자 미표시, 머리글 ? 버튼, 번역). 첫 실행은 브라우저 언어를 감지해 저장하고, 이후에는 저장된 언어를 씁니다.
+ * v1.17(Z: 첫 방문 안내 띠의 표시·종료 조건과 유지, 샘플 체험, 기존 사용자 미표시, 머리글 ? 버튼, 번역),
+ * v1.19(AA: 이름 끌어 놓기 맞바꾸기·실행 취소, 규칙 위반 빨간 테두리와 이유·[무시], 언어 전환, ✎ 교체 위반 표시). 첫 실행은 브라우저 언어를 감지해 저장하고, 이후에는 저장된 언어를 씁니다.
  * 각 항목은 JS 예외·콘솔 오류·브라우저 기본 대화상자 발생도 함께 실패로 기록합니다.
  */
 
@@ -444,6 +445,48 @@ const errsOK=(p,id)=>{ if(p.errs.length) log(id+' 오류없음',false,p.errs.joi
  const tx=await p.evaluate(()=>document.querySelector('#welcome').textContent+document.querySelector('#btnHelp').title);
  log('Z8 다른 언어: 안내 띠·? 버튼 번역',!/[가-힣]/.test(tx),tx.replace(/\s+/g,' ').trim().slice(0,70));
  errsOK(p,'Z8'); await p.context().close();}
+
+// AA. v1.19: 이름 끌어 놓기 맞바꾸기 · 규칙 위반 빨간 테두리 · [무시]
+{const p=await fresh(b); await p.click('#wClose'); await p.click('#btnSample'); await p.waitForTimeout(300); await gen(p);
+ await p.evaluate(()=>document.querySelector('#cal').scrollIntoView({block:'center'})); await p.waitForTimeout(150);
+ const drag=async(a,c)=>{const sb=await (await p.$(`#cal [data-day="${a}"] .duty-name`)).boundingBox(),db=await (await p.$(`#cal [data-day="${c}"]`)).boundingBox();
+   await p.mouse.move(sb.x+sb.width/2,sb.y+sb.height/2);await p.mouse.down();await p.mouse.move(sb.x+20,sb.y+10,{steps:3});
+   await p.mouse.move(db.x+db.width/2,db.y+db.height/2,{steps:6});await p.mouse.up();await p.waitForTimeout(250);};
+ // 규칙에 맞는 맞바꿈 / 어긋나는 맞바꿈 날 쌍을 규칙 점검 함수로 찾기
+ const pair=await p.evaluate(()=>{const R=state.result,N=R.cal.N,P=R.cfg.people;let ok=null,bad=null;
+   for(let a=1;a<=N&&(!ok||!bad);a++)for(let c=a+1;c<=N;c++){if(R.duty[a]<0||R.duty[c]<0||R.duty[a]===R.duty[c])continue;
+     if(P[R.duty[a]].level>=4||P[R.duty[c]].level>=4)continue;
+     const d=R.duty.slice();[d[a],d[c]]=[d[c],d[a]];const T={...R,duty:d};
+     const v=ruleViolations(T,a,d[a],-1).length+ruleViolations(T,c,d[c],-1).length;
+     if(!v&&!ok)ok=[a,c];if(v&&!bad)bad=[a,c];}
+   return {ok,bad};});
+ const dutyAt=pr=>p.evaluate(([a,c])=>[state.result.duty[a],state.result.duty[c]],pr);
+ const b0=await dutyAt(pair.ok);
+ await drag(...pair.ok);
+ const s1=await dutyAt(pair.ok), u1=await p.evaluate(()=>!document.querySelector('#undoBar').classList.contains('hidden')), hl1=await p.evaluate(()=>state.hl);
+ log('AA1 끌어 놓기 → 두 날 맞바꿈·실행 취소 막대',s1[0]===b0[1]&&s1[1]===b0[0]&&u1&&hl1<0,pair.ok.join('↔'));
+ await p.click('#undoBtn'); await p.waitForTimeout(200);
+ log('AA2 실행 취소로 원래대로',JSON.stringify(await dutyAt(pair.ok))===JSON.stringify(b0),'');
+ await drag(...pair.bad);
+ const v=await p.$$eval('#cal .cell.violate',x=>x.map(c=>[c.dataset.day,c.title,!!c.querySelector('[data-ignore]')]));
+ log('AA3 규칙 위반 → 빨간 테두리·이유·[무시]',v.length>=1&&v.every(x=>x[1].includes('⚠️')&&x[2]),v.map(x=>x[0]+': '+x[1].slice(0,30)).join(' / '));
+ await p.selectOption('#langSelect','en'); await p.waitForTimeout(150);
+ const enT=await p.$$eval('#cal .cell.violate',x=>x.map(c=>c.title+c.textContent).join(''));
+ log('AA4 언어 전환 시 이유·버튼 번역',!/[가-힣]/.test(enT)&&/Ignore/.test(enT),enT.slice(0,60));
+ await p.selectOption('#langSelect','ko'); await p.waitForTimeout(150);
+ await p.click('#cal [data-ignore]'); await p.waitForTimeout(150);
+ log('AA5 [무시] → 그 날 빨간 표시만 사라짐',(await p.$$('#cal .cell.violate')).length===v.length-1,'');
+ // 같은 칸 안에서 놓으면 변화 없음, 끌기 뒤 클릭으로 강조되지 않음
+ const d0=await p.evaluate(()=>state.result.duty.join());
+ const sb=await (await p.$('#cal [data-day="1"] .duty-name')).boundingBox();
+ await p.mouse.move(sb.x+5,sb.y+5);await p.mouse.down();await p.mouse.move(sb.x+15,sb.y+8,{steps:3});await p.mouse.up();await p.waitForTimeout(150);
+ log('AA6 같은 칸에 놓으면 변화 없음·강조 안 됨',(await p.evaluate(()=>state.result.duty.join()))===d0&&(await p.evaluate(()=>state.hl))<0,'');
+ // ✎ 수동 교체: 전날 당직자(레벨 2~3)를 다음 날에 넣으면 배정 제외일 위반 → 빨간 테두리
+ const tgt=await p.evaluate(()=>{const R=state.result,P=R.cfg.people;for(let d=2;d<=R.cal.N;d++){const k=R.duty[d-1];if(k>=0&&P[k].level>1&&P[k].level<4&&R.duty[d]!==k&&!R.flags.has(d))return [d,k];}return null;});
+ await p.click(`#cal [data-edit="${tgt[0]}"]`); await p.waitForTimeout(150);
+ await p.selectOption('#editDuty',String(tgt[1])); await p.click('#editApply'); await p.waitForTimeout(200);
+ log('AA7 ✎ 수동 교체 위반도 빨간 테두리',await p.evaluate(d=>document.querySelector(`#cal [data-day="${d}"]`).classList.contains('violate'),tgt[0]),`${tgt[0]}일`);
+ errsOK(p,'AA'); await p.context().close();}
 
 await b.close();
 const f=results.filter(r=>!r.ok); console.log(`\n총 ${results.length}건 · 통과 ${results.length-f.length} · 실패 ${f.length}`);

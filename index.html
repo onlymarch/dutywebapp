@@ -292,6 +292,16 @@ th[data-tip]:hover,th[data-tip]:focus{color:var(--accent);outline:none}
 .cell.empty{border:none;background:transparent}
 .cell.unfilled{outline:2px dashed var(--bad)}
 .cell.edited::after{content:attr(data-edited);position:absolute;right:4px;bottom:3px;font-size:9px;color:var(--warn)}
+/* 드래그앤드롭 교체: 끌 수 있는 이름, 놓을 칸, 끌고 있는 이름표 */
+#cal .duty-name{cursor:grab;touch-action:manipulation}
+body.dnd-on, body.dnd-on *{cursor:grabbing!important;user-select:none;-webkit-user-select:none}
+.cell.drag-src{opacity:.45}
+.cell.drop-target{outline:2px solid var(--accent);outline-offset:-1px;background:var(--accent-weak)}
+.dnd-ghost{position:fixed;z-index:60;pointer-events:none;padding:4px 10px;border-radius:8px;background:#1d2330;color:#fff;font-size:13px;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.25);transform:translate(-50%,-120%);white-space:nowrap}
+/* 교체 후 규칙 위반: 빨간 테두리 + [무시] (화면에서만, 인쇄 제외) */
+@media screen{ .cell.violate{box-shadow:inset 0 0 0 2px var(--bad);border-color:var(--bad)} }
+.ign-btn{align-self:flex-start;margin-top:auto;border:1px solid var(--bad);background:#fff;color:var(--bad);border-radius:6px;padding:0 6px;font-size:10.5px;line-height:16px;cursor:pointer}
+.ign-btn:hover{background:#fdecec}
 .cell-top{display:flex;justify-content:space-between;align-items:center;gap:2px;min-width:0}
 .dnum{font-size:12px;font-weight:700;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hname{color:var(--bad);font-size:10px;font-weight:600;margin-left:2px}
@@ -376,6 +386,7 @@ dialog h3{margin:0 0 10px;font-size:16px}
 dialog ul{padding-left:18px;margin:6px 0}
 .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#1d2330;color:#fff;padding:9px 14px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:50;max-width:92vw}
 .toast.show{opacity:1}
+.undo-bar:not(.hidden) ~ .toast{bottom:70px}   /* 실행 취소 막대가 떠 있으면 안내는 그 위로 */
 .undo-bar{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#1d2330;color:#fff;padding:8px 10px 8px 14px;border-radius:10px;font-size:13px;z-index:60;display:flex;gap:10px;align-items:center;max-width:92vw}
 .undo-bar button{background:#fff;color:#1d2330;border:none;padding:4px 10px;font-weight:700}
 .tip{position:fixed;z-index:70;max-width:min(360px,92vw);background:#1d2330;color:#fff;border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.55;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .12s}
@@ -557,7 +568,7 @@ body.printing-sheet #printSheet{display:block}
   </section>
   <div class="cal-row">
   <section class="card">
-    <h2>📅 <span class="sel-tag" id="selTag" data-i18n-skip>1안</span> <span id="calTitle" data-i18n-skip>월간 당직</span> <span class="muted">이름 클릭 → 강조 · 빈 곳 클릭 → 해제 · ✎ → 수동 교체</span></h2>
+    <h2>📅 <span class="sel-tag" id="selTag" data-i18n-skip>1안</span> <span id="calTitle" data-i18n-skip>월간 당직</span> <span class="muted">이름 클릭 → 강조 · 빈 곳 클릭 → 해제 · 이름을 다른 날로 끌어 놓기 → 맞바꾸기 · ✎ → 수동 교체</span></h2>
     <div class="hl-info hidden" id="hlInfo"></div>
     <div class="cal" id="cal"></div>
   </section>
@@ -1070,7 +1081,7 @@ if (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScop
  *   - <b> 등 강조 태그가 든 원문은 번역문에도 같은 태그를 둡니다(툴팁·정적 HTML 일부).
  *   - 다섯 언어 모두 같은 키를 같은 순서로 두며, 앱 구역(§) 순서로 묶었습니다.
  *   - 키가 없으면 화면에 한국어 원문이 그대로 표시됩니다.
- *   키 493개 × 5개 언어 (en·ja·zh·fr·es). 한국어(ko)는 원문을 그대로 쓰므로 사전이 없습니다.
+ *   키 498개 × 5개 언어 (en·ja·zh·fr·es). 한국어(ko)는 원문을 그대로 쓰므로 사전이 없습니다.
  * ============================================================================= */
 const I18N = {
 /* ──────────────── en: English ──────────────── */
@@ -1502,7 +1513,6 @@ en: {
   "다시 생성": "Regenerate",
   "🏆 DFI 상위 3개 안": "🏆 Top 3 plans by DFI",
   "카드를 눌러 출력할 안을 선택합니다.": "Click a card to choose the plan to output.",
-  "이름 클릭 → 강조 · 빈 곳 클릭 → 해제 · ✎ → 수동 교체": "click a name → highlight · click empty space → clear · ✎ → manual swap",
   "⚖️ 당직 공정성 지수": "⚖️ Duty Fairness Index",
   "DFI 설명": "About DFI",
   "📊 근무자별 통계": "📊 Statistics by staff",
@@ -1593,6 +1603,13 @@ en: {
   "샘플로 체험하기": "Try with sample data",
   "닫기 (머리글의 ? 버튼으로 언제든 볼 수 있습니다)": "Close (you can always open the video with the ? button at the top)",
   "사용법 영상은 머리글의 ? 버튼으로 언제든 볼 수 있습니다.": "You can open the video guide any time with the ? button at the top.",
+  // ── v1.19: 이름 끌어 놓기 맞바꾸기·규칙 위반 표시 ──
+  "이름 클릭 → 강조 · 빈 곳 클릭 → 해제 · 이름을 다른 날로 끌어 놓기 → 맞바꾸기 · ✎ → 수동 교체": "click a name → highlight · click empty space → clear · drag a name onto another day → swap · ✎ → manual swap",
+  "무시": "Ignore",
+  "규칙 위반 표시를 지웁니다(배정은 그대로).": "Clear the rule warning (the assignment stays).",
+  "규칙에 어긋나는 날을 빨간 테두리로 표시했습니다: {days}일. 마우스를 올리면 이유가 보이고, [무시]를 누르면 표시가 사라집니다.": "Days that break the rules are outlined in red: {days}. Hover to see why; click [Ignore] to clear the mark.",
+  "{a}일 ↔ {b}일 맞바꿈 · DFI {x} → {y}": "Swapped {a} ↔ {b} · DFI {x} → {y}",
+  "{a}일 ↔ {b}일 맞바꿈을 취소했습니다.": "Swap {a} ↔ {b} undone.",
 },
 /* ──────────────── ja: 日本語 ──────────────── */
 ja: {
@@ -2023,7 +2040,6 @@ ja: {
   "다시 생성": "再作成",
   "🏆 DFI 상위 3개 안": "🏆 DFI 上位3案",
   "카드를 눌러 출력할 안을 선택합니다.": "カードをクリックして出力する案を選びます。",
-  "이름 클릭 → 강조 · 빈 곳 클릭 → 해제 · ✎ → 수동 교체": "名前をクリック → 強調 · 空白をクリック → 解除 · ✎ → 手動入れ替え",
   "⚖️ 당직 공정성 지수": "⚖️ 当直公平性指数",
   "DFI 설명": "DFI の説明",
   "📊 근무자별 통계": "📊 担当者別統計",
@@ -2114,6 +2130,13 @@ ja: {
   "샘플로 체험하기": "サンプルで試す",
   "닫기 (머리글의 ? 버튼으로 언제든 볼 수 있습니다)": "閉じる(上部の ? ボタンでいつでも見られます)",
   "사용법 영상은 머리글의 ? 버튼으로 언제든 볼 수 있습니다.": "使い方動画は上部の ? ボタンでいつでも見られます。",
+  // ── v1.19: 이름 끌어 놓기 맞바꾸기·규칙 위반 표시 ──
+  "이름 클릭 → 강조 · 빈 곳 클릭 → 해제 · 이름을 다른 날로 끌어 놓기 → 맞바꾸기 · ✎ → 수동 교체": "名前をクリック → 強調 · 空白をクリック → 解除 · 名前を別の日へドラッグ → 入れ替え · ✎ → 手動入れ替え",
+  "무시": "無視",
+  "규칙 위반 표시를 지웁니다(배정은 그대로).": "ルール違反の表示を消します(割り当てはそのまま)。",
+  "규칙에 어긋나는 날을 빨간 테두리로 표시했습니다: {days}일. 마우스를 올리면 이유가 보이고, [무시]를 누르면 표시가 사라집니다.": "ルールに反する日を赤枠で表示しました:{days}日。マウスを合わせると理由が表示され、[無視]を押すと表示が消えます。",
+  "{a}일 ↔ {b}일 맞바꿈 · DFI {x} → {y}": "{a}日 ↔ {b}日を入れ替え · DFI {x} → {y}",
+  "{a}일 ↔ {b}일 맞바꿈을 취소했습니다.": "{a}日 ↔ {b}日の入れ替えを取り消しました。",
 },
 /* ──────────────── zh: 中文(简体) ──────────────── */
 zh: {
@@ -2544,7 +2567,6 @@ zh: {
   "다시 생성": "重新生成",
   "🏆 DFI 상위 3개 안": "🏆 DFI 前 3 个方案",
   "카드를 눌러 출력할 안을 선택합니다.": "点击卡片选择要输出的方案。",
-  "이름 클릭 → 강조 · 빈 곳 클릭 → 해제 · ✎ → 수동 교체": "点击姓名 → 高亮 · 点击空白处 → 取消 · ✎ → 手动调换",
   "⚖️ 당직 공정성 지수": "⚖️ 值班公平指数",
   "DFI 설명": "DFI 说明",
   "📊 근무자별 통계": "📊 人员统计",
@@ -2635,6 +2657,13 @@ zh: {
   "샘플로 체험하기": "用示例体验",
   "닫기 (머리글의 ? 버튼으로 언제든 볼 수 있습니다)": "关闭(随时可点顶部的 ? 按钮观看)",
   "사용법 영상은 머리글의 ? 버튼으로 언제든 볼 수 있습니다.": "随时可点击顶部的 ? 按钮观看使用视频。",
+  // ── v1.19: 이름 끌어 놓기 맞바꾸기·규칙 위반 표시 ──
+  "이름 클릭 → 강조 · 빈 곳 클릭 → 해제 · 이름을 다른 날로 끌어 놓기 → 맞바꾸기 · ✎ → 수동 교체": "点击姓名 → 高亮 · 点击空白 → 取消 · 将姓名拖到另一天 → 互换 · ✎ → 手动替换",
+  "무시": "忽略",
+  "규칙 위반 표시를 지웁니다(배정은 그대로).": "清除规则冲突标记(排班保持不变)。",
+  "규칙에 어긋나는 날을 빨간 테두리로 표시했습니다: {days}일. 마우스를 올리면 이유가 보이고, [무시]를 누르면 표시가 사라집니다.": "已用红框标出违反规则的日期:{days}日。将鼠标移上去可查看原因,点击[忽略]即可清除标记。",
+  "{a}일 ↔ {b}일 맞바꿈 · DFI {x} → {y}": "{a}日 ↔ {b}日已互换 · DFI {x} → {y}",
+  "{a}일 ↔ {b}일 맞바꿈을 취소했습니다.": "已撤销{a}日 ↔ {b}日的互换。",
 },
 /* ──────────────── fr: Français ──────────────── */
 fr: {
@@ -3065,7 +3094,6 @@ fr: {
   "다시 생성": "Régénérer",
   "🏆 DFI 상위 3개 안": "🏆 Les 3 meilleurs plans (DFI)",
   "카드를 눌러 출력할 안을 선택합니다.": "Cliquez sur une carte pour choisir le plan à imprimer.",
-  "이름 클릭 → 강조 · 빈 곳 클릭 → 해제 · ✎ → 수동 교체": "clic sur un nom → mise en évidence · clic ailleurs → effacer · ✎ → échange manuel",
   "⚖️ 당직 공정성 지수": "⚖️ Indice d'équité des gardes",
   "DFI 설명": "À propos du DFI",
   "📊 근무자별 통계": "📊 Statistiques par personne",
@@ -3156,6 +3184,13 @@ fr: {
   "샘플로 체험하기": "Essayer avec l’exemple",
   "닫기 (머리글의 ? 버튼으로 언제든 볼 수 있습니다)": "Fermer (la vidéo reste accessible avec le bouton ? en haut)",
   "사용법 영상은 머리글의 ? 버튼으로 언제든 볼 수 있습니다.": "Le guide vidéo reste accessible à tout moment avec le bouton ? en haut.",
+  // ── v1.19: 이름 끌어 놓기 맞바꾸기·규칙 위반 표시 ──
+  "이름 클릭 → 강조 · 빈 곳 클릭 → 해제 · 이름을 다른 날로 끌어 놓기 → 맞바꾸기 · ✎ → 수동 교체": "cliquer un nom → surligner · cliquer ailleurs → effacer · glisser un nom sur un autre jour → échanger · ✎ → échange manuel",
+  "무시": "Ignorer",
+  "규칙 위반 표시를 지웁니다(배정은 그대로).": "Effacer l’alerte de règle (l’affectation reste).",
+  "규칙에 어긋나는 날을 빨간 테두리로 표시했습니다: {days}일. 마우스를 올리면 이유가 보이고, [무시]를 누르면 표시가 사라집니다.": "Les jours qui enfreignent les règles sont encadrés en rouge : {days}. Survolez pour voir pourquoi ; cliquez sur [Ignorer] pour effacer.",
+  "{a}일 ↔ {b}일 맞바꿈 · DFI {x} → {y}": "Échange {a} ↔ {b} · DFI {x} → {y}",
+  "{a}일 ↔ {b}일 맞바꿈을 취소했습니다.": "Échange {a} ↔ {b} annulé.",
 },
 /* ──────────────── es: Español ──────────────── */
 es: {
@@ -3586,7 +3621,6 @@ es: {
   "다시 생성": "Volver a generar",
   "🏆 DFI 상위 3개 안": "🏆 Los 3 mejores planes (DFI)",
   "카드를 눌러 출력할 안을 선택합니다.": "Haga clic en una tarjeta para elegir el plan a imprimir.",
-  "이름 클릭 → 강조 · 빈 곳 클릭 → 해제 · ✎ → 수동 교체": "clic en un nombre → resaltar · clic en un espacio vacío → quitar · ✎ → cambio manual",
   "⚖️ 당직 공정성 지수": "⚖️ Índice de equidad de guardias",
   "DFI 설명": "Acerca del DFI",
   "📊 근무자별 통계": "📊 Estadísticas por persona",
@@ -3677,6 +3711,13 @@ es: {
   "샘플로 체험하기": "Probar con el ejemplo",
   "닫기 (머리글의 ? 버튼으로 언제든 볼 수 있습니다)": "Cerrar (puede ver el vídeo cuando quiera con el botón ? de arriba)",
   "사용법 영상은 머리글의 ? 버튼으로 언제든 볼 수 있습니다.": "Puede abrir el vídeo guía en cualquier momento con el botón ? de arriba.",
+  // ── v1.19: 이름 끌어 놓기 맞바꾸기·규칙 위반 표시 ──
+  "이름 클릭 → 강조 · 빈 곳 클릭 → 해제 · 이름을 다른 날로 끌어 놓기 → 맞바꾸기 · ✎ → 수동 교체": "clic en un nombre → resaltar · clic en un espacio vacío → quitar · arrastrar un nombre a otro día → intercambiar · ✎ → cambio manual",
+  "무시": "Ignorar",
+  "규칙 위반 표시를 지웁니다(배정은 그대로).": "Quitar el aviso de regla (la asignación se mantiene).",
+  "규칙에 어긋나는 날을 빨간 테두리로 표시했습니다: {days}일. 마우스를 올리면 이유가 보이고, [무시]를 누르면 표시가 사라집니다.": "Los días que incumplen las reglas se marcan en rojo: {days}. Pase el ratón para ver el motivo; pulse [Ignorar] para quitar la marca.",
+  "{a}일 ↔ {b}일 맞바꿈 · DFI {x} → {y}": "Intercambio {a} ↔ {b} · DFI {x} → {y}",
+  "{a}일 ↔ {b}일 맞바꿈을 취소했습니다.": "Intercambio {a} ↔ {b} deshecho.",
 }
 };
 </script>
@@ -3721,8 +3762,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
 /* 버전: 기능이 바뀔 때마다 갱신합니다. 변경 이력은 화면에 표시하지 않고 코드에만 기록합니다. */
-const APP_VERSION = '1.18.0', APP_BUILD = '2026-11-25';
+const APP_VERSION = '1.19.0', APP_BUILD = '2026-11-25';
 const CHANGELOG = [
+  '1.19.0 당직표 달력에서 이름을 다른 날로 끌어 놓아 두 날의 배정을 맞바꾸기(마우스·터치 길게 누르기, 레벨 4의 백업은 함께 이동, DFI 재계산·실행 취소). 처음 규칙에 어긋나면 그 날을 빨간 테두리로 표시하고 [무시]로 지움(✎ 수동 교체도 같음)',
   '1.18.0 레벨 이름 변경: Lv1 교수급 · Lv2 펠로우급 · Lv3 전공의급 · Lv4 신입(백업 필요) (영어: Expert · Senior · Regular · Junior + backup). 조력·조력자 → 백업(현장 용어). 첫 방문 안내 문구 "체험해보세요"',
   '1.17.0 처음 쓰는 사람을 위한 안내: 저장된 명단이 없는 첫 방문에만 맨 위 안내 띠(30초 영상·샘플 체험·닫기, 영상을 보거나 닫거나 생성하면 다시 안 나옴), 머리글에 언제든 영상을 여는 ? 버튼',
   '1.16.1 파비콘 추가(파란 달력·체크 표시): 브라우저 탭·즐겨찾기·iOS 홈 화면 아이콘',
@@ -4942,7 +4984,7 @@ function onDone(res){
   if (res.error){ setProg(() => t('중단: 사전 검증 실패')); showError(simErrorText(res)); return; }
   const cal = Engine.buildCalendar(cfgSnapshot.year, cfgSnapshot.month, cfgSnapshot.holidays), at = new Date();
   state.cands = res.top.map((t, i) => ({ rank: i + 1, cfg: cfgSnapshot, cal, duty: t.duty, assist: t.assist, unfilled: t.unfilled,
-    dfi: t.dfi, attempt: t.attempt, edited: new Set(), at }));
+    dfi: t.dfi, attempt: t.attempt, edited: new Set(), flags: new Set(), at }));
   Object.assign(state, { sel: 0, result: state.cands[0], hl: -1, genSig: cfgSig(cfgSnapshot) });
 
   state.run = { ms: performance.now() - runStart, attempts: res.attempts, hist: res.hist, hits: res.hits, stop: res.stop,
@@ -5256,9 +5298,11 @@ function renderCalendar(R){
     const day = R.cal.days[d], k = R.duty[d], a = R.assist[d];
     const hn = day.isPub ? holName(R.cfg.year, R.cfg.month, d) : '';
     const hs = day.isPub ? holShort(R.cfg.year, R.cfg.month, d) : '';     // 칸에는 짧은 이름(대체공휴일 → 대체)
-    const cls = ['cell', dayClass(day), k < 0 ? 'unfilled' : '', R.edited.has(d) ? 'edited' : ''].join(' ');
+    // 교체 후 규칙 위반으로 표시된 날: 이유는 그릴 때마다 현재 언어로 다시 만듦 (무시하면 표시에서 빠짐)
+    const fv = R.flags && R.flags.has(d) && k >= 0 ? ruleViolations(R, d, k, a) : [], fl = fv.length ? fv : null;
+    const cls = ['cell', dayClass(day), k < 0 ? 'unfilled' : '', R.edited.has(d) ? 'edited' : '', fl ? 'violate' : ''].join(' ');
     // data-edited: 수정한 칸 오른쪽 아래 표시 글자 (CSS ::after가 attr()로 읽음)
-    h += `<div class="${cls}" data-day="${d}"${R.edited.has(d) ? ` data-edited="${editLbl}"` : ''}><div class="cell-top">` +
+    h += `<div class="${cls}" data-day="${d}"${R.edited.has(d) ? ` data-edited="${editLbl}"` : ''}${fl ? ` title="${esc('⚠️ ' + fl.join('\n⚠️ '))}"` : ''}><div class="cell-top">` +
          `<span class="dnum" title="${esc(hn)}">${d}${hn ? `<span class="hname">${esc(hs)}</span>` : ''}</span>` +
          `<button type="button" class="edit-btn no-print" data-edit="${d}" title="${swapLbl}" aria-label="${esc(t('{date} 수동 교체', { date: fmtMD(R.cfg.month, d) }))}">✎</button></div>`;
     h += k >= 0
@@ -5269,6 +5313,7 @@ function renderCalendar(R){
         ? `<button type="button" class="nm-btn assist-name ${hlCls(a)}" data-pid="${a}" aria-pressed="${state.hl === a}">(${esc(P[a].name)})</button>`
         : `<span class="assist-name" style="color:var(--bad)">${esc(t('(백업 없음)'))}</span>`;
     }
+    if (fl) h += `<button type="button" class="ign-btn no-print" data-ignore="${d}" title="${esc(t('규칙 위반 표시를 지웁니다(배정은 그대로).'))}">${esc(t('무시'))}</button>`;
     h += '</div>';
   }
   const cal = $('#cal'); cal.innerHTML = h; cal.classList.toggle('has-hl', state.hl >= 0);
@@ -5594,9 +5639,12 @@ function fillAssist(){
   $('#editAssist').innerHTML = `<option value="-1">${esc(t('— 없음 —'))}</option>` +
     R.cfg.people.map((p, i) => p.level === 3 ? `<option value="${i}" ${cur === i ? 'selected' : ''}>${esc(p.name)}</option>` : '').join('');
 }
-/** 선택한 사람이 규칙을 어기는지 확인 (엔진 1단계 조건과 같은 기준) */
-function checkEdit(){
-  const R = state.result, d = editDay, k = +$('#editDuty').value, a = +$('#editAssist').value, w = [];
+/**
+ * d일에 정규 k(백업 a)를 두면 어기는 처음 규칙 목록 (엔진 1단계 조건과 같은 기준).
+ * R.duty의 다른 날 배정을 기준으로 한도·배정 제외일을 셉니다. 빈 배열이면 규칙에 맞습니다.
+ */
+function ruleViolations(R, d, k, a){
+  const w = [];
   if (k >= 0){
     const p = R.cfg.people[k], day = R.cal.days[d];
     if (p.avoid.includes(d)) w.push(t('제외일입니다.'));
@@ -5622,6 +5670,11 @@ function checkEdit(){
       else if (R.duty[d - 1] === a) w.push(t('백업이 전날 정규 당직자입니다.'));
     }
   }
+  return w;
+}
+/** 대화상자에서 고른 사람이 규칙을 어기는지 표시 */
+function checkEdit(){
+  const R = state.result, w = ruleViolations(R, editDay, +$('#editDuty').value, +$('#editAssist').value);
   $('#editWarn').innerHTML = w.length ? '⚠️ ' + w.map(esc).join('<br>⚠️ ') + `<br><span class="muted">${esc(t('경고가 있어도 적용할 수 있습니다. 적용 후 실행 취소할 수 있습니다.'))}</span>` : '';
 }
 $('#editDuty').addEventListener('change', () => { fillAssist(); checkEdit(); });
@@ -5630,19 +5683,126 @@ $('#editCancel').addEventListener('click', () => $('#editDialog').close());
 $('#editApply').addEventListener('click', () => {
   const R = state.result, d = editDay, k = +$('#editDuty').value;
   // 실행 취소용 스냅샷 (배열·Set은 복사본으로)
-  const snap = { duty: R.duty.slice(), assist: R.assist.slice(), unfilled: R.unfilled.slice(), edited: new Set(R.edited), dfi: R.dfi };
+  const snap = snapshot(R);
   R.duty[d] = k;
   R.assist[d] = (k >= 0 && R.cfg.people[k].level >= 4) ? +$('#editAssist').value : -1;
-  R.unfilled = []; for (let i = 1; i <= R.cal.N; i++) if (R.duty[i] < 0) R.unfilled.push(i);
-  R.edited.add(d);
-  R.dfi = Engine.computeDFI(R.cfg, R.cal, R.duty, R.assist);
-  invalidate(R);
+  afterChange(R, [d]);
   $('#editDialog').close(); renderResults();
   const before = snap.dfi.total.toFixed(1), after = R.dfi.total.toFixed(1);
   showUndo(() => t('{d}일 교체 · DFI {a} → {b}', { d, a: before, b: after }), () => {
     Object.assign(R, snap); invalidate(R); renderResults(); toast(t('{d}일 교체를 취소했습니다.', { d }));
   });
 });
+
+/* ---- 14-2. 수동 변경 공용: 스냅샷(실행 취소)·재계산·위반 표시 ---- */
+function snapshot(R){
+  return { duty: R.duty.slice(), assist: R.assist.slice(), unfilled: R.unfilled.slice(), edited: new Set(R.edited),
+           flags: new Set(R.flags || []), dfi: R.dfi };
+}
+/**
+ * 배정을 바꾼 뒤 공통 처리: 미배정 목록·DFI 다시 계산, 바꾼 날은 '수정' 표시.
+ * 위반 표시: 바꾼 날은 새로 점검하고, 이미 빨간 표시가 있던 날도 다시 점검합니다(교체로 풀렸으면 지움).
+ * [무시]로 지운 날은 다시 바꾸지 않는 한 표시하지 않습니다.
+ */
+function afterChange(R, days){
+  R.unfilled = []; for (let i = 1; i <= R.cal.N; i++) if (R.duty[i] < 0) R.unfilled.push(i);
+  days.forEach(d => R.edited.add(d));
+  if (!R.flags) R.flags = new Set();
+  new Set([...days, ...R.flags]).forEach(d => {
+    const bad = R.duty[d] >= 0 && ruleViolations(R, d, R.duty[d], R.assist[d]).length > 0;
+    bad ? R.flags.add(d) : R.flags.delete(d);
+  });
+  R.dfi = Engine.computeDFI(R.cfg, R.cal, R.duty, R.assist);
+  invalidate(R);
+}
+/** d1과 d2의 배정을 맞바꿉니다. 레벨 4의 백업은 그 사람과 함께 옮깁니다. */
+function swapDays(d1, d2){
+  const R = state.result; if (!R || d1 === d2) return;
+  const snap = snapshot(R);
+  [R.duty[d1], R.duty[d2]] = [R.duty[d2], R.duty[d1]];
+  [R.assist[d1], R.assist[d2]] = [R.assist[d2], R.assist[d1]];
+  afterChange(R, [d1, d2]);
+  renderResults();
+  const bad = [d1, d2].filter(d => R.flags.has(d));
+  if (bad.length) toast(t('규칙에 어긋나는 날을 빨간 테두리로 표시했습니다: {days}일. 마우스를 올리면 이유가 보이고, [무시]를 누르면 표시가 사라집니다.', { days: bad.join(', ') }));
+  const before = snap.dfi.total.toFixed(1), after = R.dfi.total.toFixed(1);
+  showUndo(() => t('{a}일 ↔ {b}일 맞바꿈 · DFI {x} → {y}', { a: d1, b: d2, x: before, y: after }), () => {
+    Object.assign(R, snap); invalidate(R); renderResults(); toast(t('{a}일 ↔ {b}일 맞바꿈을 취소했습니다.', { a: d1, b: d2 }));
+  });
+}
+/* [무시]: 그 날의 빨간 표시만 지웁니다(배정은 그대로). */
+$('#cal').addEventListener('click', e => {
+  const b = e.target.closest('[data-ignore]'); if (!b) return;
+  e.stopPropagation();
+  const R = state.result; R.flags && R.flags.delete(+b.dataset.ignore); renderCalendar(R);
+}, true);
+
+/*
+ * 이름 끌어 놓기 (포인터 이벤트: 마우스·터치·펜 공용, HTML5 드래그는 휴대폰에서 동작하지 않아 쓰지 않음)
+ *  - 마우스: 이름을 누른 채 5px 이상 움직이면 끌기 시작
+ *  - 터치: 이름을 0.35초 길게 누르면 끌기 시작(그 전에 움직이면 평소처럼 화면 스크롤)
+ *  - 다른 날 칸 위에서 놓으면 두 날의 배정을 맞바꿈. 칸 밖에서 놓거나 Esc를 누르면 취소
+ *  - 끌기 뒤에 따라오는 클릭(이름 강조)은 한 번 무시
+ */
+const dnd = { st: null };
+function dndCellAt(x, y){
+  const el = document.elementFromPoint(x, y);
+  const c = el && el.closest('#cal .cell[data-day]');
+  return c ? +c.dataset.day : 0;
+}
+function dndStart(){
+  const s = dnd.st; s.on = true;
+  document.body.classList.add('dnd-on'); hideTip();
+  const g = document.createElement('div'); g.className = 'dnd-ghost'; g.textContent = s.name; document.body.appendChild(g); s.ghost = g;
+  const src = $(`#cal .cell[data-day="${s.from}"]`); src && src.classList.add('drag-src');
+  if (navigator.vibrate && s.touch) try { navigator.vibrate(15); } catch(e){}
+  dndMove(s.x, s.y);
+}
+function dndMove(x, y){
+  const s = dnd.st; s.x = x; s.y = y; if (!s.on) return;
+  s.ghost.style.left = x + 'px'; s.ghost.style.top = y + 'px';
+  const d = dndCellAt(x, y), to = d && d !== s.from ? d : 0;
+  if (to !== s.over){
+    $$('#cal .drop-target').forEach(c => c.classList.remove('drop-target'));
+    if (to){ const c = $(`#cal .cell[data-day="${to}"]`); c && c.classList.add('drop-target'); }
+    s.over = to;
+  }
+}
+function dndEnd(drop){
+  const s = dnd.st; dnd.st = null; if (!s) return;
+  clearTimeout(s.timer);
+  if (!s.on) return;
+  s.ghost.remove(); document.body.classList.remove('dnd-on');
+  $$('#cal .drop-target, #cal .drag-src').forEach(c => c.classList.remove('drop-target', 'drag-src'));
+  dnd.suppressClick = true; setTimeout(() => { dnd.suppressClick = false; }, 0);
+  if (drop && s.over) swapDays(s.from, s.over);
+}
+$('#cal').addEventListener('pointerdown', e => {
+  const nm = e.target.closest('.duty-name'); if (!nm || e.button > 0 || !state.result) return;
+  const cell = nm.closest('.cell[data-day]'); if (!cell) return;
+  const touch = e.pointerType !== 'mouse';
+  dnd.st = { from: +cell.dataset.day, name: nm.textContent, x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, touch, on: false, over: 0 };
+  if (touch) dnd.st.timer = setTimeout(() => { if (dnd.st && !dnd.st.on) dndStart(); }, 350);
+});
+document.addEventListener('pointermove', e => {
+  const s = dnd.st; if (!s) return;
+  if (!s.on){
+    const dist = Math.hypot(e.clientX - s.x0, e.clientY - s.y0);
+    if (s.touch){ if (dist > 8) dndEnd(false); return; }   // 길게 누르기 전에 움직임 → 스크롤로 보고 취소
+    if (dist < 5) return;
+    s.x = e.clientX; s.y = e.clientY; dndStart(); return;
+  }
+  e.preventDefault(); dndMove(e.clientX, e.clientY);
+});
+document.addEventListener('pointerup', e => { if (dnd.st){ if (dnd.st.on) dndMove(e.clientX, e.clientY); dndEnd(true); } });
+document.addEventListener('pointercancel', () => dndEnd(false));
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && dnd.st && dnd.st.on) dndEnd(false); });
+// 끌기 중 터치 스크롤 막기 (passive:false 필요)
+document.addEventListener('touchmove', e => { if (dnd.st && dnd.st.on) e.preventDefault(); }, { passive: false });
+// 길게 누를 때 뜨는 휴대폰 메뉴(복사 등) 막기
+$('#cal').addEventListener('contextmenu', e => { if (e.target.closest('.duty-name')) e.preventDefault(); });
+// 끌기 직후의 클릭은 강조로 처리하지 않음
+$('#cal').addEventListener('click', e => { if (dnd.suppressClick){ e.stopPropagation(); e.preventDefault(); } }, true);
 
 /* ─────────────────────────── §15 알림 모달 ─────────────────────────── */
 function showUnfilled(){
