@@ -1,4 +1,4 @@
-# Duty Roster Generator (Duty Fairness Index)
+# <img src="assets/favicon.svg" width="40" height="40" alt="" align="absmiddle"> Duty Roster Generator (Duty Fairness Index)
 
 **English** · [한국어](README.ko.md)
 
@@ -96,7 +96,7 @@ Download `index.html` and open it in a browser. Nothing to install.
 | `index.html` | The whole app (UI, scheduling engine, DFI, storage, printing, translations) |
 | `tests/ui-qa.js` | UI test suite (25 categories, 148 checks, including all languages) |
 | `README.ko.md` | Korean README |
-| `assets/` | Screenshots, link-preview image, promo videos (20 s, landscape and vertical), GIF preview and 30-second guide videos (English, Korean) |
+| `assets/` | App icon (`favicon.svg`, `favicon-32.png`, `apple-touch-icon.png`), screenshots, link-preview image, promo videos (20 s, landscape and vertical), GIF preview and 30-second guide videos (English, Korean) |
 | `promo/` | Source for the promo and guide videos (screen capture, motion graphics, renderer) |
 | `.nojekyll` | Tells GitHub Pages to serve files as they are |
 

@@ -1,4 +1,4 @@
-# 당직배정 웹앱 (Duty Fairness Index)
+# <img src="assets/favicon.svg" width="40" height="40" alt="" align="absmiddle"> 당직배정 웹앱 (Duty Fairness Index)
 
 [English](README.md) · **한국어**
 
@@ -109,7 +109,7 @@
 | `tests/ui-qa.js` | 인터페이스 오류 탐색 테스트 (25개 범주 148개 항목, 다국어 포함) |
 | `README.md` | 영어 안내 (저장소 첫 화면) |
 | `README.ko.md` | 한국어 안내 (이 문서) |
-| `assets/` | 화면 캡처, 링크 미리보기 이미지(`og-image.png`, 1200×630), 20초 소개 영상(가로 `promo-20s.mp4`, 세로 `promo-shorts-20s.mp4`)과 미리보기 GIF, 30초 사용법 영상(`guide-ko-30s.mp4`, `guide-en-30s.mp4`) |
+| `assets/` | 앱 아이콘(`favicon.svg`, `favicon-32.png`, `apple-touch-icon.png`), 화면 캡처, 링크 미리보기 이미지(`og-image.png`, 1200×630), 20초 소개 영상(가로 `promo-20s.mp4`, 세로 `promo-shorts-20s.mp4`)과 미리보기 GIF, 30초 사용법 영상(`guide-ko-30s.mp4`, `guide-en-30s.mp4`) |
 | `promo/` | 소개·사용법 영상 제작 소스 (화면 캡처·모션그래픽·렌더링 스크립트) |
 | `.nojekyll` | GitHub Pages가 파일을 그대로 배포하도록 설정 |
 
